@@ -75,7 +75,7 @@ pbcopy < ~/.ssh/id_ed25519.pub
 ```
 
 3. Go to GitHub → Settings → SSH and GPG Keys → New SSH Key. Paste and save.
-4. Test: `ssh -T ``git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
+4. Test: `ssh -T ````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
 
 ---
 
@@ -198,9 +198,11 @@ source .venv/bin/activate
 ## Step 11 — Install Backend Dependencies
 
 ```bash
-pip install django djangorestframework djangorestframework-simplejwt django-cors-headers django-filter psycopg2-binary reportlab pillow gunicorn python-decouple pytest-django factory-boy
+pip install django djangorestframework djangorestframework-simplejwt django-cors-headers django-filter psycopg2-binary reportlab pillow gunicorn python-decouple pytest-django factory-boy pytest-cov freezegun
 pip freeze > requirements.txt
 ```
+
+`pytest-cov` generates test coverage reports. `freezegun` lets you freeze or mock the current datetime in tests — useful for document number generation and timestamp fields.
 
 ---
 
@@ -211,6 +213,41 @@ source .venv/bin/activate
 django-admin startproject tradetocs .
 mkdir apps
 ```
+
+---
+
+## Step 12b — Configure pytest
+
+Create `pytest.ini` in the project root:
+
+```ini
+[pytest]
+DJANGO_SETTINGS_MODULE = tradetocs.settings
+python_files = tests/*.py
+python_classes = Test*
+python_functions = test_*
+addopts = -v --tb=short
+```
+
+Verify pytest finds your project (it will find 0 tests for now — that is correct):
+
+```bash
+source .venv/bin/activate
+pytest --collect-only
+```
+
+You should see `no tests ran`. That confirms pytest is wired to Django correctly. As you build each app, its tests will appear here automatically.
+
+**How tests are organised:** Each app gets its own `tests/` directory. When you build `apps/accounts/`, you will also create:
+
+```
+apps/accounts/tests/__init__.py
+apps/accounts/tests/factories.py   ← factory-boy factories for creating test data
+apps/accounts/tests/test_models.py ← model validation tests
+apps/accounts/tests/test_views.py  ← API endpoint tests
+```
+
+Claude will create these files as part of each feature, alongside the feature code.
 
 ---
 
@@ -427,6 +464,15 @@ Frontend pages live under `frontend/src/pages/`.
 - Packing List: `PL-YYYY-NNNN`
 - Commercial Invoice: `CI-YYYY-NNNN`
 
+## Testing Rules
+- Every app has a `tests/` directory with `__init__.py`, `factories.py`, `test_models.py`, and `test_views.py`.
+- Every model must have a factory in `tests/factories.py` using factory-boy.
+- Every API endpoint must have at minimum: one happy-path test and one permission-denial test.
+- Run tests with `pytest`, never `python manage.py test`.
+- All tests must pass before any `git commit`. Run `pytest` and confirm 0 failures before committing.
+- Use `pytest --cov=apps/{app} --cov-report=term-missing` to check coverage after completing a feature.
+- Factories must use `SubFactory` for related models — never hardcode IDs in tests.
+
 ## Current Status
 Project is bootstrapped. No feature code written yet.
 ```
@@ -565,19 +611,44 @@ Then wait for my confirmation before writing anything.
 
 ### Skill 4: `/verify`
 
-Use this after writing any backend feature to confirm it actually works.
+Use this after writing any backend feature to confirm it actually works. It covers both automated tests and manual checks.
 
 Create `~/.claude/commands/verify.md`:
 
 ```markdown
-I just implemented a feature. Help me verify it works without running automated tests.
+I just implemented a feature. Help me verify it works.
 
-1. Tell me what `curl` commands or browser URLs I should hit to confirm each endpoint works.
-2. Tell me what database query I can run (via the postgres MCP) to confirm data was saved correctly.
-3. Tell me what visual check to do in the React UI to confirm the feature renders correctly.
-4. List the three most likely things that could be broken based on the code you wrote.
+Step 1 — Automated tests:
+1. Run `pytest apps/{app}/tests/ -v` and show me the output. If any tests fail, diagnose the root cause before suggesting a fix.
+2. Run `pytest apps/{app}/tests/ --cov=apps/{app} --cov-report=term-missing` and identify any untested critical paths.
 
-Give me a simple checklist I can run through manually.
+Step 2 — Manual spot-check:
+3. Tell me what `curl` commands or browser URLs I should hit to confirm each endpoint works end-to-end.
+4. Tell me what database query I can run (via the postgres MCP) to confirm data was saved correctly.
+5. Tell me what visual check to do in the React UI to confirm the feature renders correctly.
+6. List the three most likely things that could be broken that the automated tests may not have caught.
+
+Give me a checklist in order: run tests → fix any failures → manual spot-check → confirm done.
+```
+
+### Skill 5: `/write-tests`
+
+Use this after implementing any backend layer to generate the tests for it.
+
+Create `~/.claude/commands/write-tests.md`:
+
+```markdown
+I just implemented a feature. Now write the automated tests for it.
+
+1. Read the feature code I just wrote (I will tell you which files).
+2. Create or update `tests/factories.py` in the app — add a factory-boy factory for every new model, using SubFactory for any related models.
+3. Write `tests/test_models.py` — test any model validation, custom save logic, or property methods.
+4. Write `tests/test_views.py` — for each API endpoint, write:
+   - One happy-path test (correct role, correct data → expected response)
+   - One permission-denial test (wrong role → 403 or unauthenticated → 401)
+   - One validation test (missing required field → 400 with an error message)
+5. Show me only the test files. Do not touch any other file.
+6. After writing the tests, tell me the exact command to run them.
 ```
 
 ---
@@ -618,11 +689,13 @@ Create a Git branch for the feature
     ↓
 Run /feature-plan → review the plan → confirm
     ↓
-Implement in layers: Model → Migration → Serializer → View → URL → Frontend
+Implement in layers: Model → Migration → Serializer → View → URL
     ↓
-Run /verify → manually check each layer works
+Run /write-tests → run pytest → fix any failures
     ↓
-Commit working code
+Run /verify → manual spot-check (curl, postgres MCP, browser)
+    ↓
+Commit working code (tests must pass)
     ↓
 Session End → run /session-end → update MEMORY.md
     ↓
@@ -705,7 +778,7 @@ Only say "go ahead" when the plan looks correct.
 
 This is the most important mental model for working with Claude Code on a full-stack project. **Build one layer at a time, verify it works, then move to the next.**
 
-### The 6 Layers of a Backend Feature
+### The 7 Layers of a Backend Feature
 
 ```
 Layer 1: Model          — The database table (apps/{app}/models.py)
@@ -713,8 +786,11 @@ Layer 2: Migration      — The SQL change (python manage.py makemigrations)
 Layer 3: Serializer     — The API shape (apps/{app}/serializers.py)
 Layer 4: View           — The endpoint logic (apps/{app}/views.py)
 Layer 5: URL            — Wire it up (apps/{app}/urls.py → tradetocs/urls.py)
-Layer 6: Manual test    — Hit the endpoint with curl or a browser
+Layer 6: Tests          — Automated tests (apps/{app}/tests/)
+Layer 7: Manual check   — Hit the endpoint with curl or a browser to confirm end-to-end
 ```
+
+Write Layer 6 (tests) before doing the manual Layer 7 check. If tests pass, the manual check is a quick sanity check, not a full investigation.
 
 ### The 4 Layers of a Frontend Feature
 
@@ -765,17 +841,61 @@ Use the URL structure from technical_architecture.md Section 5.
 Show me only the urls.py changes.
 ```
 
+**Layer 6 (Tests):**
+```
+/write-tests
+
+The feature I just implemented is the Organisation CRUD (master_data app).
+Files written: apps/master_data/models.py, serializers.py, views.py, urls.py.
+
+Write:
+- apps/master_data/tests/factories.py — OrganisationFactory with SubFactory for related models
+- apps/master_data/tests/test_models.py — test is_active default, address FK, any custom validation
+- apps/master_data/tests/test_views.py — for each endpoint:
+    • Maker can list (GET 200), cannot create (POST 403)
+    • Checker can create (POST 201), can edit (PATCH 200)
+    • Unauthenticated gets 401
+
+Show me only the test files. Then tell me the exact pytest command to run them.
+```
+
+After Claude writes the tests, run them:
+
+```bash
+source .venv/bin/activate
+pytest apps/master_data/tests/ -v
+```
+
+If any tests fail, paste the full failure output to Claude and say: *"Diagnose the root cause. Do not write any fix yet."*
+
 ---
 
-## Step 29 — Verify Each Layer Before Moving On
+## Step 29 — Test and Verify Each Layer Before Moving On
 
-After each layer, run:
+After completing Layers 1–5 for a feature, do this in order:
 
+**Step A — Write and run the tests (Layer 6):**
+
+Use the `/write-tests` skill (see Step 28) to have Claude write the test files. Then run:
+
+```bash
+source .venv/bin/activate
+pytest apps/{app}/tests/ -v
 ```
-/verify
+
+All tests must pass before you move on. If something fails, diagnose it — do not skip it or comment it out.
+
+**Step B — Check coverage:**
+
+```bash
+pytest apps/{app}/tests/ --cov=apps/{app} --cov-report=term-missing
 ```
 
-Or be specific:
+Look at the "Miss" column. If any critical code path (a view handler, a permission check) is uncovered, ask Claude to add a test for it.
+
+**Step C — Manual spot-check (Layer 7):**
+
+Run `/verify` or be specific:
 
 ```
 I just wrote the Organisation model and ran migrations.
@@ -785,7 +905,7 @@ Using the postgres MCP, check the database and confirm:
 3. The organisations_organisationaddress table exists with the correct foreign key
 ```
 
-This is your replacement for automated tests. Instead of writing test code, you are directly confirming the output.
+Manual checks catch things tests miss — visual layout, edge cases in the UI, end-to-end data flow across apps.
 
 ---
 
@@ -814,7 +934,13 @@ Wait for the diagnosis. Confirm it makes sense. Then ask for the fix.
 
 ## Step 31 — Workflow Checklist Before Committing
 
-Before committing any document-related code, verify manually:
+Before committing any document-related code, verify all of the following:
+
+**Tests (run this first — do not commit with failing tests):**
+- [ ] `pytest` passes with 0 failures
+- [ ] A happy-path test exists for each new endpoint
+- [ ] A permission-denial test exists for each new endpoint (wrong role → 403, unauthenticated → 401)
+- [ ] `pytest --cov=apps/{app}` shows no untested critical paths (view handlers, permission logic)
 
 **Status transitions:**
 - [ ] `status` is only ever assigned inside `apps/workflow/services.py`
@@ -882,6 +1008,8 @@ git branch -d feature/fr-04-organisation-master-data
 
 Each layer depends on the one before it. Do not start Layer 2 before Layer 1 is merged to main.
 
+**Testing rule for all sessions:** After implementing a feature's backend layers, use `/write-tests` to generate the tests before moving to the next feature. Every session ends with `pytest` passing with 0 failures. Do not carry failing tests into the next session.
+
 ---
 
 ## Layer 1 — Foundation (no dependencies; build these first)
@@ -900,11 +1028,11 @@ These are the tables and pages everything else depends on. Build them before tou
 | 8 | All Master Data pages in React (Organisation, Bank, Reference Data, T&C Templates) | FR-04–07 | `feature/master-data-pages` |
 
 **How to break Layer 1 into sessions:**
-- Session 1: accounts app (User model + JWT auth). Stop. Verify login works.
-- Session 2: Country, Port, Location, Incoterm, UOM, PaymentTerm, PreCarriageBy models + their API endpoints.
-- Session 3: Organisation model with all four sub-sections (FR-04.1–04.4). This is the most complex master data model. Give it a full session.
-- Session 4: Bank model + API.
-- Session 5: T&C Template model + API.
+- Session 1: accounts app (User model + JWT auth). Write tests: login returns a token, wrong password returns 401, Maker cannot access admin endpoints. Stop. Confirm `pytest` passes.
+- Session 2: Country, Port, Location, Incoterm, UOM, PaymentTerm, PreCarriageBy models + their API endpoints. Write tests: list endpoints return 200, unauthenticated gets 401. Confirm `pytest` passes.
+- Session 3: Organisation model with all four sub-sections (FR-04.1–04.4). Write tests: factory for Organisation + Address, permission tests for Maker vs Checker. This is the most complex master data model. Give it a full session.
+- Session 4: Bank model + API. Write tests. Confirm `pytest` passes.
+- Session 5: T&C Template model + API. Write tests. Confirm `pytest` passes.
 - Session 6: React pages for all master data (this is mostly CRUD forms — ask Claude to generate them one at a time).
 
 ---
@@ -920,9 +1048,9 @@ These are the tables and pages everything else depends on. Build them before tou
 | 13 | Proforma Invoice list, create, and detail pages (React) | FR-09 | `feature/fr-09-pi-pages` |
 
 **How to break Layer 2 into sessions:**
-- Session 1: PI model only. Run migration. Verify table in DB via postgres MCP.
-- Session 2: WorkflowService for PI states (DRAFT → PENDING_APPROVAL → APPROVED → REWORK → PERMANENTLY_REJECTED). This is critical logic — spend a full session on it.
-- Session 3: PI API endpoints (create, update, list, detail). Verify with curl.
+- Session 1: PI model only. Run migration. Write model tests (field defaults, number format). Verify table in DB via postgres MCP.
+- Session 2: WorkflowService for PI states (DRAFT → PENDING_APPROVAL → APPROVED → REWORK → PERMANENTLY_REJECTED). Write tests for every valid and invalid transition — e.g., APPROVED cannot go back to DRAFT, REJECT without a comment must raise an error. This is critical logic — spend a full session on it. Confirm `pytest` passes before moving on.
+- Session 3: PI API endpoints (create, update, list, detail). Write permission tests (Maker cannot approve, unauthenticated gets 401). Verify with curl.
 - Session 4: PI PDF layout in ReportLab. Generate a test PDF and open it.
 - Session 5: React list and create pages.
 - Session 6: React detail page (line items, workflow actions, PDF download).
@@ -990,6 +1118,21 @@ Implement Layer [N] only: [what the layer is, e.g., "the Django model for Packin
 Reference requirements.md section [X] for exact fields.
 Apply these constraints from technical_architecture.md Section 9: [list the relevant constraint numbers].
 Show me only [the specific file]. Do not touch any other file.
+```
+
+---
+
+### Write tests for a feature
+
+```
+/write-tests
+
+Feature just implemented: [feature name, e.g., "Packing List CRUD"]
+App: apps/[app_name]/
+Files written: [list the files you just wrote]
+
+Write the full test suite: factories.py, test_models.py, test_views.py.
+Cover: happy path, permission denial (wrong role → 403), unauthenticated (401), and validation errors (400).
 ```
 
 ---
@@ -1113,14 +1256,14 @@ Use anchored corrections — point to the specific document and rule:
 | **Claude Code Power Setup** | 19 | Create `~/.claude/CLAUDE.md` (global rules) |
 |  | 20 | Create `CLAUDE.md` in project root (TradeDocs rules) |
 |  | 21 | Install PostgreSQL and Filesystem MCP servers |
-|  | 22 | Create `/session-start`, `/session-end`, `/feature-plan`, `/verify` skills |
+|  | 22 | Create `/session-start`, `/session-end`, `/feature-plan`, `/verify`, `/write-tests` skills |
 |  | 23 | Understand Plan Mode and Agent Mode |
 | **Development Loop** | 24 | Run `/session-start` — confirm active task |
 |  | 25 | Start Docker, Django, React |
 |  | 26 | Create feature branch |
 |  | 27 | Run `/feature-plan` — review and confirm before coding |
-|  | 28 | Implement one layer at a time (model → migration → serializer → view → URL → frontend) |
-|  | 29 | Run `/verify` after each layer |
+|  | 28 | Implement one layer at a time (model → migration → serializer → view → URL → tests → manual check) |
+|  | 29 | Run `/write-tests` after Layer 5, then `pytest`, then `/verify` for manual spot-check |
 |  | 30 | Handle errors with full error paste + diagnosis-first approach |
 |  | 31 | Run workflow checklist before committing |
 |  | 32 | Commit and push |
