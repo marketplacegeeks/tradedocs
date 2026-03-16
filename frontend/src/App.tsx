@@ -1,14 +1,86 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import OrganisationListPage from './pages/master-data/OrganisationListPage'
-import OrganisationFormPage from './pages/master-data/OrganisationFormPage'
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import LoginPage from "./pages/auth/LoginPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import OrganisationListPage from "./pages/master-data/OrganisationListPage";
+import OrganisationFormPage from "./pages/master-data/OrganisationFormPage";
+import BankListPage from "./pages/master-data/BankListPage";
+import BankFormPage from "./pages/master-data/BankFormPage";
+
+import ProtectedRoute from "./components/ProtectedRoute";
+import AppLayout from "./components/AppLayout";
+import { ROLES } from "./utils/constants";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/master-data/organisations" replace />} />
-      <Route path="/master-data/organisations" element={<OrganisationListPage />} />
-      <Route path="/master-data/organisations/new" element={<OrganisationFormPage />} />
-      <Route path="/master-data/organisations/:id/edit" element={<OrganisationFormPage />} />
+      {/* Public route — accessible without login */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* All routes below require authentication and render inside the sidebar layout */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+
+        {/* Master data — Checker and Company Admin only */}
+        <Route
+          path="/master-data/organisations"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <OrganisationListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/organisations/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <OrganisationFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/organisations/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <OrganisationFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/banks"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <BankListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/banks/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <BankFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/banks/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <BankFormPage />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
+
+      {/* Catch-all: redirect unknown URLs to dashboard */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
-  )
+  );
 }
