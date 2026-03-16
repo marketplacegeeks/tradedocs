@@ -1,8 +1,13 @@
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
+
 from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyAdminFactory
-from .factories import CountryFactory, PortFactory, IncotermFactory, UOMFactory, PaymentTermFactory, PreCarriageByFactory, LocationFactory
+from .factories import (
+    CountryFactory, IncotermFactory, LocationFactory, OrganisationAddressFactory,
+    OrganisationFactory, OrganisationTagFactory, PortFactory, PaymentTermFactory,
+    PreCarriageByFactory, UOMFactory,
+)
 
 
 @pytest.fixture
@@ -199,3 +204,218 @@ class TestPreCarriageByEndpoints:
 
     def test_unauthenticated_cannot_list(self, api_client):
         assert api_client.get(reverse("precarriageby-list")).status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Organisation endpoints (FR-04)
+# ---------------------------------------------------------------------------
+
+def _org_payload(country_id):
+    """Minimal valid Organisation payload for POST/PUT tests."""
+    return {
+        "name": "Sunrise Exports Pvt Ltd",
+        "iec_code": None,
+        "tags": [{"tag": "CONSIGNEE"}],
+        "addresses": [
+            {
+                "address_type": "REGISTERED",
+                "line1": "123 Marine Drive",
+                "city": "Mumbai",
+                "country": country_id,
+                "email": "contact@sunrise.com",
+                "contact_name": "Raj Mehta",
+                "phone_country_code": "",
+                "phone_number": "",
+            }
+        ],
+        "tax_codes": [],
+    }
+
+
+@pytest.mark.django_db
+class TestOrganisationEndpoints:
+    # Test 9: A Maker (any logged-in user) can view the list of organisations.
+    def test_maker_can_list_organisations(self):
+        OrganisationFactory.create_batch(2)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("organisation-list"))
+        assert response.status_code == 200
+        assert len(response.data) >= 2
+
+    # Test 10: Someone who is not logged in at all cannot access the organisation list.
+    def test_unauthenticated_cannot_list(self, api_client):
+        response = api_client.get(reverse("organisation-list"))
+        assert response.status_code == 401
+
+    # Test 11: A Maker does not have permission to create an organisation.
+    def test_maker_cannot_create_organisation(self):
+        country = CountryFactory()
+        client = auth_client(MakerFactory())
+        response = client.post(
+            reverse("organisation-list"), _org_payload(country.id), format="json"
+        )
+        assert response.status_code == 403
+
+    # Test 12: A Checker can create a complete and valid organisation.
+    def test_checker_can_create_organisation(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-list"), _org_payload(country.id), format="json"
+        )
+        assert response.status_code == 201
+        assert response.data["name"] == "Sunrise Exports Pvt Ltd"
+
+    # Test 13: Trying to create an organisation with no tags is rejected with a clear error.
+    def test_create_without_tags_returns_validation_error(self):
+        country = CountryFactory()
+        payload = _org_payload(country.id)
+        payload["tags"] = []
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "tags" in response.data
+
+    # Test 14: Trying to create an organisation with no addresses is rejected with a clear error.
+    def test_create_without_addresses_returns_validation_error(self):
+        country = CountryFactory()
+        payload = _org_payload(country.id)
+        payload["addresses"] = []
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "addresses" in response.data
+
+    # Test 15: An Exporter-tagged organisation requires an IEC code — omitting it is rejected.
+    def test_exporter_without_iec_code_returns_validation_error(self):
+        country = CountryFactory()
+        payload = _org_payload(country.id)
+        payload["tags"] = [{"tag": "EXPORTER"}]
+        payload["iec_code"] = None
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "iec_code" in response.data
+
+    # Test 16: An Exporter-tagged organisation with a valid IEC code is created successfully.
+    def test_exporter_with_valid_iec_code_succeeds(self):
+        country = CountryFactory()
+        payload = _org_payload(country.id)
+        payload["tags"] = [{"tag": "EXPORTER"}]
+        payload["iec_code"] = "AABCD1234E"
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 201
+        assert response.data["iec_code"] == "AABCD1234E"
+
+    # Test 17: Calling DELETE on an organisation returns 405 (organisations cannot be deleted).
+    def test_delete_organisation_returns_405(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        OrganisationTagFactory(organisation=org, tag="CONSIGNEE")
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("organisation-detail", args=[org.id]))
+        assert response.status_code == 405
+
+    # Test 18: A Checker can deactivate an organisation by patching is_active to false.
+    def test_checker_can_deactivate_organisation(self):
+        org = OrganisationFactory(is_active=True)
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-detail", args=[org.id]),
+            {"is_active": False},
+            format="json",
+        )
+        assert response.status_code == 200
+        org.refresh_from_db()
+        assert org.is_active is False
+
+    # Test 19: A deactivated organisation does not appear in the default list (only active shown).
+    def test_inactive_org_hidden_from_default_list(self):
+        active_org = OrganisationFactory(is_active=True)
+        inactive_org = OrganisationFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("organisation-list"))
+        ids_returned = [item["id"] for item in response.data]
+        assert active_org.id in ids_returned
+        assert inactive_org.id not in ids_returned
+
+    # Test 20: Filtering by ?tag=EXPORTER returns only organisations tagged as Exporter.
+    def test_filter_by_tag_returns_matching_organisations(self):
+        exporter = OrganisationFactory(name="Export Co")
+        OrganisationTagFactory(organisation=exporter, tag="EXPORTER")
+        consignee = OrganisationFactory(name="Consignee Co")
+        OrganisationTagFactory(organisation=consignee, tag="CONSIGNEE")
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("organisation-list") + "?tag=EXPORTER")
+        names_returned = [item["name"] for item in response.data]
+        assert "Export Co" in names_returned
+        assert "Consignee Co" not in names_returned
+
+
+@pytest.mark.django_db
+class TestOrganisationAddressEndpoints:
+    # Test 21: A Checker can add a new address to an organisation that already has one.
+    def test_checker_can_add_address(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Office Contact",
+                "phone_country_code": "",
+                "phone_number": "",
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+
+    # Test 22: A Maker cannot add an address to an organisation (write is restricted).
+    def test_maker_cannot_add_address(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(MakerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Office Contact",
+                "phone_country_code": "",
+                "phone_number": "",
+            },
+            format="json",
+        )
+        assert response.status_code == 403
+
+    # Test 23: Deleting one of two addresses succeeds — there's still one left.
+    def test_can_delete_address_when_another_exists(self):
+        org = OrganisationFactory()
+        address1 = OrganisationAddressFactory(organisation=org)
+        address2 = OrganisationAddressFactory(organisation=org)
+        client = auth_client(CheckerFactory())
+        response = client.delete(
+            reverse("organisation-address-detail", args=[org.id, address1.id])
+        )
+        assert response.status_code == 204
+
+    # Test 24: Deleting the only address is blocked — every organisation must keep at least one.
+    def test_cannot_delete_last_address(self):
+        org = OrganisationFactory()
+        address = OrganisationAddressFactory(organisation=org)
+        client = auth_client(CheckerFactory())
+        response = client.delete(
+            reverse("organisation-address-detail", args=[org.id, address.id])
+        )
+        assert response.status_code == 400

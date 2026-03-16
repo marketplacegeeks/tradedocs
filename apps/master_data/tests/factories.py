@@ -1,5 +1,8 @@
 import factory
-from apps.master_data.models import Country, Incoterm, Location, Port, PaymentTerm, PreCarriageBy, UOM
+from apps.master_data.models import (
+    Country, Incoterm, Location, Organisation, OrganisationAddress,
+    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, UOM,
+)
 
 
 class CountryFactory(factory.django.DjangoModelFactory):
@@ -60,3 +63,44 @@ class PreCarriageByFactory(factory.django.DjangoModelFactory):
         model = PreCarriageBy
 
     name = factory.Sequence(lambda n: f"Carrier {n}")
+
+
+class OrganisationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Organisation
+
+    name = factory.Sequence(lambda n: f"Organisation {n}")
+    iec_code = None
+    is_active = True
+
+
+class OrganisationAddressFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = OrganisationAddress
+
+    organisation = factory.SubFactory(OrganisationFactory)
+    address_type = OrganisationAddress.AddressType.REGISTERED
+    line1 = factory.Sequence(lambda n: f"{n} Test Street")
+    city = "Mumbai"
+    country = factory.SubFactory(CountryFactory)
+    email = factory.Sequence(lambda n: f"contact{n}@example.com")
+    contact_name = factory.Sequence(lambda n: f"Contact Person {n}")
+    phone_country_code = ""
+    phone_number = ""
+
+
+class OrganisationTagFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = OrganisationTag
+
+    organisation = factory.SubFactory(OrganisationFactory)
+    tag = OrganisationTag.Tag.EXPORTER
+
+
+class OrganisationTaxCodeFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = OrganisationTaxCode
+
+    organisation = factory.SubFactory(OrganisationFactory)
+    tax_type = "GSTIN"
+    tax_code = "22AAAAA0000A1Z5"

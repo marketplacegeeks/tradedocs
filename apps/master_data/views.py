@@ -1,10 +1,13 @@
-from rest_framework import viewsets
+from rest_framework import serializers, status, viewsets
+from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from rest_framework.permissions import SAFE_METHODS
+from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAnyRole, IsCheckerOrAdmin
-from .models import Country, Incoterm, Location, Port, PaymentTerm, PreCarriageBy, UOM
+from .models import Country, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, UOM
 from .serializers import (
     CountrySerializer, IncotermSerializer, LocationSerializer,
+    OrganisationAddressSerializer, OrganisationSerializer,
     PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, UOMSerializer,
 )
 
@@ -62,3 +65,85 @@ class PreCarriageByViewSet(ReferenceDataViewSet):
     permission_classes = [IsAnyRole]
     queryset = PreCarriageBy.objects.all()
     serializer_class = PreCarriageBySerializer
+
+
+# ---------------------------------------------------------------------------
+# Organisation views (FR-04)
+# ---------------------------------------------------------------------------
+
+class OrganisationViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for organisations.
+    Read: any authenticated user (needed so Makers can populate document dropdowns).
+    Write: Checker or Company Admin only.
+    DELETE is blocked — organisations are deactivated via PATCH {is_active: false}.
+    """
+    serializer_class = OrganisationSerializer
+    permission_classes = [IsAnyRole]  # overridden per method in get_permissions()
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAnyRole()]
+        return [IsCheckerOrAdmin()]
+
+    def get_queryset(self):
+        queryset = Organisation.objects.prefetch_related(
+            "addresses__country", "tags", "tax_codes"
+        )
+
+        # By default show only active organisations; pass ?is_active=false to see inactive.
+        is_active_param = self.request.query_params.get("is_active")
+        if is_active_param is not None:
+            queryset = queryset.filter(is_active=is_active_param.lower() == "true")
+        else:
+            queryset = queryset.filter(is_active=True)
+
+        # Allow filtering by tag so document forms can request e.g. ?tag=EXPORTER.
+        tag = self.request.query_params.get("tag")
+        if tag:
+            queryset = queryset.filter(tags__tag=tag.upper())
+
+        return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        # Constraint #8: organisations must never be hard-deleted.
+        raise MethodNotAllowed(
+            "DELETE",
+            detail="Organisations cannot be deleted. Set is_active=false to deactivate."
+        )
+
+
+class OrganisationAddressViewSet(viewsets.ModelViewSet):
+    """
+    Manages addresses for a single organisation (/organisations/{org_id}/addresses/).
+    Read: any authenticated user.
+    Write: Checker or Company Admin only.
+    DELETE is allowed but blocked if it would remove the last address.
+    """
+    serializer_class = OrganisationAddressSerializer
+    permission_classes = [IsAnyRole]  # overridden per method in get_permissions()
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAnyRole()]
+        return [IsCheckerOrAdmin()]
+
+    def get_queryset(self):
+        # Scope all queries to the parent organisation from the URL.
+        return OrganisationAddress.objects.filter(
+            organisation_id=self.kwargs["organisation_pk"]
+        ).select_related("country")
+
+    def perform_create(self, serializer):
+        organisation = Organisation.objects.get(pk=self.kwargs["organisation_pk"])
+        serializer.save(organisation=organisation)
+
+    def destroy(self, request, *args, **kwargs):
+        address = self.get_object()
+        # Prevent removing the last address — every organisation must keep at least one.
+        if address.organisation.addresses.count() <= 1:
+            raise ValidationError(
+                "Cannot delete the only address. An organisation must have at least one address."
+            )
+        address.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

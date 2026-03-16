@@ -35,6 +35,7 @@ TradeDocs is a web application for a single trading house to create, review, app
 | python-decouple | Reads environment variables from a `.env` file cleanly |
 | pytest-django | Testing framework for Django |
 | factory-boy | Creates test data (fake organisations, documents, etc.) for tests |
+| phonenumbers | Validates phone numbers (country code + number) for OrganisationAddress; checks that the combination parses to a real phone number |
 
 ### Frontend
 
@@ -487,39 +488,39 @@ VITE_API_BASE_URL          ← The Django API URL; used by Vite at build time
 
 2. **No new dependencies without updating this file.** If a new library is needed, add it to Section 2 with a plain-English explanation before using it.
 
-3. **Django apps live under ****`apps/`****.** Never create an app at the project root. Import them as `apps.proforma_invoice.models` etc.
+3. **Django apps live under \****`apps/`**\*\*.** Never create an app at the project root. Import them as `apps.proforma_invoice.models` etc.
 
 4. **Migrations must be committed.** Every model change requires a migration file checked in to version control. Never use `--fake` in production.
 
 ### Models
 
-5. **All monetary amounts use ****`DecimalField(max_digits=15, decimal_places=2)`****.** Never use `FloatField` for money.
+5. **All monetary amounts use \****`DecimalField(max_digits=15, decimal_places=2)`**\*\*.** Never use `FloatField` for money.
 
-6. **All weights use ****`DecimalField(max_digits=12, decimal_places=3)`****.** Never use `FloatField` for weights.
+6. **All weights use \****`DecimalField(max_digits=12, decimal_places=3)`**\*\*.** Never use `FloatField` for weights.
 
-7. **All FK references to master data use ****`on_delete=PROTECT`****.** This prevents accidental deletion of an Organisation, Bank, Port, etc. that is referenced by a document.
+7. **All FK references to master data use \****`on_delete=PROTECT`**\*\*.** This prevents accidental deletion of an Organisation, Bank, Port, etc. that is referenced by a document.
 
 8. **Organisation records are never hard-deleted.** Set `is_active=False` instead. The same applies to User records.
 
-9. **`gross_weight`**** on ****`Container`**** is always stored (never computed on-the-fly).** Recompute and save it whenever `net_weight` or `tare_weight` changes, using `Container.save()` override.
+9. **`gross_weight`**** on \****`Container`**\*\* is always stored (never computed on-the-fly).** Recompute and save it whenever `net_weight` or `tare_weight` changes, using `Container.save()` override.
 
-10. **Document status is always a string matching a ****`DocumentStatus`**** enum.** Define this enum in `apps/workflow/constants.py` and import it everywhere. Never hardcode status strings like `"draft"` in view or serializer code.
+10. **Document status is always a string matching a \****`DocumentStatus`**\*\* enum.** Define this enum in `apps/workflow/constants.py` and import it everywhere. Never hardcode status strings like `"draft"` in view or serializer code.
 
 ### Workflow
 
-11. **All status transitions go through ****`WorkflowService`**** in ****`apps/workflow/services.py`****.** Never update a document's `status` field anywhere else — not in serializers, not in signals, not in management commands.
+11. **All status transitions go through \****`WorkflowService`***\* in \****`apps/workflow/services.py`**\*\*.** Never update a document's `status` field anywhere else — not in serializers, not in signals, not in management commands.
 
-12. **`WorkflowService`**** must write an ****`AuditLog`**** entry in the same database transaction as the status update.** Use `transaction.atomic()` wrapping both operations.
+12. **`WorkflowService`**** must write an \****`AuditLog`**\*\* entry in the same database transaction as the status update.** Use `transaction.atomic()` wrapping both operations.
 
-13. **Permanently Rejected cascading is implemented only in ****`WorkflowService.permanently_reject()`****.** Never use a Django signal for cascade logic — signals are invisible and hard to debug.
+13. **Permanently Rejected cascading is implemented only in \****`WorkflowService.permanently_reject()`**\*\*.** Never use a Django signal for cascade logic — signals are invisible and hard to debug.
 
-14. **`Disabled`**** state is valid only for ****`CommercialInvoice`****.** `WorkflowService` must raise a `ValueError` if `DISABLE` action is attempted on a ProformaInvoice or PackingList.
+14. **`Disabled`**** state is valid only for \****`CommercialInvoice`**\*\*.** `WorkflowService` must raise a `ValueError` if `DISABLE` action is attempted on a ProformaInvoice or PackingList.
 
 15. **Mandatory comment enforcement:** `WorkflowService` must block any `REJECT`, `REWORK`, `PERMANENTLY_REJECT`, or `DISABLE` action if the `comment` field is empty. Raise a `ValidationError` with a clear message.
 
 ### Auto-Generated Numbers
 
-16. **PI, PL, and CI numbers are generated inside a ****`select_for_update()`**** [database lock] transaction.** The sequence for each document type is determined by `COUNT(*) + 1` within a locked query. This prevents duplicate numbers if two users save simultaneously. Implement this in `apps/{document_app}/services.py` in a function called `generate_document_number()`.
+16. **PI, PL, and CI numbers are generated inside a \****`select_for_update()`****\*\* [database lock] transaction.**** The sequence for each document type is determined by \`COUNT(*) + 1` within a locked query. This prevents duplicate numbers if two users save simultaneously. Implement this in `apps/{document_app}/services.py` in a function called `generate_document_number()`.
 
 17. **Number formats are fixed:**
   - Proforma Invoice: `PI-YYYY-NNNN` (4-digit, zero-padded)
@@ -530,21 +531,21 @@ VITE_API_BASE_URL          ← The Django API URL; used by Vite at build time
 
 18. **Serializers are state-aware.** For document serializers, fields that are not editable in the current state must be declared `read_only=True` dynamically based on the document's `status`. Do this in `__init__` using `self.fields['field_name'].read_only = True`.
 
-19. **List endpoints must support filtering by ****`status`**** and ****`created_by`**** at minimum.** Use `django-filter` for this — do not write manual `filter()` calls in views.
+19. **List endpoints must support filtering by \****`status`***\* and \****`created_by`**\*\* at minimum.** Use `django-filter` for this — do not write manual `filter()` calls in views.
 
 20. **PDF endpoints stream the file directly from the view.** Use Django's `StreamingHttpResponse` or `FileResponse` with `content_type='application/pdf'`. Never write PDFs to disk and serve them — generate in memory.
 
-21. **The CI wizard's line item aggregation is computed in ****`CommercialInvoiceService.aggregate_line_items(packing_list_id)`****.** This function is called when the Maker reaches Step 3 and its output is stored on the `CommercialInvoiceLineItem` rows at the point of CI creation — not recomputed later.
+21. **The CI wizard's line item aggregation is computed in \****`CommercialInvoiceService.aggregate_line_items(packing_list_id)`**\*\*.** This function is called when the Maker reaches Step 3 and its output is stored on the `CommercialInvoiceLineItem` rows at the point of CI creation — not recomputed later.
 
 ### Frontend
 
-22. **All API calls live in ****`src/api/*.ts`**** files.** Page components and hooks import from these files. No component calls `axios` directly.
+22. **All API calls live in \****\`src/api/*.ts`**** files.** Page components and hooks import from these files. No component calls `axios` directly.
 
-23. **Document status values and role constants in the frontend are imported from ****`src/utils/constants.ts`****.** This file mirrors the backend enums. Never hardcode a status string like `"DRAFT"` in a component.
+23. **Document status values and role constants in the frontend are imported from \****`src/utils/constants.ts`**\*\*.** This file mirrors the backend enums. Never hardcode a status string like `"DRAFT"` in a component.
 
-24. **The ****`WorkflowActionButton`**** component handles all role + status checks for what actions are visible.** It takes `documentStatus`, `userRole`, and `documentType` as props and renders the correct buttons. Do not repeat this logic in individual pages.
+24. **The \****`WorkflowActionButton`**\*\* component handles all role + status checks for what actions are visible.** It takes `documentStatus`, `userRole`, and `documentType` as props and renders the correct buttons. Do not repeat this logic in individual pages.
 
-25. **TanStack Query keys follow the pattern ****`[resource, id, subresource]`**, e.g. `['proforma-invoice', '123', 'line-items']`. Use these consistently to allow targeted cache invalidation.
+25. **TanStack Query keys follow the pattern \****`[resource, id, subresource]`**, e.g. `['proforma-invoice', '123', 'line-items']`. Use these consistently to allow targeted cache invalidation.
 
 26. **After a workflow action succeeds, invalidate the document query and the audit log query.** Do not optimistically update the status — refetch from the server to ensure consistency.
 
@@ -554,7 +555,7 @@ VITE_API_BASE_URL          ← The Django API URL; used by Vite at build time
 
 28. **CORS is configured to the known frontend domain only.** Do not use `CORS_ALLOW_ALL_ORIGINS = True` in any environment, including development. Use `CORS_ALLOWED_ORIGINS` with the explicit localhost dev URL.
 
-29. **Every DRF view class must explicitly declare ****`permission_classes`****.** The global default in settings is `IsAuthenticated` as a safety net, but it must never be relied upon as the sole permission check for sensitive endpoints.
+29. **Every DRF view class must explicitly declare \****`permission_classes`**\*\*.** The global default in settings is `IsAuthenticated` as a safety net, but it must never be relied upon as the sole permission check for sensitive endpoints.
 
 30. **Email notifications are sent synchronously in WorkflowService.** Do not introduce Celery or any async task queue.
 

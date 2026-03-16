@@ -1,7 +1,13 @@
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
-from .factories import CountryFactory, PortFactory, LocationFactory, IncotermFactory, UOMFactory
+
+from .factories import (
+    CountryFactory, IncotermFactory, LocationFactory, OrganisationAddressFactory,
+    OrganisationFactory, OrganisationTagFactory, OrganisationTaxCodeFactory,
+    PortFactory, UOMFactory,
+)
 
 
 @pytest.mark.django_db
@@ -76,3 +82,78 @@ class TestUOMModel:
         UOMFactory(abbreviation="MT")
         with pytest.raises(IntegrityError):
             UOMFactory(abbreviation="MT")
+
+
+# ---------------------------------------------------------------------------
+# Organisation model tests (FR-04)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestOrganisationModel:
+    # Test 1: __str__ returns the organisation name.
+    def test_str(self):
+        org = OrganisationFactory(name="Sunrise Exports Pvt Ltd")
+        assert str(org) == "Sunrise Exports Pvt Ltd"
+
+    # Test 2: Two organisations cannot share the same name — the database enforces uniqueness.
+    def test_name_must_be_unique(self):
+        OrganisationFactory(name="Sunrise Exports")
+        with pytest.raises(IntegrityError):
+            OrganisationFactory(name="Sunrise Exports")
+
+    # Test 3: Multiple organisations can have no IEC code — blank/null does not conflict.
+    def test_multiple_orgs_can_have_null_iec_code(self):
+        OrganisationFactory(iec_code=None)
+        OrganisationFactory(iec_code=None)  # should not raise
+
+    # Test 4: Two organisations cannot share the same non-blank IEC code.
+    def test_iec_code_must_be_unique_when_set(self):
+        OrganisationFactory(iec_code="AABCD1234E")
+        with pytest.raises(IntegrityError):
+            OrganisationFactory(iec_code="AABCD1234E")
+
+    # Test 5: Deleting a Country that is used by an OrganisationAddress is blocked.
+    # This protects data integrity — you cannot orphan an address by removing its country.
+    def test_deleting_country_used_by_address_raises_protected_error(self):
+        address = OrganisationAddressFactory()
+        with pytest.raises(ProtectedError):
+            address.country.delete()
+
+    # Test 6: Deleting an Organisation removes all its child records automatically (CASCADE).
+    def test_deleting_org_cascades_to_addresses_tags_tax_codes(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        OrganisationTagFactory(organisation=org)
+        OrganisationTaxCodeFactory(organisation=org)
+        org_id = org.id
+        org.delete()
+        from apps.master_data.models import OrganisationAddress, OrganisationTag, OrganisationTaxCode
+        assert OrganisationAddress.objects.filter(organisation_id=org_id).count() == 0
+        assert OrganisationTag.objects.filter(organisation_id=org_id).count() == 0
+        assert OrganisationTaxCode.objects.filter(organisation_id=org_id).count() == 0
+
+
+@pytest.mark.django_db
+class TestOrganisationTaxCodeModel:
+    # Test 7a: A valid GSTIN passes validation without raising an error.
+    def test_valid_gstin_passes_validation(self):
+        tax_code = OrganisationTaxCodeFactory.build(tax_type="GSTIN", tax_code="22AAAAA0000A1Z5")
+        tax_code.clean()  # should not raise
+
+    # Test 7b: A GSTIN with the wrong format raises a ValidationError.
+    def test_invalid_gstin_raises_validation_error(self):
+        tax_code = OrganisationTaxCodeFactory.build(tax_type="GSTIN", tax_code="BADGSTIN")
+        with pytest.raises(ValidationError):
+            tax_code.clean()
+
+    # Test 8a: A valid PAN passes validation without raising an error.
+    # PAN format: 3 letters + entity-type letter (P/C/H/F/A/T/B/L/J/G/E) + letter + 4 digits + letter
+    def test_valid_pan_passes_validation(self):
+        tax_code = OrganisationTaxCodeFactory.build(tax_type="PAN", tax_code="ABCPD1234E")
+        tax_code.clean()  # should not raise
+
+    # Test 8b: A PAN with the wrong format raises a ValidationError.
+    def test_invalid_pan_raises_validation_error(self):
+        tax_code = OrganisationTaxCodeFactory.build(tax_type="PAN", tax_code="BADPAN")
+        with pytest.raises(ValidationError):
+            tax_code.clean()
