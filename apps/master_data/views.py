@@ -17,12 +17,31 @@ class ReferenceDataViewSet(viewsets.ModelViewSet):
     Base viewset for all lookup/reference data.
     Read access: any authenticated user (needed for dropdown population).
     Write access: Checker or Company Admin only (FR-06).
-    All subclasses inherit this permission split automatically.
+    Soft-delete: destroy sets is_active=False instead of deleting the row.
+    All subclasses inherit this behaviour automatically.
     """
     def get_permissions(self):
         if self.request.method in SAFE_METHODS:
             return [IsAnyRole()]
         return [IsCheckerOrAdmin()]
+
+    def get_queryset(self):
+        # Default: return only active records.
+        # Pass ?is_active=false to include deactivated records (admin use).
+        queryset = super().get_queryset()
+        is_active_param = self.request.query_params.get("is_active")
+        if is_active_param is not None:
+            queryset = queryset.filter(is_active=is_active_param.lower() == "true")
+        else:
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        # Soft delete: mark as inactive instead of removing from the database.
+        instance = self.get_object()
+        instance.is_active = False
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CountryViewSet(ReferenceDataViewSet):
@@ -75,6 +94,10 @@ class CurrencyViewSet(ReferenceDataViewSet):
     permission_classes = [IsAnyRole]
     queryset = Currency.objects.all()
     serializer_class = CurrencySerializer
+
+    def get_queryset(self):
+        # Currency has no is_active field — return all records, bypassing the base filter.
+        return Currency.objects.all()
 
 
 class BankViewSet(viewsets.ModelViewSet):

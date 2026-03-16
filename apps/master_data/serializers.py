@@ -12,7 +12,7 @@ from .models import (
 class CountrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Country
-        fields = ["id", "name", "iso2", "iso3"]
+        fields = ["id", "name", "iso2", "iso3", "is_active"]
 
 
 class PortSerializer(serializers.ModelSerializer):
@@ -21,7 +21,7 @@ class PortSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Port
-        fields = ["id", "name", "code", "country", "country_name"]
+        fields = ["id", "name", "code", "country", "country_name", "is_active"]
 
 
 class LocationSerializer(serializers.ModelSerializer):
@@ -29,31 +29,31 @@ class LocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = ["id", "name", "country", "country_name"]
+        fields = ["id", "name", "country", "country_name", "is_active"]
 
 
 class IncotermSerializer(serializers.ModelSerializer):
     class Meta:
         model = Incoterm
-        fields = ["id", "code", "full_name", "description"]
+        fields = ["id", "code", "full_name", "description", "is_active"]
 
 
 class UOMSerializer(serializers.ModelSerializer):
     class Meta:
         model = UOM
-        fields = ["id", "name", "abbreviation"]
+        fields = ["id", "name", "abbreviation", "is_active"]
 
 
 class PaymentTermSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentTerm
-        fields = ["id", "name", "description"]
+        fields = ["id", "name", "description", "is_active"]
 
 
 class PreCarriageBySerializer(serializers.ModelSerializer):
     class Meta:
         model = PreCarriageBy
-        fields = ["id", "name"]
+        fields = ["id", "name", "is_active"]
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ class Country(models.Model):
     name = models.CharField(max_length=100)
     iso2 = models.CharField(max_length=2, unique=True, help_text="ISO 3166-1 Alpha-2 code, e.g. IN")
     iso3 = models.CharField(max_length=3, unique=True, help_text="ISO 3166-1 Alpha-3 code, e.g. IND")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_country"
@@ -26,6 +27,7 @@ class Port(models.Model):
     code = models.CharField(max_length=10, unique=True, help_text="UN/LOCODE, e.g. INBOM")
     # Constraint #7: PROTECT prevents deleting a Country that has ports referencing it
     country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name="ports")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_port"
@@ -43,6 +45,7 @@ class Location(models.Model):
     name = models.CharField(max_length=150)
     # Constraint #7: PROTECT prevents deleting a Country that has locations referencing it
     country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name="locations")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_location"
@@ -57,6 +60,7 @@ class Incoterm(models.Model):
     code = models.CharField(max_length=10, unique=True, help_text="Short code, e.g. FOB")
     full_name = models.CharField(max_length=100, help_text="e.g. Free On Board")
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_incoterm"
@@ -70,6 +74,7 @@ class UOM(models.Model):
     """Unit of Measurement used on line items (e.g. MT, KG, PCS, CBM)."""
     name = models.CharField(max_length=50, help_text="e.g. Metric Tonnes")
     abbreviation = models.CharField(max_length=20, unique=True, help_text="e.g. MT")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_uom"
@@ -85,6 +90,7 @@ class PaymentTerm(models.Model):
     """Payment terms used on Proforma Invoices (e.g. Advance Payment, LC at Sight)."""
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_paymentterm"
@@ -97,6 +103,7 @@ class PaymentTerm(models.Model):
 class PreCarriageBy(models.Model):
     """Mode of pre-carriage transport (e.g. Truck, Rail, Feeder Vessel)."""
     name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_precarriageby"

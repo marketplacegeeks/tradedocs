@@ -26,7 +26,9 @@ Beyond document generation, TradeDocs will provide:
 
 ### Goals
 - Provide a centralised, error-free document generation system for export trade documents (commercial invoice, proforma invoice, packing list)
-- Maintain structured master data to ensure consistency and reuse across all documents
+- Maintain structured 
+- 
+- =ter data to ensure consistency and reuse across all documents
 - Enforce a maker–checker 
 -  workflow before any document is finalised
 - Allow Company Admins to manage users, roles, and organisation-level master data

@@ -9,6 +9,7 @@ import BankFormPage from "./pages/master-data/BankFormPage";
 import TCTemplateListPage from "./pages/master-data/TCTemplateListPage";
 import TCTemplateFormPage from "./pages/master-data/TCTemplateFormPage";
 import UserListPage from "./pages/users/UserListPage";
+import ReferenceDataPage from "./pages/master-data/ReferenceDataPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -101,7 +102,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-      </Route>
+
+        {/* Reference Data — readable by all, writable by Checker/Admin */}
+        <Route path="/master-data/reference-data" element={<ReferenceDataPage />} />
 
         {/* User Management — Company Admin only */}
         <Route
@@ -112,6 +115,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+      </Route>
 
       {/* Catch-all: redirect unknown URLs to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
