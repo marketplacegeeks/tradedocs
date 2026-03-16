@@ -6,7 +6,7 @@ from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyA
 from .factories import (
     BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
     OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
-    PortFactory, PaymentTermFactory, PreCarriageByFactory, UOMFactory,
+    PortFactory, PaymentTermFactory, PreCarriageByFactory, TCTemplateFactory, UOMFactory,
 )
 
 
@@ -578,3 +578,112 @@ class TestBankEndpoints:
         )
         assert response.status_code == 200
         assert response.data["nickname"] == "Updated Nickname"
+
+
+# ---------------------------------------------------------------------------
+# T&C Template endpoints (FR-07)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestTCTemplateEndpoints:
+    def _valid_payload(self, org_id: int) -> dict:
+        return {
+            "name": "Standard Terms",
+            "body": "<p>Standard terms and conditions apply.</p>",
+            "organisations": [org_id],
+        }
+
+    # Happy path: any authenticated user can list templates.
+    def test_maker_can_list_templates(self):
+        TCTemplateFactory.create_batch(2)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("tctemplate-list"))
+        assert response.status_code == 200
+        assert len(response.data) >= 2
+
+    # Happy path: Checker can create a template.
+    def test_checker_can_create_template(self):
+        org = OrganisationFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("tctemplate-list"), self._valid_payload(org.id), format="json")
+        assert response.status_code == 201
+        assert response.data["name"] == "Standard Terms"
+
+    # Happy path: Company Admin can create a template.
+    def test_company_admin_can_create_template(self):
+        org = OrganisationFactory()
+        client = auth_client(CompanyAdminFactory())
+        response = client.post(reverse("tctemplate-list"), self._valid_payload(org.id), format="json")
+        assert response.status_code == 201
+
+    # Permission denial: Maker cannot create a template.
+    def test_maker_cannot_create_template(self):
+        org = OrganisationFactory()
+        client = auth_client(MakerFactory())
+        response = client.post(reverse("tctemplate-list"), self._valid_payload(org.id), format="json")
+        assert response.status_code == 403
+
+    # Validation: empty body is rejected.
+    def test_empty_body_rejected(self):
+        org = OrganisationFactory()
+        client = auth_client(CheckerFactory())
+        payload = self._valid_payload(org.id)
+        payload["body"] = "   "  # whitespace only
+        response = client.post(reverse("tctemplate-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "body" in response.data
+
+    # Validation: no organisations is rejected.
+    def test_no_organisations_rejected(self):
+        client = auth_client(CheckerFactory())
+        payload = {
+            "name": "Orphan Template",
+            "body": "<p>Some content</p>",
+            "organisations": [],
+        }
+        response = client.post(reverse("tctemplate-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "organisations" in response.data
+
+    # Validation: duplicate name is rejected.
+    def test_duplicate_name_rejected(self):
+        org = OrganisationFactory()
+        TCTemplateFactory(name="Existing Template", organisations=[org])
+        client = auth_client(CheckerFactory())
+        payload = self._valid_payload(org.id)
+        payload["name"] = "Existing Template"
+        response = client.post(reverse("tctemplate-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "name" in response.data
+
+    # Soft delete: DELETE sets is_active=False, does not hard-delete.
+    def test_delete_soft_deletes_template(self):
+        template = TCTemplateFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 204
+        template.refresh_from_db()
+        assert template.is_active is False
+
+    # After soft delete, the template no longer appears in the default list.
+    def test_soft_deleted_template_not_in_list(self):
+        template = TCTemplateFactory()
+        template.is_active = False
+        template.save()
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("tctemplate-list"))
+        ids = [t["id"] for t in response.data]
+        assert template.id not in ids
+
+    # Maker cannot delete a template.
+    def test_maker_cannot_delete_template(self):
+        template = TCTemplateFactory()
+        client = auth_client(MakerFactory())
+        response = client.delete(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 403
+
+    # Unauthenticated requests are rejected.
+    def test_unauthenticated_cannot_list(self):
+        client = APIClient()
+        response = client.get(reverse("tctemplate-list"))
+        assert response.status_code == 401

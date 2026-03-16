@@ -6,6 +6,8 @@ import OrganisationListPage from "./pages/master-data/OrganisationListPage";
 import OrganisationFormPage from "./pages/master-data/OrganisationFormPage";
 import BankListPage from "./pages/master-data/BankListPage";
 import BankFormPage from "./pages/master-data/BankFormPage";
+import TCTemplateListPage from "./pages/master-data/TCTemplateListPage";
+import TCTemplateFormPage from "./pages/master-data/TCTemplateFormPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -74,6 +76,27 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
               <BankFormPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* T&C Templates — Checker and Company Admin can write; all roles can read */}
+        <Route
+          path="/master-data/tc-templates"
+          element={<TCTemplateListPage />}
+        />
+        <Route
+          path="/master-data/tc-templates/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <TCTemplateFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-data/tc-templates/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <TCTemplateFormPage />
             </ProtectedRoute>
           }
         />

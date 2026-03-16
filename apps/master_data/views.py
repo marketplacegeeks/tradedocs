@@ -4,11 +4,11 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAnyRole, IsCheckerOrAdmin
-from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, UOM
+from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM
 from .serializers import (
     BankSerializer, CountrySerializer, CurrencySerializer, IncotermSerializer, LocationSerializer,
     OrganisationAddressSerializer, OrganisationSerializer,
-    PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, UOMSerializer,
+    PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, TCTemplateSerializer, UOMSerializer,
 )
 
 
@@ -174,4 +174,42 @@ class OrganisationAddressViewSet(viewsets.ModelViewSet):
                 "Cannot delete the only address. An organisation must have at least one address."
             )
         address.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# T&C Template views (FR-07)
+# ---------------------------------------------------------------------------
+
+class TCTemplateViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for Terms & Conditions templates.
+    Read: any authenticated user (so Makers can select templates on document forms).
+    Write: Checker or Company Admin only.
+    DELETE: soft-deleted (is_active=False) — never hard-deleted.
+    """
+    serializer_class = TCTemplateSerializer
+    permission_classes = [IsAnyRole]  # overridden per method in get_permissions()
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAnyRole()]
+        return [IsCheckerOrAdmin()]
+
+    def get_queryset(self):
+        queryset = TCTemplate.objects.prefetch_related("organisations")
+        # Default: return only active templates; pass ?is_active=false to see deactivated ones.
+        is_active_param = self.request.query_params.get("is_active")
+        if is_active_param is not None:
+            queryset = queryset.filter(is_active=is_active_param.lower() == "true")
+        else:
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        # Soft delete: mark as inactive instead of removing from the database.
+        # This preserves templates that may already be referenced by existing documents.
+        template = self.get_object()
+        template.is_active = False
+        template.save()
         return Response(status=status.HTTP_204_NO_CONTENT)

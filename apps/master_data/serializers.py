@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, UOM,
+    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
 )
 
 
@@ -275,3 +275,47 @@ class OrganisationSerializer(serializers.ModelSerializer):
                 OrganisationTaxCode.objects.create(organisation=instance, **tax_code_data)
 
         return instance
+
+
+# ---------------------------------------------------------------------------
+# T&C Template serializer (FR-07)
+# ---------------------------------------------------------------------------
+
+class TCTemplateSerializer(serializers.ModelSerializer):
+    # Read-only list of org names so the frontend can display them without extra requests.
+    organisation_names = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = TCTemplate
+        fields = [
+            "id", "name", "body", "organisations", "organisation_names",
+            "is_active", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_organisation_names(self, obj):
+        return list(obj.organisations.values_list("name", flat=True))
+
+    def validate_name(self, value):
+        """Template name must be unique across all templates (active or inactive)."""
+        queryset = TCTemplate.objects.filter(name=value)
+        # On update, exclude the current instance to allow saving with no name change.
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A template with this name already exists.")
+        return value
+
+    def validate_body(self, value):
+        """Body must not be empty — a blank template body cannot be saved."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Template body cannot be empty.")
+        return value
+
+    def validate_organisations(self, value):
+        """At least one organisation must be associated before the template can be saved."""
+        if not value:
+            raise serializers.ValidationError(
+                "At least one organisation must be associated with this template."
+            )
+        return value

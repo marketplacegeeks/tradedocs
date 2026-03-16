@@ -44,6 +44,7 @@ const NAV_ITEMS = [
     children: [
       { key: "/master-data/organisations", label: "Organisations" },
       { key: "/master-data/banks", label: "Banks" },
+      { key: "/master-data/tc-templates", label: "T&C Templates" },
     ],
   },
   {

@@ -109,6 +109,39 @@ class PreCarriageBy(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Terms & Conditions Templates (FR-07)
+# ---------------------------------------------------------------------------
+
+class TCTemplate(models.Model):
+    """
+    A reusable Terms & Conditions template selectable when creating trade documents.
+    Body stores rich HTML produced by the TipTap editor on the frontend.
+    Soft-deleted via is_active=False — never hard-deleted — so templates already
+    referenced by documents remain retrievable for historical display.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    body = models.TextField(help_text="Rich HTML content produced by the rich text editor")
+    # A template can be associated with multiple organisations; an org can have many templates.
+    organisations = models.ManyToManyField(
+        "Organisation",
+        related_name="tc_templates",
+        help_text="Organisations this template is available to",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "master_data_tctemplate"
+        ordering = ["name"]
+        verbose_name = "T&C Template"
+        verbose_name_plural = "T&C Templates"
+
+    def __str__(self):
+        return self.name
+
+
+# ---------------------------------------------------------------------------
 # Bank and Currency (FR-05)
 # ---------------------------------------------------------------------------
 

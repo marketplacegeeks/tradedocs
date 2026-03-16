@@ -6,7 +6,7 @@ from django.db.models.deletion import ProtectedError
 from .factories import (
     BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
     OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
-    OrganisationTaxCodeFactory, PortFactory, UOMFactory,
+    OrganisationTaxCodeFactory, PortFactory, TCTemplateFactory, UOMFactory,
 )
 
 
@@ -229,3 +229,36 @@ class TestBankModel:
     def test_empty_iban_is_allowed(self):
         bank = BankFactory.build(iban="")
         bank.full_clean(exclude=["bank_country", "currency"])  # optional — should not raise
+
+
+# ---------------------------------------------------------------------------
+# T&C Template model tests (FR-07)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestTCTemplateModel:
+    def test_str(self):
+        template = TCTemplateFactory(name="My Terms")
+        assert str(template) == "My Terms"
+
+    def test_name_must_be_unique(self):
+        TCTemplateFactory(name="Standard T&C")
+        with pytest.raises(Exception):  # IntegrityError from DB unique constraint
+            TCTemplateFactory(name="Standard T&C")
+
+    def test_is_active_defaults_to_true(self):
+        template = TCTemplateFactory()
+        assert template.is_active is True
+
+    def test_can_associate_multiple_organisations(self):
+        org1 = OrganisationFactory()
+        org2 = OrganisationFactory()
+        template = TCTemplateFactory(organisations=[org1, org2])
+        assert template.organisations.count() == 2
+
+    def test_soft_delete_sets_is_active_false(self):
+        template = TCTemplateFactory()
+        template.is_active = False
+        template.save()
+        template.refresh_from_db()
+        assert template.is_active is False
