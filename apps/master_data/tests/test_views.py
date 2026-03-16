@@ -4,9 +4,9 @@ from rest_framework.test import APIClient
 
 from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyAdminFactory
 from .factories import (
-    CountryFactory, IncotermFactory, LocationFactory, OrganisationAddressFactory,
-    OrganisationFactory, OrganisationTagFactory, PortFactory, PaymentTermFactory,
-    PreCarriageByFactory, UOMFactory,
+    BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
+    OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
+    PortFactory, PaymentTermFactory, PreCarriageByFactory, UOMFactory,
 )
 
 
@@ -419,3 +419,162 @@ class TestOrganisationAddressEndpoints:
             reverse("organisation-address-detail", args=[org.id, address.id])
         )
         assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Currency endpoints (FR-05)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestCurrencyEndpoints:
+    # Test 25: Any authenticated user can list currencies (needed for Bank form dropdown).
+    def test_maker_can_list_currencies(self):
+        CurrencyFactory.create_batch(2)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("currency-list"))
+        assert response.status_code == 200
+        assert len(response.data) >= 2
+
+    # Test 26: A Maker cannot create currencies — write is restricted to Checker/Admin.
+    def test_maker_cannot_create_currency(self):
+        client = auth_client(MakerFactory())
+        response = client.post(reverse("currency-list"), {"code": "USD", "name": "US Dollar"})
+        assert response.status_code == 403
+
+    # Test 27: A Checker can create a currency.
+    def test_checker_can_create_currency(self):
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("currency-list"), {"code": "USD", "name": "US Dollar"})
+        assert response.status_code == 201
+        assert response.data["code"] == "USD"
+
+    # Test 28: An unauthenticated request is rejected.
+    def test_unauthenticated_cannot_list_currencies(self):
+        client = APIClient()
+        response = client.get(reverse("currency-list"))
+        assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Bank endpoints (FR-05)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestBankEndpoints:
+    def _valid_payload(self, country, currency):
+        """Return a minimal valid bank creation payload."""
+        return {
+            "nickname": "USD Operating Account",
+            "beneficiary_name": "Sunrise Exports Pvt Ltd",
+            "bank_name": "HDFC Bank",
+            "bank_country": country.id,
+            "branch_name": "Fort Branch",
+            "account_number": "50100123456789",
+            "account_type": "CURRENT",
+            "currency": currency.id,
+        }
+
+    # Test 29: Any authenticated user can list banks (needed for PI/CI dropdowns).
+    def test_maker_can_list_banks(self):
+        BankFactory.create_batch(2)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("bank-list"))
+        assert response.status_code == 200
+        assert len(response.data) >= 2
+
+    # Test 30: A Maker cannot create a bank — write is Checker/Admin only.
+    def test_maker_cannot_create_bank(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        client = auth_client(MakerFactory())
+        response = client.post(reverse("bank-list"), self._valid_payload(country, currency))
+        assert response.status_code == 403
+
+    # Test 31: A Company Admin can create a bank with all required fields.
+    def test_company_admin_can_create_bank(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        client = auth_client(CompanyAdminFactory())
+        response = client.post(reverse("bank-list"), self._valid_payload(country, currency))
+        assert response.status_code == 201
+        assert response.data["bank_name"] == "HDFC Bank"
+
+    # Test 32: Response includes read-only display fields so the frontend doesn't need extra calls.
+    def test_create_response_includes_display_fields(self):
+        country = CountryFactory(name="India")
+        currency = CurrencyFactory(code="INR", name="Indian Rupee")
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), self._valid_payload(country, currency))
+        assert response.status_code == 201
+        assert response.data["bank_country_name"] == "India"
+        assert response.data["currency_code"] == "INR"
+        assert response.data["currency_name"] == "Indian Rupee"
+
+    # Test 33: A valid 8-char SWIFT code is accepted.
+    def test_valid_swift_8_chars_accepted(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["swift_code"] = "HDFCINBB"
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 201
+
+    # Test 34: An invalid SWIFT code (wrong length) is rejected.
+    def test_invalid_swift_rejected(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["swift_code"] = "BADC0DE"  # 7 chars
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+        assert "swift_code" in response.data
+
+    # Test 35: A valid IBAN is accepted.
+    def test_valid_iban_accepted(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["iban"] = "GB29NWBK60161331926819"
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 201
+
+    # Test 36: An invalid IBAN (starts with digits) is rejected.
+    def test_invalid_iban_rejected(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["iban"] = "12BADIBAN"
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+        assert "iban" in response.data
+
+    # Test 37: Omitting a required field returns 400.
+    def test_missing_required_field_rejected(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        del payload["account_number"]
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+
+    # Test 38: An unauthenticated request is rejected.
+    def test_unauthenticated_cannot_list_banks(self):
+        client = APIClient()
+        response = client.get(reverse("bank-list"))
+        assert response.status_code == 401
+
+    # Test 39: A Checker can update an existing bank via PATCH.
+    def test_checker_can_patch_bank(self):
+        bank = BankFactory()
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("bank-detail", args=[bank.id]),
+            {"nickname": "Updated Nickname"},
+        )
+        assert response.status_code == 200
+        assert response.data["nickname"] == "Updated Nickname"

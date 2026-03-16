@@ -109,6 +109,87 @@ class PreCarriageBy(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Bank and Currency (FR-05)
+# ---------------------------------------------------------------------------
+
+class Currency(models.Model):
+    """ISO 4217 currency. Referenced by Bank accounts."""
+    code = models.CharField(
+        max_length=3, unique=True,
+        help_text="ISO 4217 currency code, e.g. USD, AED, INR"
+    )
+    name = models.CharField(max_length=100, help_text="e.g. US Dollar")
+
+    class Meta:
+        db_table = "master_data_currency"
+        ordering = ["code"]
+        verbose_name_plural = "currencies"
+
+    def __str__(self):
+        return f"{self.code} – {self.name}"
+
+
+def _validate_swift(value):
+    """SWIFT/BIC must be 8 or 11 uppercase alphanumeric characters (ISO 9362)."""
+    if not re.match(r'^[A-Z0-9]{8}$|^[A-Z0-9]{11}$', value):
+        raise ValidationError(
+            "SWIFT/BIC code must be exactly 8 or 11 uppercase letters and digits (ISO 9362)."
+        )
+
+
+def _validate_iban(value):
+    """IBAN: 2-letter country code, 2 check digits, up to 30 alphanumeric chars. Max 34."""
+    if not re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$', value):
+        raise ValidationError(
+            "IBAN must start with a 2-letter country code, 2 check digits, "
+            "and up to 30 alphanumeric characters (max 34 total)."
+        )
+
+
+class Bank(models.Model):
+    """
+    A bank account record used on Proforma Invoices (optional) and
+    Commercial Invoices (mandatory). Details print on both PDFs.
+    Constraint #7: all FK references use PROTECT.
+    """
+    class AccountType(models.TextChoices):
+        CURRENT = "CURRENT", "Current"
+        SAVINGS = "SAVINGS", "Savings"
+        CHECKING = "CHECKING", "Checking"
+
+    nickname = models.CharField(max_length=255, help_text="Short internal label, e.g. 'USD Operating Account'")
+    beneficiary_name = models.CharField(max_length=255, help_text="Account holder name as it appears on wire instructions")
+    bank_name = models.CharField(max_length=255)
+    # Constraint #7: cannot delete a Country that a Bank references.
+    bank_country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name="banks")
+    branch_name = models.CharField(max_length=255)
+    branch_address = models.TextField(blank=True)
+    account_number = models.CharField(max_length=50)
+    account_type = models.CharField(max_length=10, choices=AccountType.choices)
+    # Constraint #7: cannot delete a Currency that a Bank references.
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="banks")
+    swift_code = models.CharField(
+        max_length=11, blank=True,
+        validators=[_validate_swift],
+        help_text="Optional. 8 or 11 uppercase alphanumeric characters (ISO 9362)."
+    )
+    iban = models.CharField(
+        max_length=34, blank=True,
+        validators=[_validate_iban],
+        help_text="Optional. Up to 34 alphanumeric characters."
+    )
+    # Stores IFSC (India), ACH routing number (USA), sort code (UK), etc.
+    routing_number = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        db_table = "master_data_bank"
+        ordering = ["bank_name", "nickname"]
+
+    def __str__(self):
+        return f"{self.bank_name} – {self.nickname}"
+
+
+# ---------------------------------------------------------------------------
 # Organisation and its sub-records (FR-04)
 # ---------------------------------------------------------------------------
 

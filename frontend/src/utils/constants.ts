@@ -50,3 +50,17 @@ export const ADDRESS_TYPE_LABELS: Record<AddressType, string> = {
   FACTORY: "Factory",
   OFFICE: "Office",
 };
+
+export const ACCOUNT_TYPES = {
+  CURRENT: "CURRENT",
+  SAVINGS: "SAVINGS",
+  CHECKING: "CHECKING",
+} as const;
+
+export type AccountType = (typeof ACCOUNT_TYPES)[keyof typeof ACCOUNT_TYPES];
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  CURRENT: "Current",
+  SAVINGS: "Savings",
+  CHECKING: "Checking",
+};

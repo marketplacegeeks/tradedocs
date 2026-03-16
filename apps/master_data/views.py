@@ -4,9 +4,9 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAnyRole, IsCheckerOrAdmin
-from .models import Country, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, UOM
+from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, UOM
 from .serializers import (
-    CountrySerializer, IncotermSerializer, LocationSerializer,
+    BankSerializer, CountrySerializer, CurrencySerializer, IncotermSerializer, LocationSerializer,
     OrganisationAddressSerializer, OrganisationSerializer,
     PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, UOMSerializer,
 )
@@ -65,6 +65,34 @@ class PreCarriageByViewSet(ReferenceDataViewSet):
     permission_classes = [IsAnyRole]
     queryset = PreCarriageBy.objects.all()
     serializer_class = PreCarriageBySerializer
+
+
+# ---------------------------------------------------------------------------
+# Currency and Bank views (FR-05)
+# ---------------------------------------------------------------------------
+
+class CurrencyViewSet(ReferenceDataViewSet):
+    permission_classes = [IsAnyRole]
+    queryset = Currency.objects.all()
+    serializer_class = CurrencySerializer
+
+
+class BankViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for bank account records.
+    Read: any authenticated user (needed for PI and CI dropdowns).
+    Write: Checker or Company Admin only.
+    """
+    serializer_class = BankSerializer
+    permission_classes = [IsAnyRole]  # overridden per method in get_permissions()
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAnyRole()]
+        return [IsCheckerOrAdmin()]
+
+    def get_queryset(self):
+        return Bank.objects.select_related("bank_country", "currency").all()
 
 
 # ---------------------------------------------------------------------------

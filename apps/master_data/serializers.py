@@ -4,7 +4,7 @@ import phonenumbers
 from rest_framework import serializers
 
 from .models import (
-    Country, Incoterm, Location, Organisation, OrganisationAddress,
+    Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
     OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, UOM,
 )
 
@@ -54,6 +54,55 @@ class PreCarriageBySerializer(serializers.ModelSerializer):
     class Meta:
         model = PreCarriageBy
         fields = ["id", "name"]
+
+
+# ---------------------------------------------------------------------------
+# Currency and Bank serializers (FR-05)
+# ---------------------------------------------------------------------------
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = ["id", "code", "name"]
+
+
+class BankSerializer(serializers.ModelSerializer):
+    # Read-only display fields so the frontend can show names without extra requests.
+    bank_country_name = serializers.CharField(source="bank_country.name", read_only=True)
+    currency_code = serializers.CharField(source="currency.code", read_only=True)
+    currency_name = serializers.CharField(source="currency.name", read_only=True)
+
+    class Meta:
+        model = Bank
+        fields = [
+            "id", "nickname", "beneficiary_name", "bank_name",
+            "bank_country", "bank_country_name",
+            "branch_name", "branch_address",
+            "account_number", "account_type",
+            "currency", "currency_code", "currency_name",
+            "swift_code", "iban", "routing_number",
+        ]
+
+    def validate_swift_code(self, value):
+        """If SWIFT code is provided, it must be 8 or 11 uppercase alphanumeric characters."""
+        if value:
+            value = value.strip().upper()
+            if not re.match(r'^[A-Z0-9]{8}$|^[A-Z0-9]{11}$', value):
+                raise serializers.ValidationError(
+                    "SWIFT/BIC code must be exactly 8 or 11 uppercase letters and digits (ISO 9362)."
+                )
+        return value
+
+    def validate_iban(self, value):
+        """If IBAN is provided, validate its format: 2-letter country code + 2 digits + up to 30 alphanumeric."""
+        if value:
+            value = value.strip().upper()
+            if not re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$', value):
+                raise serializers.ValidationError(
+                    "IBAN must start with a 2-letter country code, 2 check digits, "
+                    "and up to 30 alphanumeric characters (max 34 total)."
+                )
+        return value
 
 
 # ---------------------------------------------------------------------------

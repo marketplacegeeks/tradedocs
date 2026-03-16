@@ -1,6 +1,6 @@
 import factory
 from apps.master_data.models import (
-    Country, Incoterm, Location, Organisation, OrganisationAddress,
+    Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
     OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, UOM,
 )
 
@@ -104,3 +104,34 @@ class OrganisationTaxCodeFactory(factory.django.DjangoModelFactory):
     organisation = factory.SubFactory(OrganisationFactory)
     tax_type = "GSTIN"
     tax_code = "22AAAAA0000A1Z5"
+
+
+# ---------------------------------------------------------------------------
+# Currency and Bank factories (FR-05)
+# ---------------------------------------------------------------------------
+
+class CurrencyFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Currency
+
+    # Unique 3-letter codes: USD, USe, USf, ... (n=0 → "USD", sequential after)
+    code = factory.Sequence(lambda n: f"C{n:02d}")
+    name = factory.Sequence(lambda n: f"Currency {n}")
+
+
+class BankFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Bank
+
+    nickname = factory.Sequence(lambda n: f"Bank Account {n}")
+    beneficiary_name = factory.Sequence(lambda n: f"Beneficiary {n}")
+    bank_name = factory.Sequence(lambda n: f"Bank {n}")
+    bank_country = factory.SubFactory(CountryFactory)
+    branch_name = factory.Sequence(lambda n: f"Branch {n}")
+    branch_address = ""
+    account_number = factory.Sequence(lambda n: f"ACC{n:06d}")
+    account_type = Bank.AccountType.CURRENT
+    currency = factory.SubFactory(CurrencyFactory)
+    swift_code = ""
+    iban = ""
+    routing_number = ""

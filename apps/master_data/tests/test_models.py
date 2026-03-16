@@ -4,9 +4,9 @@ from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
 
 from .factories import (
-    CountryFactory, IncotermFactory, LocationFactory, OrganisationAddressFactory,
-    OrganisationFactory, OrganisationTagFactory, OrganisationTaxCodeFactory,
-    PortFactory, UOMFactory,
+    BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
+    OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
+    OrganisationTaxCodeFactory, PortFactory, UOMFactory,
 )
 
 
@@ -157,3 +157,75 @@ class TestOrganisationTaxCodeModel:
         tax_code = OrganisationTaxCodeFactory.build(tax_type="PAN", tax_code="BADPAN")
         with pytest.raises(ValidationError):
             tax_code.clean()
+
+
+# ---------------------------------------------------------------------------
+# Currency and Bank model tests (FR-05)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestCurrencyModel:
+    def test_str(self):
+        currency = CurrencyFactory(code="USD", name="US Dollar")
+        assert str(currency) == "USD – US Dollar"
+
+    def test_code_must_be_unique(self):
+        CurrencyFactory(code="USD")
+        with pytest.raises(IntegrityError):
+            CurrencyFactory(code="USD")
+
+
+@pytest.mark.django_db
+class TestBankModel:
+    def test_str(self):
+        bank = BankFactory(bank_name="HDFC Bank", nickname="USD Operating Account")
+        assert str(bank) == "HDFC Bank – USD Operating Account"
+
+    def test_deleting_country_with_bank_raises_protected_error(self):
+        """Constraint #7: on_delete=PROTECT prevents orphaning a bank's country."""
+        bank = BankFactory()
+        with pytest.raises(ProtectedError):
+            bank.bank_country.delete()
+
+    def test_deleting_currency_with_bank_raises_protected_error(self):
+        """Constraint #7: on_delete=PROTECT prevents deleting a currency in use."""
+        bank = BankFactory()
+        with pytest.raises(ProtectedError):
+            bank.currency.delete()
+
+    def test_valid_swift_8_chars_passes_validation(self):
+        bank = BankFactory.build(swift_code="HDFCINBB")
+        # Exclude FK fields: build() doesn't save related objects, so they have no PK.
+        # We only want to test the SWIFT validator here.
+        bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_valid_swift_11_chars_passes_validation(self):
+        bank = BankFactory.build(swift_code="HDFCINBBXXX")
+        bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_invalid_swift_raises_validation_error(self):
+        bank = BankFactory.build(swift_code="BADC0DE")  # 7 chars — invalid
+        with pytest.raises(ValidationError):
+            bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_swift_lowercase_raises_validation_error(self):
+        bank = BankFactory.build(swift_code="hdfcinbb")  # lowercase — invalid
+        with pytest.raises(ValidationError):
+            bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_empty_swift_is_allowed(self):
+        bank = BankFactory.build(swift_code="")
+        bank.full_clean(exclude=["bank_country", "currency"])  # optional — should not raise
+
+    def test_valid_iban_passes_validation(self):
+        bank = BankFactory.build(iban="GB29NWBK60161331926819")
+        bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_invalid_iban_raises_validation_error(self):
+        bank = BankFactory.build(iban="12BADIBAN")  # starts with digits, not letters
+        with pytest.raises(ValidationError):
+            bank.full_clean(exclude=["bank_country", "currency"])
+
+    def test_empty_iban_is_allowed(self):
+        bank = BankFactory.build(iban="")
+        bank.full_clean(exclude=["bank_country", "currency"])  # optional — should not raise

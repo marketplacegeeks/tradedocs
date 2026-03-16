@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    CountryViewSet, IncotermViewSet, LocationViewSet,
+    BankViewSet, CountryViewSet, CurrencyViewSet, IncotermViewSet, LocationViewSet,
     OrganisationAddressViewSet, OrganisationViewSet,
     PortViewSet, PaymentTermViewSet, PreCarriageByViewSet, UOMViewSet,
 )
@@ -15,6 +15,8 @@ router.register("incoterms", IncotermViewSet, basename="incoterm")
 router.register("uom", UOMViewSet, basename="uom")
 router.register("payment-terms", PaymentTermViewSet, basename="paymentterm")
 router.register("pre-carriage", PreCarriageByViewSet, basename="precarriageby")
+router.register("currencies", CurrencyViewSet, basename="currency")
+router.register("banks", BankViewSet, basename="bank")
 router.register("organisations", OrganisationViewSet, basename="organisation")
 
 # Nested address routes under /organisations/{organisation_pk}/addresses/
