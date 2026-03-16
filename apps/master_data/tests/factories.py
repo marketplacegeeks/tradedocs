@@ -1,7 +1,7 @@
 import factory
 from apps.master_data.models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, UOM,
+    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
 )
 
 
@@ -135,3 +135,31 @@ class BankFactory(factory.django.DjangoModelFactory):
     swift_code = ""
     iban = ""
     routing_number = ""
+
+
+# ---------------------------------------------------------------------------
+# T&C Template factory (FR-07)
+# ---------------------------------------------------------------------------
+
+class TCTemplateFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = TCTemplate
+
+    name = factory.Sequence(lambda n: f"T&C Template {n}")
+    body = "<p>Standard terms and conditions apply.</p>"
+    is_active = True
+
+    # M2M associations are added via the @factory.post_generation decorator.
+    @factory.post_generation
+    def organisations(self, create, extracted, **kwargs):
+        """
+        If called with organisations=[org1, org2], associates those orgs.
+        Otherwise creates and associates one default organisation.
+        """
+        if not create:
+            return
+        if extracted:
+            for org in extracted:
+                self.organisations.add(org)
+        else:
+            self.organisations.add(OrganisationFactory())

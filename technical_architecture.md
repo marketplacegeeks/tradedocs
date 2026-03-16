@@ -52,6 +52,7 @@ TradeDocs is a web application for a single trading house to create, review, app
 | Ant Design (antd) | UI component library; provides tables, forms, modals, steps wizard, dropdowns |
 | dayjs | Lightweight date formatting and manipulation library |
 | React Context API | Stores the current user's identity and role in memory — no external library needed |
+| @tiptap/react@2.27.2 + @tiptap/pm@2.27.2 + @tiptap/starter-kit@2.27.2 + @tiptap/extension-underline@2.27.2 + @tiptap/extension-link@2.27.2 | Rich-text editor used on the T&C Template form (FR-07); provides bold, italic, underline, bullet/numbered lists, hyperlinks, and clear formatting. Pinned to v2 (v3 is alpha and ships without pre-built dist) |
 
 ### Infrastructure
 
