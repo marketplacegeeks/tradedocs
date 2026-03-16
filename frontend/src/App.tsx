@@ -8,6 +8,7 @@ import BankListPage from "./pages/master-data/BankListPage";
 import BankFormPage from "./pages/master-data/BankFormPage";
 import TCTemplateListPage from "./pages/master-data/TCTemplateListPage";
 import TCTemplateFormPage from "./pages/master-data/TCTemplateFormPage";
+import UserListPage from "./pages/users/UserListPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -101,6 +102,16 @@ export default function App() {
           }
         />
       </Route>
+
+        {/* User Management — Company Admin only */}
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.COMPANY_ADMIN]}>
+              <UserListPage />
+            </ProtectedRoute>
+          }
+        />
 
       {/* Catch-all: redirect unknown URLs to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -1026,7 +1026,7 @@ These are the tables and pages everything else depends on. Build them before tou
 | 5 | `master_data` — Bank model | FR-05 | `feature/fr-05-bank` |
 | 6 | `master_data` — T&C Templates (rich text) | FR-07 | `feature/fr-07-tc-templates` |
 | 7 | User Management page (Company Admin only) | FR-10 | `feature/fr-10-user-management` |
-| 8 | All Master Data pages in React (Organisation, Bank, Reference Data, T&C Templates) | FR-04–07 | `feature/master-data-pages` |
+| 8 | All Master Data pages in React (Organisation, Bank, Reference Data, T&C Templates) | FR-04–07 and FR-10 | `feature/master-data-pages` |
 
 **How to break Layer 1 into sessions:**
 - Session 1: accounts app (User model + JWT auth). Write tests: login returns a token, wrong password returns 401, Maker cannot access admin endpoints. Stop. Confirm `pytest` passes.

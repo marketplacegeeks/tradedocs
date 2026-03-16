@@ -155,3 +155,26 @@ class TestUserDetailView:
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
         response = api_client.get(reverse("user-detail", kwargs={"pk": other.pk}))
         assert response.status_code == 403
+
+    def test_company_admin_cannot_deactivate_themselves(self, api_client):
+        admin = CompanyAdminFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": admin.pk}), {"is_active": False})
+        assert response.status_code == 400
+
+    def test_company_admin_cannot_change_their_own_role(self, api_client):
+        admin = CompanyAdminFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": admin.pk}), {"role": "MAKER"})
+        assert response.status_code == 400
+
+    def test_cannot_deactivate_last_company_admin(self, api_client):
+        # Only one admin exists — deactivating should be blocked.
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": admin.pk}), {"is_active": False})
+        assert response.status_code == 400

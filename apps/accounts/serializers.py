@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, UserRole
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -40,3 +40,34 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["role", "is_active"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        instance = self.instance
+
+        # Guard 1: A Company Admin cannot modify their own account via this serializer.
+        if request and instance and request.user.pk == instance.pk:
+            if "is_active" in attrs:
+                raise serializers.ValidationError(
+                    {"is_active": "You cannot deactivate your own account."}
+                )
+            if "role" in attrs:
+                raise serializers.ValidationError(
+                    {"role": "You cannot change your own role."}
+                )
+
+        # Guard 2: Cannot deactivate or demote the last active Company Admin.
+        if instance and instance.role == UserRole.COMPANY_ADMIN:
+            active_admin_count = User.objects.filter(
+                role=UserRole.COMPANY_ADMIN, is_active=True
+            ).count()
+            if attrs.get("is_active") is False and active_admin_count <= 1:
+                raise serializers.ValidationError(
+                    {"is_active": "Cannot deactivate the last active Company Admin."}
+                )
+            if "role" in attrs and attrs["role"] != UserRole.COMPANY_ADMIN and active_admin_count <= 1:
+                raise serializers.ValidationError(
+                    {"role": "Cannot change the role of the last active Company Admin."}
+                )
+
+        return attrs

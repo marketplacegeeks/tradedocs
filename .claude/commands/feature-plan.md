@@ -6,5 +6,5 @@ I want to implement a new feature. Before writing any code:
 4. Identify any dependencies — master data, other models, or services that must exist first.
 5. Break the implementation into steps: Model → Serializer → View → URL → Frontend API call → Page component.
 6. Flag any ambiguity in the requirements before starting.
-
+7. ensure you follow designsystem.md
 Then wait for my confirmation before writing anything.
