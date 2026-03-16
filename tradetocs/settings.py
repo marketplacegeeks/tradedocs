@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "django_filters",
     # Project apps
     "apps.accounts",
+    "apps.master_data",
 ]
 
 MIDDLEWARE = [
