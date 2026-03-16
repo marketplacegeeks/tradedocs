@@ -759,7 +759,8 @@ Your `main` branch stays clean.
 In Claude Code:
 
 ```
-/feature-plan
+02
+z/feature-plan
 
 The feature is FR-04: Organisation master data.
 The relevant section in requirements.md is Section 5.3 (FR-04.1 through FR-04.4).

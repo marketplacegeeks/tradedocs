@@ -1,11 +1,8 @@
-// Bank list page — shows all bank accounts in a table.
-// Checker and Company Admin can create or edit banks.
-// Makers can only view (they need the list to populate PI/CI dropdowns).
+// Bank accounts list page — design system table layout.
 
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Table, Space, Typography, Flex } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { Plus, Pencil } from "lucide-react";
 
 import { listBanks } from "../../api/banks";
 import type { Bank } from "../../api/banks";
@@ -13,109 +10,216 @@ import { useAuth } from "../../store/AuthContext";
 import { ROLES, ACCOUNT_TYPE_LABELS } from "../../utils/constants";
 import type { AccountType } from "../../utils/constants";
 
-const { Title } = Typography;
+const ACCOUNT_TYPE_CHIP: Record<string, string> = {
+  CURRENT: "chip-blue",
+  SAVINGS: "chip-green",
+  CHECKING: "chip-purple",
+};
 
 export default function BankListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
 
-  // Only Checker and Company Admin can write.
-  const canWrite =
-    user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
-
-  // Fetch all banks — cached by TanStack Query.
-  // Constraint #25: query keys follow the pattern [resource].
   const { data: banks = [], isLoading } = useQuery({
     queryKey: ["banks"],
     queryFn: listBanks,
   });
 
-  const columns = [
-    {
-      title: "Nickname",
-      dataIndex: "nickname",
-      key: "nickname",
-      sorter: (a: Bank, b: Bank) => a.nickname.localeCompare(b.nickname),
-    },
-    {
-      title: "Bank Name",
-      dataIndex: "bank_name",
-      key: "bank_name",
-    },
-    {
-      title: "Beneficiary Name",
-      dataIndex: "beneficiary_name",
-      key: "beneficiary_name",
-    },
-    {
-      title: "Account Number",
-      dataIndex: "account_number",
-      key: "account_number",
-    },
-    {
-      title: "Account Type",
-      dataIndex: "account_type",
-      key: "account_type",
-      render: (val: string) => ACCOUNT_TYPE_LABELS[val as AccountType] ?? val,
-    },
-    {
-      title: "Currency",
-      dataIndex: "currency_code",
-      key: "currency_code",
-    },
-    {
-      title: "Country",
-      dataIndex: "bank_country_name",
-      key: "bank_country_name",
-    },
-    {
-      title: "SWIFT",
-      dataIndex: "swift_code",
-      key: "swift_code",
-      render: (val: string) => val || "—",
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      render: (_: unknown, record: Bank) => (
-        <Space>
-          {canWrite && (
-            <Button
-              size="small"
-              onClick={() => navigate(`/master-data/banks/${record.id}/edit`)}
-            >
-              Edit
-            </Button>
-          )}
-        </Space>
-      ),
-    },
-  ];
-
   return (
-    <div style={{ padding: 24 }}>
-      <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          Bank Accounts
-        </Title>
-        {canWrite && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate("/master-data/banks/new")}
+    <div>
+      {/* Page header */}
+      <div
+        className="page-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-heading)",
+              fontSize: 22,
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              marginBottom: 4,
+            }}
           >
+            Bank Accounts
+          </h1>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
+            {banks.length} account{banks.length !== 1 ? "s" : ""} registered
+          </p>
+        </div>
+        {canWrite && (
+          <button
+            onClick={() => navigate("/master-data/banks/new")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 16px",
+              background: "var(--primary)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontFamily: "var(--font-body)",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.background = "var(--primary-hover)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.background = "var(--primary)")
+            }
+          >
+            <Plus size={16} strokeWidth={2} />
             New Bank Account
-          </Button>
+          </button>
         )}
-      </Flex>
+      </div>
 
-      <Table
-        rowKey="id"
-        loading={isLoading}
-        dataSource={banks}
-        columns={columns}
-        pagination={{ pageSize: 20 }}
-      />
+      {/* Table card */}
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border-light)",
+          borderRadius: 14,
+          boxShadow: "var(--shadow-card)",
+          overflow: "hidden",
+        }}
+      >
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-body)" }}>
+            Loading…
+          </div>
+        ) : banks.length === 0 ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              padding: "48px 24px",
+              gap: 12,
+            }}
+          >
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+              No bank accounts yet
+            </p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+              {canWrite ? "Click \"New Bank Account\" to add one." : "No bank accounts have been added."}
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  {["Nickname", "Bank Name", "Account Number", "Type", "Currency", "Country", "SWIFT"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "12px 16px",
+                        textAlign: "left",
+                        fontFamily: "var(--font-body)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "var(--text-muted)",
+                        borderBottom: "1px solid var(--border-light)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                  {canWrite && (
+                    <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {banks.map((bank: Bank) => (
+                  <tr
+                    key={bank.id}
+                    style={{ cursor: "default" }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLTableRowElement).style.background = "transparent";
+                    }}
+                  >
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)" }}>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                        {bank.nickname}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)" }}>
+                      {bank.bank_name}
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                      {bank.account_number}
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)" }}>
+                      <span className={`chip ${ACCOUNT_TYPE_CHIP[bank.account_type] ?? "chip-blue"}`}>
+                        {ACCOUNT_TYPE_LABELS[bank.account_type as AccountType] ?? bank.account_type}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)" }}>
+                      <span className="chip chip-green">{bank.currency_code}</span>
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)" }}>
+                      {bank.bank_country_name}
+                    </td>
+                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {bank.swift_code || "—"}
+                    </td>
+                    {canWrite && (
+                      <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", textAlign: "right" }}>
+                        <button
+                          onClick={() => navigate(`/master-data/banks/${bank.id}/edit`)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "5px 10px",
+                            background: "transparent",
+                            border: "1px solid var(--border-medium)",
+                            borderRadius: 6,
+                            fontFamily: "var(--font-body)",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "var(--text-secondary)",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
+                          }
+                          onMouseLeave={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                          }
+                        >
+                          <Pencil size={12} strokeWidth={1.5} />
+                          Edit
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
