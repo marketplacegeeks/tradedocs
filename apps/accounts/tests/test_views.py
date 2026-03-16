@@ -1,0 +1,157 @@
+import pytest
+from django.urls import reverse
+from rest_framework.test import APIClient
+from .factories import CompanyAdminFactory, MakerFactory, CheckerFactory
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+def get_tokens(client, email, password):
+    """Helper: log in and return access + refresh tokens."""
+    response = client.post(reverse("auth-login"), {"email": email, "password": password})
+    return response.data
+
+
+@pytest.mark.django_db
+class TestLoginView:
+    def test_valid_credentials_return_tokens(self, api_client):
+        user = MakerFactory()
+        data = get_tokens(api_client, user.email, "testpass123")
+        assert "access" in data
+        assert "refresh" in data
+
+    def test_wrong_password_returns_401(self, api_client):
+        user = MakerFactory()
+        response = api_client.post(reverse("auth-login"), {"email": user.email, "password": "wrongpass"})
+        assert response.status_code == 401
+
+    def test_unknown_email_returns_401(self, api_client):
+        response = api_client.post(reverse("auth-login"), {"email": "nobody@test.com", "password": "pass"})
+        assert response.status_code == 401
+
+    def test_inactive_user_cannot_login(self, api_client):
+        user = MakerFactory(is_active=False)
+        response = api_client.post(reverse("auth-login"), {"email": user.email, "password": "testpass123"})
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestMeView:
+    def test_authenticated_user_gets_profile(self, api_client):
+        user = MakerFactory(first_name="Aniket", last_name="Shah")
+        tokens = get_tokens(api_client, user.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("auth-me"))
+        assert response.status_code == 200
+        assert response.data["email"] == user.email
+        assert response.data["role"] == "MAKER"
+        assert response.data["full_name"] == "Aniket Shah"
+
+    def test_unauthenticated_returns_401(self, api_client):
+        response = api_client.get(reverse("auth-me"))
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestLogoutView:
+    def test_logout_blacklists_refresh_token(self, api_client):
+        user = MakerFactory()
+        tokens = get_tokens(api_client, user.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.post(reverse("auth-logout"), {"refresh": tokens["refresh"]})
+        assert response.status_code == 204
+
+    def test_logout_without_refresh_token_returns_400(self, api_client):
+        user = MakerFactory()
+        tokens = get_tokens(api_client, user.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.post(reverse("auth-logout"), {})
+        assert response.status_code == 400
+
+    def test_unauthenticated_logout_returns_401(self, api_client):
+        response = api_client.post(reverse("auth-logout"), {"refresh": "faketoken"})
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestTokenRefreshView:
+    def test_valid_refresh_token_returns_new_access(self, api_client):
+        user = MakerFactory()
+        tokens = get_tokens(api_client, user.email, "testpass123")
+        response = api_client.post(reverse("auth-token-refresh"), {"refresh": tokens["refresh"]})
+        assert response.status_code == 200
+        assert "access" in response.data
+
+
+@pytest.mark.django_db
+class TestUserListCreateView:
+    def test_company_admin_can_list_users(self, api_client):
+        admin = CompanyAdminFactory()
+        MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("user-list-create"))
+        assert response.status_code == 200
+        assert len(response.data) >= 2
+
+    def test_maker_cannot_list_users(self, api_client):
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, maker.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("user-list-create"))
+        assert response.status_code == 403
+
+    def test_checker_cannot_list_users(self, api_client):
+        checker = CheckerFactory()
+        tokens = get_tokens(api_client, checker.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("user-list-create"))
+        assert response.status_code == 403
+
+    def test_company_admin_can_create_user(self, api_client):
+        admin = CompanyAdminFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        payload = {
+            "email": "newmaker@test.com",
+            "first_name": "New",
+            "last_name": "Maker",
+            "role": "MAKER",
+            "password": "securepass123",
+        }
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 201
+
+    def test_unauthenticated_cannot_list_users(self, api_client):
+        response = api_client.get(reverse("user-list-create"))
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestUserDetailView:
+    def test_company_admin_can_deactivate_user(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": maker.pk}), {"is_active": False})
+        assert response.status_code == 200
+
+    def test_company_admin_can_change_role(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": maker.pk}), {"role": "CHECKER"})
+        assert response.status_code == 200
+
+    def test_maker_cannot_access_user_detail(self, api_client):
+        maker = MakerFactory()
+        other = MakerFactory()
+        tokens = get_tokens(api_client, maker.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("user-detail", kwargs={"pk": other.pk}))
+        assert response.status_code == 403

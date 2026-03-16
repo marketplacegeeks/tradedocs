@@ -1,4 +1,3 @@
-
 # TradeDocs — Project Rules for Claude Code
 
 ## What This Project Is
@@ -42,6 +41,15 @@ Frontend pages live under `frontend/src/pages/`.
 - Proforma Invoice: `PI-YYYY-NNNN`
 - Packing List: `PL-YYYY-NNNN`
 - Commercial Invoice: `CI-YYYY-NNNN`
+
+## Testing Rules
+- Every app has a `tests/` directory with `__init__.py`, `factories.py`, `test_models.py`, and `test_views.py`.
+- Every model must have a factory in `tests/factories.py` using factory-boy.
+- Every API endpoint must have at minimum: one happy-path test and one permission-denial test.
+- Run tests with `pytest`, never `python manage.py test`.
+- All tests must pass before any `git commit`. Run `pytest` and confirm 0 failures before committing.
+- Use `pytest --cov=apps/{app} --cov-report=term-missing` to check coverage after completing a feature.
+- Factories must use `SubFactory` for related models — never hardcode IDs in tests.
 
 ## Current Status
 Project is bootstrapped. No feature code written yet.
