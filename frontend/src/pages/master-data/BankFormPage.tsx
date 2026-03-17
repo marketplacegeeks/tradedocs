@@ -11,35 +11,68 @@ import { ArrowLeft } from "lucide-react";
 import { createBank, getBank, updateBank } from "../../api/banks";
 import { listCountries } from "../../api/countries";
 import { listCurrencies } from "../../api/currencies";
+import { listOrganisations } from "../../api/organisations";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS } from "../../utils/constants";
 import type { AccountType } from "../../utils/constants";
 
 // ---- Schema ---------------------------------------------------------------
 
-const bankSchema = z.object({
-  nickname: z.string().min(1, "Required").max(255),
-  beneficiary_name: z.string().min(1, "Required").max(255),
-  bank_name: z.string().min(1, "Required").max(255),
-  bank_country: z.number({ required_error: "Required" }),
-  branch_name: z.string().min(1, "Required").max(255),
-  branch_address: z.string().optional().default(""),
-  account_number: z.string().min(1, "Required").max(50),
-  account_type: z.enum(["CURRENT", "SAVINGS", "CHECKING"], { required_error: "Required" }),
-  currency: z.number({ required_error: "Required" }),
-  swift_code: z
-    .string().optional()
-    .refine((v) => !v || /^[A-Z0-9]{8}$|^[A-Z0-9]{11}$/.test(v), {
-      message: "Must be 8 or 11 uppercase letters/digits",
-    })
-    .default(""),
-  iban: z
-    .string().optional()
-    .refine((v) => !v || /^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/.test(v), {
-      message: "2-letter country code + 2 digits + up to 30 alphanumeric",
-    })
-    .default(""),
-  routing_number: z.string().optional().default(""),
-});
+const bankSchema = z
+  .object({
+    organisation: z.number({ required_error: "Required" }),
+    nickname: z.string().min(1, "Required").max(255),
+    beneficiary_name: z.string().min(1, "Required").max(255),
+    bank_name: z.string().min(1, "Required").max(255),
+    bank_country: z.number({ required_error: "Required" }),
+    branch_name: z.string().min(1, "Required").max(255),
+    branch_address: z.string().optional().default(""),
+    account_number: z.string().min(1, "Required").max(50),
+    account_type: z.enum(["CURRENT", "SAVINGS", "CHECKING"], { required_error: "Required" }),
+    currency: z.number({ required_error: "Required" }),
+    swift_code: z
+      .string().optional()
+      .refine((v) => !v || /^[A-Z0-9]{8}$|^[A-Z0-9]{11}$/.test(v), {
+        message: "Must be 8 or 11 uppercase letters/digits",
+      })
+      .default(""),
+    iban: z
+      .string().optional()
+      .refine((v) => !v || /^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/.test(v), {
+        message: "2-letter country code + 2 digits + up to 30 alphanumeric",
+      })
+      .default(""),
+    routing_number: z.string().optional().default(""),
+    // Intermediary institution — optional, but all-or-nothing
+    intermediary_bank_name: z.string().optional().default(""),
+    intermediary_account_number: z.string().optional().default(""),
+    intermediary_swift_code: z
+      .string().optional()
+      .refine((v) => !v || /^[A-Z0-9]{8}$|^[A-Z0-9]{11}$/.test(v), {
+        message: "Must be 8 or 11 uppercase letters/digits",
+      })
+      .default(""),
+    intermediary_currency: z.number().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const fields = [
+      data.intermediary_bank_name,
+      data.intermediary_account_number,
+      data.intermediary_swift_code,
+      data.intermediary_currency,
+    ];
+    const filled = fields.filter(Boolean);
+    if (filled.length > 0 && filled.length < 4) {
+      if (!data.intermediary_bank_name)
+        ctx.addIssue({ code: "custom", path: ["intermediary_bank_name"], message: "Required when any intermediary field is entered" });
+      if (!data.intermediary_account_number)
+        ctx.addIssue({ code: "custom", path: ["intermediary_account_number"], message: "Required when any intermediary field is entered" });
+      if (!data.intermediary_swift_code)
+        ctx.addIssue({ code: "custom", path: ["intermediary_swift_code"], message: "Required when any intermediary field is entered" });
+      if (!data.intermediary_currency)
+        ctx.addIssue({ code: "custom", path: ["intermediary_currency"], message: "Required when any intermediary field is entered" });
+    }
+  });
+
 type BankFormValues = z.infer<typeof bankSchema>;
 
 // ---- Field components -----------------------------------------------------
@@ -91,7 +124,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
 function StyledSelect({
   value, onChange, options, placeholder, hasError,
 }: {
-  value: string | number | undefined;
+  value: string | number | undefined | null;
   onChange: (v: number | string) => void;
   options: { value: string | number; label: string }[];
   placeholder?: string;
@@ -116,7 +149,7 @@ function StyledSelect({
 
 // ---- Section card ---------------------------------------------------------
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -132,13 +165,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         style={{
           padding: "14px 24px",
           borderBottom: "1px solid var(--border-light)",
-          fontFamily: "var(--font-heading)",
-          fontSize: 14,
-          fontWeight: 600,
-          color: "var(--text-primary)",
         }}
       >
-        {title}
+        <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+          {title}
+        </div>
+        {description && (
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            {description}
+          </div>
+        )}
       </div>
       <div style={{ padding: "20px 24px" }}>{children}</div>
     </div>
@@ -165,14 +201,21 @@ export default function BankFormPage() {
   const { control, handleSubmit, reset, formState: { errors } } = useForm<BankFormValues>({
     resolver: zodResolver(bankSchema),
     defaultValues: {
+      organisation: undefined,
       nickname: "", beneficiary_name: "", bank_name: "",
       branch_name: "", branch_address: "", account_number: "",
       account_type: undefined, swift_code: "", iban: "", routing_number: "",
+      intermediary_bank_name: "", intermediary_account_number: "",
+      intermediary_swift_code: "", intermediary_currency: null,
     },
   });
 
   const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
   const { data: currencies = [] } = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
+  const { data: exporters = [] } = useQuery({
+    queryKey: ["organisations", "EXPORTER"],
+    queryFn: () => listOrganisations("EXPORTER"),
+  });
   const { data: existingBank, isLoading } = useQuery({
     queryKey: ["banks", Number(id)],
     queryFn: () => getBank(Number(id)),
@@ -182,6 +225,7 @@ export default function BankFormPage() {
   useEffect(() => {
     if (existingBank) {
       reset({
+        organisation: existingBank.organisation,
         nickname: existingBank.nickname,
         beneficiary_name: existingBank.beneficiary_name,
         bank_name: existingBank.bank_name,
@@ -194,6 +238,10 @@ export default function BankFormPage() {
         swift_code: existingBank.swift_code,
         iban: existingBank.iban,
         routing_number: existingBank.routing_number,
+        intermediary_bank_name: existingBank.intermediary_bank_name,
+        intermediary_account_number: existingBank.intermediary_account_number,
+        intermediary_swift_code: existingBank.intermediary_swift_code,
+        intermediary_currency: existingBank.intermediary_currency,
       });
     }
   }, [existingBank, reset]);
@@ -209,6 +257,7 @@ export default function BankFormPage() {
 
   const countryOptions = countries.map((c) => ({ value: c.id, label: `${c.name} (${c.iso2})` }));
   const currencyOptions = currencies.map((c) => ({ value: c.id, label: `${c.code} – ${c.name}` }));
+  const exporterOptions = exporters.map((o) => ({ value: o.id, label: o.name }));
   const accountTypeOptions = Object.entries(ACCOUNT_TYPE_LABELS).map(
     ([value, label]) => ({ value: value as AccountType, label })
   );
@@ -253,6 +302,18 @@ export default function BankFormPage() {
 
       <form onSubmit={handleSubmit((v) => saveMutation.mutate(v))}>
         <Section title="Account Details">
+          {/* Exporter Organisation — full width */}
+          <Field label="Exporter Organisation" required error={errors.organisation?.message}>
+            <Controller name="organisation" control={control} render={({ field }) =>
+              <StyledSelect
+                value={field.value}
+                onChange={(v) => field.onChange(v as number)}
+                options={exporterOptions}
+                placeholder="Select exporter…"
+                hasError={!!errors.organisation}
+              />
+            } />
+          </Field>
           <Row2>
             <Field label="Nickname" required error={errors.nickname?.message}>
               <Controller name="nickname" control={control} render={({ field }) =>
@@ -268,7 +329,7 @@ export default function BankFormPage() {
           <Row2>
             <Field label="Bank Name" required error={errors.bank_name?.message}>
               <Controller name="bank_name" control={control} render={({ field }) =>
-                <input {...field} style={inputStyle(!!errors.bank_name)} placeholder="e.g. HDFC Bank" />
+                <input {...field} style={inputStyle(!!errors.bank_name)} placeholder="e.g. State Bank of India" />
               } />
             </Field>
             <Field label="Bank Country" required error={errors.bank_country?.message}>
@@ -280,7 +341,7 @@ export default function BankFormPage() {
           <Row2>
             <Field label="Branch Name" required error={errors.branch_name?.message}>
               <Controller name="branch_name" control={control} render={({ field }) =>
-                <input {...field} style={inputStyle(!!errors.branch_name)} placeholder="e.g. Fort Branch" />
+                <input {...field} style={inputStyle(!!errors.branch_name)} placeholder="e.g. Commercial Client Group" />
               } />
             </Field>
             <Field label="Branch Address" error={errors.branch_address?.message}>
@@ -312,7 +373,7 @@ export default function BankFormPage() {
           <Row3>
             <Field label="SWIFT / BIC Code" error={errors.swift_code?.message} hint="Optional. 8 or 11 characters.">
               <Controller name="swift_code" control={control} render={({ field }) =>
-                <input {...field} style={inputStyle(!!errors.swift_code)} placeholder="e.g. HDFCINBB" maxLength={11} />
+                <input {...field} style={inputStyle(!!errors.swift_code)} placeholder="e.g. SBININBB659" maxLength={11} />
               } />
             </Field>
             <Field label="IBAN" error={errors.iban?.message} hint="Optional. Required for EU/Middle East.">
@@ -322,10 +383,46 @@ export default function BankFormPage() {
             </Field>
             <Field label="IFSC / Routing / Sort Code" error={errors.routing_number?.message} hint="Optional. India: IFSC, USA: ACH, UK: Sort.">
               <Controller name="routing_number" control={control} render={({ field }) =>
-                <input {...field} style={inputStyle(!!errors.routing_number)} />
+                <input {...field} style={inputStyle(!!errors.routing_number)} placeholder="e.g. SBIN0013039" />
               } />
             </Field>
           </Row3>
+        </Section>
+
+        <Section
+          title="Intermediary Institution"
+          description="Optional. Fill all four fields if your bank requires a correspondent bank for a specific currency (e.g. USD payments via a US correspondent)."
+        >
+          <Row2>
+            <Field label="Intermediary Bank Name" error={errors.intermediary_bank_name?.message}>
+              <Controller name="intermediary_bank_name" control={control} render={({ field }) =>
+                <input {...field} style={inputStyle(!!errors.intermediary_bank_name)} placeholder="e.g. THE BANK OF SBI NEW YORK" />
+              } />
+            </Field>
+            <Field label="Intermediary Account Number" error={errors.intermediary_account_number?.message}>
+              <Controller name="intermediary_account_number" control={control} render={({ field }) =>
+                <input {...field} style={inputStyle(!!errors.intermediary_account_number)} placeholder="e.g. 77600125220002" />
+              } />
+            </Field>
+          </Row2>
+          <Row2>
+            <Field label="Intermediary SWIFT Code" error={errors.intermediary_swift_code?.message} hint="8 or 11 uppercase letters/digits.">
+              <Controller name="intermediary_swift_code" control={control} render={({ field }) =>
+                <input {...field} style={inputStyle(!!errors.intermediary_swift_code)} placeholder="e.g. SBINUS33" maxLength={11} />
+              } />
+            </Field>
+            <Field label="Routing Currency" error={errors.intermediary_currency?.message} hint="Currency for which this intermediary is used.">
+              <Controller name="intermediary_currency" control={control} render={({ field }) =>
+                <StyledSelect
+                  value={field.value ?? undefined}
+                  onChange={(v) => field.onChange(v === "" ? null : Number(v))}
+                  options={currencyOptions}
+                  placeholder="Select currency…"
+                  hasError={!!errors.intermediary_currency}
+                />
+              } />
+            </Field>
+          </Row2>
         </Section>
 
         {/* Actions */}

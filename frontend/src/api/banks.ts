@@ -7,24 +7,33 @@ import api from "./axiosInstance";
 
 export interface Bank {
   id: number;
+  organisation: number;             // Organisation ID
+  organisation_name: string;        // read-only, returned by API
   nickname: string;
   beneficiary_name: string;
   bank_name: string;
-  bank_country: number;       // Country ID
-  bank_country_name: string;  // read-only, returned by API
+  bank_country: number;             // Country ID
+  bank_country_name: string;        // read-only, returned by API
   branch_name: string;
   branch_address: string;
   account_number: string;
   account_type: string;
-  currency: number;           // Currency ID
-  currency_code: string;      // read-only, returned by API
-  currency_name: string;      // read-only, returned by API
+  currency: number;                 // Currency ID
+  currency_code: string;            // read-only, returned by API
+  currency_name: string;            // read-only, returned by API
   swift_code: string;
   iban: string;
   routing_number: string;
+  // Intermediary institution (optional; all-or-nothing)
+  intermediary_bank_name: string;
+  intermediary_account_number: string;
+  intermediary_swift_code: string;
+  intermediary_currency: number | null;     // Currency ID
+  intermediary_currency_code: string | null; // read-only, returned by API
 }
 
 export interface BankPayload {
+  organisation: number;
   nickname: string;
   beneficiary_name: string;
   bank_name: string;
@@ -37,6 +46,11 @@ export interface BankPayload {
   swift_code?: string;
   iban?: string;
   routing_number?: string;
+  // Intermediary institution (optional; all-or-nothing)
+  intermediary_bank_name?: string;
+  intermediary_account_number?: string;
+  intermediary_swift_code?: string;
+  intermediary_currency?: number | null;
 }
 
 // ---- API functions --------------------------------------------------------

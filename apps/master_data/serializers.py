@@ -71,17 +71,33 @@ class BankSerializer(serializers.ModelSerializer):
     bank_country_name = serializers.CharField(source="bank_country.name", read_only=True)
     currency_code = serializers.CharField(source="currency.code", read_only=True)
     currency_name = serializers.CharField(source="currency.name", read_only=True)
+    organisation_name = serializers.CharField(source="organisation.name", read_only=True)
+    intermediary_currency_code = serializers.CharField(
+        source="intermediary_currency.code", read_only=True, default=None
+    )
 
     class Meta:
         model = Bank
         fields = [
-            "id", "nickname", "beneficiary_name", "bank_name",
+            "id", "organisation", "organisation_name",
+            "nickname", "beneficiary_name", "bank_name",
             "bank_country", "bank_country_name",
             "branch_name", "branch_address",
             "account_number", "account_type",
             "currency", "currency_code", "currency_name",
             "swift_code", "iban", "routing_number",
+            "intermediary_bank_name", "intermediary_account_number",
+            "intermediary_swift_code",
+            "intermediary_currency", "intermediary_currency_code",
         ]
+
+    def validate_organisation(self, value):
+        """The selected organisation must be tagged as Exporter."""
+        if value and not value.tags.filter(tag="EXPORTER").exists():
+            raise serializers.ValidationError(
+                "The selected organisation must be tagged as Exporter."
+            )
+        return value
 
     def validate_swift_code(self, value):
         """If SWIFT code is provided, it must be 8 or 11 uppercase alphanumeric characters."""
@@ -103,6 +119,31 @@ class BankSerializer(serializers.ModelSerializer):
                     "and up to 30 alphanumeric characters (max 34 total)."
                 )
         return value
+
+    def validate_intermediary_swift_code(self, value):
+        """If intermediary SWIFT is provided, apply the same ISO 9362 format check."""
+        if value:
+            value = value.strip().upper()
+            if not re.match(r'^[A-Z0-9]{8}$|^[A-Z0-9]{11}$', value):
+                raise serializers.ValidationError(
+                    "SWIFT/BIC code must be exactly 8 or 11 uppercase letters and digits (ISO 9362)."
+                )
+        return value
+
+    def validate(self, data):
+        """All four intermediary fields must be provided together or not at all."""
+        intermediary_fields = [
+            data.get("intermediary_bank_name", ""),
+            data.get("intermediary_account_number", ""),
+            data.get("intermediary_swift_code", ""),
+            data.get("intermediary_currency"),
+        ]
+        filled = [bool(f) for f in intermediary_fields]
+        if any(filled) and not all(filled):
+            raise serializers.ValidationError(
+                "If any intermediary institution field is entered, all four fields are required."
+            )
+        return data
 
 
 # ---------------------------------------------------------------------------

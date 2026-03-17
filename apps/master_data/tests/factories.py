@@ -123,6 +123,8 @@ class BankFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Bank
 
+    # A bank belongs to an Exporter organisation — factory creates one automatically.
+    organisation = factory.SubFactory(OrganisationFactory)
     nickname = factory.Sequence(lambda n: f"Bank Account {n}")
     beneficiary_name = factory.Sequence(lambda n: f"Beneficiary {n}")
     bank_name = factory.Sequence(lambda n: f"Bank {n}")
@@ -135,6 +137,11 @@ class BankFactory(factory.django.DjangoModelFactory):
     swift_code = ""
     iban = ""
     routing_number = ""
+    # Intermediary fields default to empty (optional)
+    intermediary_bank_name = ""
+    intermediary_account_number = ""
+    intermediary_swift_code = ""
+    intermediary_currency = None
 
 
 # ---------------------------------------------------------------------------

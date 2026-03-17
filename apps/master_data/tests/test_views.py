@@ -461,9 +461,12 @@ class TestCurrencyEndpoints:
 
 @pytest.mark.django_db
 class TestBankEndpoints:
-    def _valid_payload(self, country, currency):
+    def _valid_payload(self, country, currency, organisation=None):
         """Return a minimal valid bank creation payload."""
+        org = organisation or OrganisationFactory()
+        OrganisationTagFactory(organisation=org, tag="EXPORTER")
         return {
+            "organisation": org.id,
             "nickname": "USD Operating Account",
             "beneficiary_name": "Sunrise Exports Pvt Ltd",
             "bank_name": "HDFC Bank",

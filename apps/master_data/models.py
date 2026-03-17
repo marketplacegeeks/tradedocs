@@ -191,12 +191,23 @@ class Bank(models.Model):
     A bank account record used on Proforma Invoices (optional) and
     Commercial Invoices (mandatory). Details print on both PDFs.
     Constraint #7: all FK references use PROTECT.
+    Each bank account belongs to one Exporter organisation.
     """
     class AccountType(models.TextChoices):
         CURRENT = "CURRENT", "Current"
         SAVINGS = "SAVINGS", "Savings"
         CHECKING = "CHECKING", "Checking"
 
+    # The Exporter organisation this bank account belongs to.
+    # Constraint #7: cannot delete an Organisation that a Bank references.
+    organisation = models.ForeignKey(
+        "Organisation",
+        on_delete=models.PROTECT,
+        related_name="banks",
+        null=True,  # nullable at DB level to allow safe migration of existing rows
+        blank=True,
+        help_text="Exporter organisation this bank account belongs to",
+    )
     nickname = models.CharField(max_length=255, help_text="Short internal label, e.g. 'USD Operating Account'")
     beneficiary_name = models.CharField(max_length=255, help_text="Account holder name as it appears on wire instructions")
     bank_name = models.CharField(max_length=255)
@@ -221,12 +232,44 @@ class Bank(models.Model):
     # Stores IFSC (India), ACH routing number (USA), sort code (UK), etc.
     routing_number = models.CharField(max_length=50, blank=True)
 
+    # --- Intermediary Institution (optional; all-or-nothing) ---
+    # Used when the receiving bank requires a correspondent bank for a specific currency.
+    intermediary_bank_name = models.CharField(max_length=255, blank=True)
+    intermediary_account_number = models.CharField(max_length=50, blank=True)
+    intermediary_swift_code = models.CharField(
+        max_length=11, blank=True,
+        validators=[_validate_swift],
+        help_text="Optional. 8 or 11 uppercase alphanumeric characters (ISO 9362).",
+    )
+    # Constraint #7: cannot delete a Currency that a Bank intermediary references.
+    intermediary_currency = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name="intermediary_banks",
+        help_text="Currency for which this intermediary routing applies (e.g. USD)",
+    )
+
     class Meta:
         db_table = "master_data_bank"
         ordering = ["bank_name", "nickname"]
 
     def __str__(self):
         return f"{self.bank_name} – {self.nickname}"
+
+    def clean(self):
+        """All four intermediary fields must be filled together or not at all."""
+        intermediary_fields = [
+            self.intermediary_bank_name,
+            self.intermediary_account_number,
+            self.intermediary_swift_code,
+            self.intermediary_currency_id,
+        ]
+        filled = [bool(f) for f in intermediary_fields]
+        if any(filled) and not all(filled):
+            raise ValidationError(
+                "If any intermediary institution field is entered, all four are required."
+            )
 
 
 # ---------------------------------------------------------------------------
