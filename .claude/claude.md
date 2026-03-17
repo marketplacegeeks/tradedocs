@@ -11,6 +11,7 @@
 - Before writing any code, confirm which files you will touch and why.
 - After writing code, tell me what to run to verify it works.
 - When I ask you to fix something, touch only the specific thing that is broken. Do not "clean up" surrounding code.
+- ensure you follow designsystem.md
 
 ## What to Never Do
 - Never start implementing until I say "go ahead" or similar confirmation.

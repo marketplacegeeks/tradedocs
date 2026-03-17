@@ -75,7 +75,7 @@ pbcopy < ~/.ssh/id_ed25519.pub
 ```
 
 3. Go to GitHub → Settings → SSH and GPG Keys → New SSH Key. Paste and save.
-4. Test: `ssh -T ````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
+4. Test: `ssh -T ````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
 
 ---
 
@@ -1042,19 +1042,29 @@ These are the tables and pages everything else depends on. Build them before tou
 
 | # | Feature | FR | Branch name |
 | --- | --- | --- | --- |
-| 9 | PI model: header, line items, charges | FR-09.1–09.5 | `feature/fr-09-pi-model` |
+| 9 | PI model: header (FR-09.1–09.3), line items (FR-09.5), dynamic charge rows, Incoterm cost breakdown (FR-09.7) | FR-09.1–09.5, FR-09.7 | `feature/fr-09-pi-model` |
 | 10 | `workflow` app — WorkflowService, AuditLog (PI states first) | FR-08 | `feature/fr-08-workflow-pi` |
 | 11 | PI create/edit API endpoints + state-aware serializers | FR-09 | `feature/fr-09-pi-api` |
-| 12 | PI PDF generation (ReportLab) — DRAFT watermark + clean Approved output | FR-09.6 | `feature/fr-09-pi-pdf` |
+| 12 | PI PDF generation (ReportLab) — DRAFT watermark + clean Approved output; includes Incoterm cost breakdown block, MT103 instruction, Declaration, and Bank details block | FR-09.6 | `feature/fr-09-pi-pdf` |
 | 13 | Proforma Invoice list, create, and detail pages (React) | FR-09 | `feature/fr-09-pi-pages` |
 
+**Key PI rules to carry into every session:**
+- Document number format: `PI-YYYY-NNNN` (e.g., PI-2026-0001). Auto-generated on save; read-only field.
+- Submission is blocked if there are zero line items — at least one line item is required (FR-09.5).
+- Workflow states: `Draft → Pending Approval → Approved` or `→ Rework → Permanently Rejected`. The state is "Pending Approval" (not "Pending") and rejection returns to "Rework" (not "Draft").
+- Rate label on line items is dynamic: "Rate (USD/MT)", "Rate (USD/KG)", etc. — it follows the UOM selected on that line item.
+- Additional charges below the line items are free-text rows (Description + Amount USD). There is no fixed "Bank Charges" field — the Maker names each charge.
+- The Incoterm selection controls which cost fields appear in the Cost Breakdown section (FR-09.7). Fields the buyer bears are hidden entirely — never greyed out.
+- Invoice Total = Grand Total + seller-borne cost breakdown fields. "Amount in Words" reflects Invoice Total, not Grand Total.
+- For EXW: no cost breakdown fields appear at all; Invoice Total = Grand Total.
+
 **How to break Layer 2 into sessions:**
-- Session 1: PI model only. Run migration. Write model tests (field defaults, number format). Verify table in DB via postgres MCP.
-- Session 2: WorkflowService for PI states (DRAFT → PENDING_APPROVAL → APPROVED → REWORK → PERMANENTLY_REJECTED). Write tests for every valid and invalid transition — e.g., APPROVED cannot go back to DRAFT, REJECT without a comment must raise an error. This is critical logic — spend a full session on it. Confirm `pytest` passes before moving on.
-- Session 3: PI API endpoints (create, update, list, detail). Write permission tests (Maker cannot approve, unauthenticated gets 401). Verify with curl.
-- Session 4: PI PDF layout in ReportLab. Generate a test PDF and open it.
+- Session 1: PI model only — header fields, PILineItem (with UOM FK, dynamic rate label stored as-is), PICharge (free-text description + amount), and the Incoterm cost breakdown fields (freight, insurance, import duty, destination charges) on the PI header. Run migration. Write model tests (field defaults, PI-YYYY-NNNN format, line item amount calculation). Verify tables in DB via postgres MCP.
+- Session 2: WorkflowService for PI states (`Draft → Pending Approval → Approved → Rework → Permanently Rejected`). Write tests for every valid and invalid transition — e.g., Approved cannot go back to Draft, Rework without a comment must raise an error, submission with zero line items must raise an error. This is critical logic — spend a full session on it. Confirm `pytest` passes before moving on.
+- Session 3: PI API endpoints (create, update, list, detail). Enforce at-least-one-line-item on submit. Write permission tests (Maker cannot approve, unauthenticated gets 401). Verify with curl.
+- Session 4: PI PDF layout in ReportLab. Must include: main info table (8 rows), line items table, amount block with dynamic charge rows + cost breakdown (Incoterm-driven), MT103 static text, Declaration static text, Bank details block (BENEFICIARY NAME / BANK NAME / BRANCH NAME / BRANCH ADDRESS / A/C NO. / IFSC CODE / SWIFT CODE + intermediary block if configured), T&C on new page. Generate a test PDF and open it.
 - Session 5: React list and create pages.
-- Session 6: React detail page (line items, workflow actions, PDF download).
+- Session 6: React detail page (line items, dynamic charge rows, Incoterm cost breakdown, workflow actions, PDF download).
 
 ---
 
