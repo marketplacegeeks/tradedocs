@@ -361,41 +361,48 @@ def generate_pi_pdf(pi) -> io.BytesIO:
 
     amount_rows = []
     amount_rows.append([_p("Amount Chargeable in: USD", STYLE_BOLD), _p("")])
-    amount_rows.append([_p("Total Amount (USD)"), _p(_fmt_decimal(line_total, ""), STYLE_RIGHT)])
-    for charge in charges:
-        amount_rows.append([_p(charge.description), _p(_fmt_decimal(charge.amount_usd, ""), STYLE_RIGHT)])
+
+    # Sub Total row only appears when there are additional charges — avoids
+    # showing two identical numbers (Sub Total = Grand Total) when charges = 0.
+    if charges:
+        amount_rows.append([_p("Sub Total"), _p(_fmt_decimal(line_total, ""), STYLE_RIGHT)])
+        for charge in charges:
+            amount_rows.append([_p(charge.description), _p(_fmt_decimal(charge.amount_usd, ""), STYLE_RIGHT)])
+
     amount_rows.append([_p("Grand Total Amount", STYLE_BOLD), _p(_fmt_decimal(grand_total, ""), STYLE_RIGHT_BOLD)])
 
-    # Cost breakdown (FR-09.7) — only if incoterm is set and not EXW
-    if incoterm_code and incoterm_code != "EXW":
-        amount_rows.append([_p(f"COST BREAKDOWN ({incoterm_code})", STYLE_SECTION), _p("")])
+    # Cost breakdown (FR-09.7) — skipped for EXW (no seller costs) and for
+    # FCA/FOB (buyer bears freight; showing only FOB Value = Grand Total adds
+    # nothing and is confusing on the document).
+    shows_cost_breakdown = (
+        incoterm_code
+        and incoterm_code not in ("EXW",)
+        and incoterm_code not in FOB_ONLY_INCOTERMS
+    )
 
-        # FOB Value always shows for every incoterm (except EXW, which is already guarded above)
+    invoice_total = grand_total
+    if shows_cost_breakdown:
+        amount_rows.append([_p(f"COST BREAKDOWN ({incoterm_code})", STYLE_SECTION), _p("")])
         amount_rows.append([_p("FOB Value"), _p(_fmt_decimal(grand_total, ""), STYLE_RIGHT)])
 
         if "freight" in seller_fields:
             amount_rows.append([_p("Freight"), _p(_fmt_decimal(pi.freight or Decimal("0.00"), ""), STYLE_RIGHT)])
+            invoice_total += pi.freight or Decimal("0.00")
         if "insurance_amount" in seller_fields:
-            tooltip = " (All-risk coverage)" if incoterm_code in ("CIP",) else ""
+            tooltip = " (All-risk coverage)" if incoterm_code == "CIP" else ""
             amount_rows.append([_p(f"Insurance Amount{tooltip}"), _p(_fmt_decimal(pi.insurance_amount or Decimal("0.00"), ""), STYLE_RIGHT)])
+            invoice_total += pi.insurance_amount or Decimal("0.00")
         if "import_duty" in seller_fields:
             amount_rows.append([_p("Import Duty / Taxes"), _p(_fmt_decimal(pi.import_duty or Decimal("0.00"), ""), STYLE_RIGHT)])
+            invoice_total += pi.import_duty or Decimal("0.00")
         if "destination_charges" in seller_fields:
             amount_rows.append([_p("Destination Charges"), _p(_fmt_decimal(pi.destination_charges or Decimal("0.00"), ""), STYLE_RIGHT)])
+            invoice_total += pi.destination_charges or Decimal("0.00")
 
-    # Invoice Total
-    invoice_total = grand_total
-    if incoterm_code and incoterm_code not in ("EXW",):
-        if "freight" in seller_fields and pi.freight:
-            invoice_total += pi.freight
-        if "insurance_amount" in seller_fields and pi.insurance_amount:
-            invoice_total += pi.insurance_amount
-        if "import_duty" in seller_fields and pi.import_duty:
-            invoice_total += pi.import_duty
-        if "destination_charges" in seller_fields and pi.destination_charges:
-            invoice_total += pi.destination_charges
-
-    amount_rows.append([_p("Invoice Total Value", STYLE_BOLD), _p(_fmt_decimal(invoice_total, ""), STYLE_RIGHT_BOLD)])
+        # Only print Invoice Total (Amount Payable) when it differs from Grand Total —
+        # avoids two identical numbers on the document.
+        if invoice_total != grand_total:
+            amount_rows.append([_p("Invoice Total (Amount Payable)", STYLE_BOLD), _p(_fmt_decimal(invoice_total, ""), STYLE_RIGHT_BOLD)])
 
     amount_table = Table(amount_rows, colWidths=[CONTENT_W * 0.7, CONTENT_W * 0.3])
     amount_table.setStyle(_table_style([
@@ -405,7 +412,9 @@ def generate_pi_pdf(pi) -> io.BytesIO:
     story.append(amount_table)
     story.append(Spacer(1, 2 * mm))
 
-    # -- 6. Amount in words ---------------------------------------------------
+    # -- 6. Amount in words — always reflects the final payable amount --------
+    # When Invoice Total (Amount Payable) is shown it is the payable figure;
+    # otherwise Grand Total is the amount the buyer owes.
     story.append(_p(f"<b>Amount in Words:</b> {_amount_in_words(invoice_total)}", STYLE_NORMAL))
     story.append(Spacer(1, 3 * mm))
 

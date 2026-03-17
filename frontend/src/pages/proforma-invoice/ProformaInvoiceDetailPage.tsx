@@ -434,67 +434,81 @@ export default function ProformaInvoiceDetailPage() {
   // ---- Render: Totals + Cost breakdown (FR-09.7) ---------------------------
 
   function renderTotals() {
-    const showCostBreakdown = incotermsCode && incotermsCode !== "EXW" && sellerFields.size > 0;
+    // Cost breakdown is shown only when the seller bears costs (not EXW, not FCA/FOB).
+    // FCA/FOB: buyer pays freight so FOB Value = Grand Total — showing the section adds nothing.
+    const FOB_ONLY = new Set(["FCA", "FOB"]);
+    const showCostBreakdown = incotermsCode && incotermsCode !== "EXW" && !FOB_ONLY.has(incotermsCode) && sellerFields.size > 0;
+
+    // Invoice Total (Amount Payable) is only shown when it exceeds Grand Total —
+    // avoids printing two identical numbers side by side.
+    const invoiceTotalNum = parseFloat(pi.invoice_total || "0");
+    const grandTotalNum = parseFloat(pi.grand_total || "0");
+    const showInvoiceTotal = showCostBreakdown && invoiceTotalNum > grandTotalNum;
 
     return (
       <div style={{ ...CARD, maxWidth: 480, marginLeft: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Total Amount (USD)</span>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>{formatMoney(pi.line_items_total)}</span>
-        </div>
-        {pi.charges.map((c) => (
-          <div key={c.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>{c.description}</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(c.amount_usd)}</span>
-          </div>
-        ))}
+        {/* Sub Total row only when there are additional charges */}
+        {pi.charges.length > 0 && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Sub Total</span>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>{formatMoney(pi.line_items_total)}</span>
+            </div>
+            {pi.charges.map((c) => (
+              <div key={c.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>{c.description}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(c.amount_usd)}</span>
+              </div>
+            ))}
+          </>
+        )}
 
-        <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: 8, marginTop: 4, display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ borderTop: pi.charges.length > 0 ? "1px solid var(--border-light)" : "none", paddingTop: pi.charges.length > 0 ? 8 : 0, marginTop: pi.charges.length > 0 ? 4 : 0, display: "flex", justifyContent: "space-between", marginBottom: showCostBreakdown ? 16 : 0 }}>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Grand Total Amount</span>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{formatMoney(pi.grand_total)}</span>
         </div>
 
         {showCostBreakdown && (
-          <>
-            <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 10 }}>
-                Cost Breakdown ({incotermsCode})
-              </p>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value</span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(pi.grand_total)}</span>
-              </div>
-              {Array.from(sellerFields).map((field) => (
-                <div key={field} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>
-                    {COST_FIELD_LABELS[field]}
-                    {field === "insurance_amount" && incotermsCode === "CIP" && (
-                      <Tooltip title="CIP requires all-risk (Institute Cargo Clauses A) coverage.">
-                        <span style={{ marginLeft: 4, color: "var(--primary)", fontSize: 11, cursor: "help" }}>ℹ</span>
-                      </Tooltip>
-                    )}
-                  </span>
-                  {canEdit ? (
-                    <input
-                      style={{ ...INPUT, width: 120, textAlign: "right" }}
-                      value={costFields[field] ?? (pi as any)[field] ?? ""}
-                      onChange={(e) => setCostFields((p) => ({ ...p, [field]: e.target.value }))}
-                      onBlur={() => updateCostFieldsMutation.mutate({ [field]: costFields[field] || null })}
-                      placeholder="0.00"
-                    />
-                  ) : (
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney((pi as any)[field])}</span>
-                  )}
-                </div>
-              ))}
+          <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 10 }}>
+              Cost Breakdown ({incotermsCode})
+            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(pi.grand_total)}</span>
             </div>
-          </>
+            {Array.from(sellerFields).map((field) => (
+              <div key={field} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>
+                  {COST_FIELD_LABELS[field]}
+                  {field === "insurance_amount" && incotermsCode === "CIP" && (
+                    <Tooltip title="CIP requires all-risk (Institute Cargo Clauses A) coverage.">
+                      <span style={{ marginLeft: 4, color: "var(--primary)", fontSize: 11, cursor: "help" }}>ℹ</span>
+                    </Tooltip>
+                  )}
+                </span>
+                {canEdit ? (
+                  <input
+                    style={{ ...INPUT, width: 120, textAlign: "right" }}
+                    value={costFields[field] ?? (pi as any)[field] ?? ""}
+                    onChange={(e) => setCostFields((p) => ({ ...p, [field]: e.target.value }))}
+                    onBlur={() => updateCostFieldsMutation.mutate({ [field]: costFields[field] || null })}
+                    placeholder="0.00"
+                  />
+                ) : (
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney((pi as any)[field])}</span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
-        <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total Value</span>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{formatMoney(pi.invoice_total)}</span>
-        </div>
+        {showInvoiceTotal && (
+          <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{formatMoney(pi.invoice_total)}</span>
+          </div>
+        )}
       </div>
     );
   }
