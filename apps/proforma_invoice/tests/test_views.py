@@ -631,15 +631,15 @@ class TestPdfDownload:
         assert f"{pi.pi_number}.pdf" in resp["Content-Disposition"]
 
     def test_draft_pdf_contains_watermark(self):
-        """Draft PI → watermark transparency ExtGState (/ca .35) is present
+        """Draft PI → watermark transparency ExtGState (/ca .07) is present
         in the uncompressed page resources dictionary (FR-08.3)."""
         pi = ProformaInvoiceFactory(status=DRAFT)
         resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
-        # ReportLab writes the alpha transparency value into the page resource dict
-        # as an ExtGState entry; this is uncompressed and reliably detectable.
-        assert b"/ca .35" in body
+        # ReportLab writes the alpha value into the page resource dict as an
+        # uncompressed ExtGState entry — reliably detectable in raw PDF bytes.
+        assert b"/ca .07" in body
 
     def test_approved_pdf_has_no_watermark(self):
         """Approved PI → clean PDF; watermark ExtGState must be absent (FR-08.3)."""
@@ -647,7 +647,7 @@ class TestPdfDownload:
         resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
-        assert b"/ca .35" not in body
+        assert b"/ca .07" not in body
 
     def test_pdf_downloadable_for_pending_approval_status(self):
         """PDF is accessible at every workflow stage, not just DRAFT (US-05)."""
