@@ -370,8 +370,8 @@ def generate_pi_pdf(pi) -> io.BytesIO:
     if incoterm_code and incoterm_code != "EXW":
         amount_rows.append([_p(f"COST BREAKDOWN ({incoterm_code})", STYLE_SECTION), _p("")])
 
-        if incoterm_code not in FOB_ONLY_INCOTERMS or True:  # FOB Value always shown except EXW
-            amount_rows.append([_p("FOB Value"), _p(_fmt_decimal(grand_total, ""), STYLE_RIGHT)])
+        # FOB Value always shows for every incoterm (except EXW, which is already guarded above)
+        amount_rows.append([_p("FOB Value"), _p(_fmt_decimal(grand_total, ""), STYLE_RIGHT)])
 
         if "freight" in seller_fields:
             amount_rows.append([_p("Freight"), _p(_fmt_decimal(pi.freight or Decimal("0.00"), ""), STYLE_RIGHT)])

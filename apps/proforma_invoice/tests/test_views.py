@@ -584,3 +584,75 @@ class TestIncotermSellerFields:
         # grand_total = 200.00, freight = 50.00 → invoice_total = 250.00
         assert Decimal(resp.data["invoice_total"]) == Decimal("250.00")
         assert Decimal(resp.data["grand_total"]) == Decimal("200.00")
+
+
+# ---- PDF download (FR-09.6) -------------------------------------------------
+
+@pytest.mark.django_db
+class TestPdfDownload:
+    """
+    PDF download endpoint (FR-09.6, US-05).
+    GET /proforma-invoices/{id}/pdf/ — streams PDF in memory; all roles; all statuses.
+    """
+
+    def test_maker_can_download_pdf(self):
+        """Any authenticated Maker gets a 200 application/pdf response."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == "application/pdf"
+
+    def test_checker_can_download_pdf(self):
+        """Checkers can also download at any status."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == "application/pdf"
+
+    def test_unauthenticated_cannot_download_pdf(self):
+        """Unauthenticated requests must be rejected."""
+        pi = ProformaInvoiceFactory()
+        resp = APIClient().get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 401
+
+    def test_pdf_response_starts_with_pdf_magic_bytes(self):
+        """Response body must be a real PDF file (starts with %PDF)."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(b"%PDF")
+
+    def test_pdf_filename_matches_pi_number(self):
+        """Content-Disposition header must use the PI number as the filename."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        assert f"{pi.pi_number}.pdf" in resp["Content-Disposition"]
+
+    def test_draft_pdf_contains_watermark(self):
+        """Draft PI → watermark transparency ExtGState (/ca .35) is present
+        in the uncompressed page resources dictionary (FR-08.3)."""
+        pi = ProformaInvoiceFactory(status=DRAFT)
+        resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        body = b"".join(resp.streaming_content)
+        # ReportLab writes the alpha transparency value into the page resource dict
+        # as an ExtGState entry; this is uncompressed and reliably detectable.
+        assert b"/ca .35" in body
+
+    def test_approved_pdf_has_no_watermark(self):
+        """Approved PI → clean PDF; watermark ExtGState must be absent (FR-08.3)."""
+        pi = ProformaInvoiceFactory(status=APPROVED)
+        resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        body = b"".join(resp.streaming_content)
+        assert b"/ca .35" not in body
+
+    def test_pdf_downloadable_for_pending_approval_status(self):
+        """PDF is accessible at every workflow stage, not just DRAFT (US-05)."""
+        pi = ProformaInvoiceFactory(status=PENDING_APPROVAL)
+        resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
+        assert resp.status_code == 200
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(b"%PDF")
