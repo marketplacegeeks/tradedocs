@@ -467,3 +467,120 @@ class TestSignedCopyUpload:
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         assert resp.status_code == 200
         assert resp.data["signed_copy_url"] is not None
+
+
+# ---- Name fields in serializer response (FR-09) ----------------------------
+
+@pytest.mark.django_db
+class TestNameFields:
+    """The serializer must return human-readable name fields alongside FK ids."""
+
+    def test_list_response_includes_exporter_and_consignee_names(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(maker).get(PI_LIST_URL)
+        assert resp.status_code == 200
+        row = next(r for r in resp.data if r["id"] == pi.pk)
+        assert row["exporter_name"] == pi.exporter.name
+        assert row["consignee_name"] == pi.consignee.name
+
+    def test_detail_response_includes_all_name_fields(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp.data["exporter_name"] == pi.exporter.name
+        assert resp.data["consignee_name"] == pi.consignee.name
+        # buyer_name is null when no buyer is set
+        assert resp.data["buyer_name"] is None
+
+    def test_detail_response_buyer_name_when_set(self):
+        maker = MakerFactory()
+        buyer_org = OrganisationFactory()
+        pi = ProformaInvoiceFactory(buyer=buyer_org)
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp.data["buyer_name"] == buyer_org.name
+
+    def test_detail_response_payment_terms_name(self):
+        maker = MakerFactory()
+        pt = PaymentTermFactory()
+        pi = ProformaInvoiceFactory(payment_terms=pt)
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp.data["payment_terms_name"] == pt.name
+
+
+# ---- INCOTERM_SELLER_FIELDS correctness (FR-09.7) ---------------------------
+
+@pytest.mark.django_db
+class TestIncotermSellerFields:
+    """
+    The serializer's INCOTERM_SELLER_FIELDS must match FR-09.7.3.
+    FCA/FOB: no editable cost fields (seller_fields = {}).
+    CFR/CPT: freight only.
+    CIF/CIP/DAP: freight + insurance.
+    """
+
+    def _pi_with_incoterm(self, code):
+        incoterm = IncotermFactory(code=code)
+        return ProformaInvoiceFactory(incoterms=incoterm)
+
+    def test_fca_invoice_total_equals_grand_total(self):
+        """FCA: no seller-borne cost fields → Invoice Total = Grand Total."""
+        maker = MakerFactory()
+        pi = self._pi_with_incoterm("FCA")
+        # Add a line item so grand_total > 0
+        ProformaInvoiceLineItemFactory(pi=pi)
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp.data["invoice_total"] == resp.data["grand_total"]
+
+    def test_fob_invoice_total_equals_grand_total(self):
+        """FOB: same as FCA."""
+        maker = MakerFactory()
+        pi = self._pi_with_incoterm("FOB")
+        ProformaInvoiceLineItemFactory(pi=pi)
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp.data["invoice_total"] == resp.data["grand_total"]
+
+    def test_cfr_invoice_total_includes_freight_not_insurance(self):
+        """CFR: freight is seller-borne, insurance is NOT (buyer pays)."""
+        from apps.proforma_invoice.serializers import INCOTERM_SELLER_FIELDS
+        cfr_fields = INCOTERM_SELLER_FIELDS["CFR"]
+        assert "freight" in cfr_fields
+        assert "insurance_amount" not in cfr_fields
+
+    def test_cpt_invoice_total_includes_freight_not_insurance(self):
+        """CPT: same shape as CFR."""
+        from apps.proforma_invoice.serializers import INCOTERM_SELLER_FIELDS
+        cpt_fields = INCOTERM_SELLER_FIELDS["CPT"]
+        assert "freight" in cpt_fields
+        assert "insurance_amount" not in cpt_fields
+
+    def test_cif_includes_freight_and_insurance(self):
+        from apps.proforma_invoice.serializers import INCOTERM_SELLER_FIELDS
+        cif_fields = INCOTERM_SELLER_FIELDS["CIF"]
+        assert "freight" in cif_fields
+        assert "insurance_amount" in cif_fields
+        assert "import_duty" not in cif_fields
+
+    def test_ddp_includes_all_cost_fields(self):
+        from apps.proforma_invoice.serializers import INCOTERM_SELLER_FIELDS
+        ddp_fields = INCOTERM_SELLER_FIELDS["DDP"]
+        assert ddp_fields == {"freight", "insurance_amount", "import_duty", "destination_charges"}
+
+    def test_cfr_invoice_total_computed_correctly(self):
+        """CFR PI with freight set → Invoice Total = Grand Total + Freight."""
+        from decimal import Decimal
+        maker = MakerFactory()
+        pi = self._pi_with_incoterm("CFR")
+        item = ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("2.000"), rate_usd=Decimal("100.00"))
+        pi.freight = Decimal("50.00")
+        pi.save(update_fields=["freight"])
+        resp = auth_client(maker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+        # grand_total = 200.00, freight = 50.00 → invoice_total = 250.00
+        assert Decimal(resp.data["invoice_total"]) == Decimal("250.00")
+        assert Decimal(resp.data["grand_total"]) == Decimal("200.00")

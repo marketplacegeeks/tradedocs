@@ -81,11 +81,11 @@ export const SHIPMENT_OPTION_LABELS: Record<ShipmentOption, string> = {
 // Used by the PI form and detail page to conditionally show/hide the cost breakdown section.
 export const INCOTERM_SELLER_FIELDS: Record<string, Set<string>> = {
   EXW: new Set(),
-  FCA: new Set(["freight"]),
-  FOB: new Set(["freight"]),
-  CFR: new Set(["freight", "insurance_amount"]),
+  FCA: new Set(),                                                    // FOB Value only; buyer bears freight
+  FOB: new Set(),                                                    // FOB Value only; buyer bears freight
+  CFR: new Set(["freight"]),                                         // seller pays freight only
   CIF: new Set(["freight", "insurance_amount"]),
-  CPT: new Set(["freight", "insurance_amount"]),
+  CPT: new Set(["freight"]),                                         // seller pays freight only
   CIP: new Set(["freight", "insurance_amount"]),
   DAP: new Set(["freight", "insurance_amount"]),
   DPU: new Set(["freight", "insurance_amount", "destination_charges"]),

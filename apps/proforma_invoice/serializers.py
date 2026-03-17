@@ -21,11 +21,11 @@ from .services import generate_document_number
 # EXW = no cost fields; any unknown incoterm → no cost fields.
 INCOTERM_SELLER_FIELDS = {
     "EXW": set(),
-    "FCA": {"freight"},
-    "FOB": {"freight"},
-    "CFR": {"freight", "insurance_amount"},
+    "FCA": set(),                                                       # FOB Value only; buyer bears freight
+    "FOB": set(),                                                       # FOB Value only; buyer bears freight
+    "CFR": {"freight"},                                                 # seller pays freight only
     "CIF": {"freight", "insurance_amount"},
-    "CPT": {"freight", "insurance_amount"},
+    "CPT": {"freight"},                                                 # seller pays freight only
     "CIP": {"freight", "insurance_amount"},
     "DAP": {"freight", "insurance_amount"},
     "DPU": {"freight", "insurance_amount", "destination_charges"},
@@ -102,6 +102,16 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     incoterms_code = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
 
+    # Organisation name helpers for display in list and detail pages
+    exporter_name = serializers.SerializerMethodField()
+    consignee_name = serializers.SerializerMethodField()
+    buyer_name = serializers.SerializerMethodField()
+
+    # Master data name helpers
+    payment_terms_name = serializers.SerializerMethodField()
+    port_of_loading_name = serializers.SerializerMethodField()
+    port_of_discharge_name = serializers.SerializerMethodField()
+
     # Returns the full URL to the signed copy file, or null if none uploaded.
     signed_copy_url = serializers.SerializerMethodField()
 
@@ -114,14 +124,19 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         fields = [
             # Header
             "id", "pi_number", "pi_date",
-            "exporter", "consignee", "buyer",
+            "exporter", "exporter_name",
+            "consignee", "consignee_name",
+            "buyer", "buyer_name",
             "buyer_order_no", "buyer_order_date", "other_references",
             "country_of_origin", "country_of_final_destination",
             # Shipping
             "pre_carriage_by", "place_of_receipt", "vessel_flight_no",
-            "port_of_loading", "port_of_discharge", "final_destination",
+            "port_of_loading", "port_of_loading_name",
+            "port_of_discharge", "port_of_discharge_name",
+            "final_destination",
             # Payment & Terms
-            "payment_terms", "incoterms", "incoterms_code", "bank",
+            "payment_terms", "payment_terms_name",
+            "incoterms", "incoterms_code", "bank",
             "validity_for_acceptance", "validity_for_shipment",
             "partial_shipment", "transshipment",
             # T&C
@@ -143,6 +158,8 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "line_items", "charges",
             "line_items_total", "charges_total", "grand_total", "invoice_total",
             "incoterms_code",
+            "exporter_name", "consignee_name", "buyer_name",
+            "payment_terms_name", "port_of_loading_name", "port_of_discharge_name",
             "signed_copy_url",
         ]
 
@@ -284,6 +301,24 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.signed_copy.url)
         return obj.signed_copy.url
+
+    def get_exporter_name(self, obj):
+        return obj.exporter.name if obj.exporter else None
+
+    def get_consignee_name(self, obj):
+        return obj.consignee.name if obj.consignee else None
+
+    def get_buyer_name(self, obj):
+        return obj.buyer.name if obj.buyer else None
+
+    def get_payment_terms_name(self, obj):
+        return obj.payment_terms.name if obj.payment_terms else None
+
+    def get_port_of_loading_name(self, obj):
+        return obj.port_of_loading.name if obj.port_of_loading else None
+
+    def get_port_of_discharge_name(self, obj):
+        return obj.port_of_discharge.name if obj.port_of_discharge else None
 
 
 # ---- Audit log serializer (read-only) -------------------------------------

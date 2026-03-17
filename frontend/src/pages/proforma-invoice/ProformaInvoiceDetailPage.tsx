@@ -634,6 +634,19 @@ export default function ProformaInvoiceDetailPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {canEdit && (
+            <button
+              onClick={() => navigate(`/proforma-invoices/${piId}/edit`)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "var(--pastel-blue)", color: "var(--pastel-blue-text)",
+                border: "none", borderRadius: 8, padding: "8px 14px",
+                fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              }}
+            >
+              <Edit2 size={14} strokeWidth={1.5} /> Edit Header
+            </button>
+          )}
           <button
             onClick={() => setAuditDrawerOpen(true)}
             style={{
@@ -675,18 +688,16 @@ export default function ProformaInvoiceDetailPage() {
       <div style={CARD}>
         <h2 style={SECTION_TITLE}>Invoice Details</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-          <LabelValue label="Exporter" value={String(pi.exporter)} />
-          <LabelValue label="Consignee" value={String(pi.consignee)} />
-          <LabelValue label="Buyer" value={pi.buyer ? String(pi.buyer) : "—"} />
+          <LabelValue label="Exporter" value={pi.exporter_name} />
+          <LabelValue label="Consignee" value={pi.consignee_name} />
+          <LabelValue label="Buyer" value={pi.buyer_name ?? undefined} />
           <LabelValue label="Invoice Date" value={pi.pi_date} />
           <LabelValue label="Buyer Order No" value={pi.buyer_order_no} />
           <LabelValue label="Buyer Order Date" value={pi.buyer_order_date ?? undefined} />
-          <LabelValue label="Country of Origin" value={pi.country_of_origin ? String(pi.country_of_origin) : "—"} />
-          <LabelValue label="Country of Final Destination" value={pi.country_of_final_destination ? String(pi.country_of_final_destination) : "—"} />
           <LabelValue label="Incoterms" value={pi.incoterms_code ?? "—"} />
-          <LabelValue label="Payment Terms" value={pi.payment_terms ? String(pi.payment_terms) : "—"} />
-          <LabelValue label="Port of Loading" value={pi.port_of_loading ? String(pi.port_of_loading) : "—"} />
-          <LabelValue label="Port of Discharge" value={pi.port_of_discharge ? String(pi.port_of_discharge) : "—"} />
+          <LabelValue label="Payment Terms" value={pi.payment_terms_name ?? undefined} />
+          <LabelValue label="Port of Loading" value={pi.port_of_loading_name ?? undefined} />
+          <LabelValue label="Port of Discharge" value={pi.port_of_discharge_name ?? undefined} />
         </div>
         {pi.other_references && (
           <div style={{ marginTop: 16 }}>

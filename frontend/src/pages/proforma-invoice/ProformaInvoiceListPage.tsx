@@ -251,13 +251,12 @@ function PIRow({ pi, onClick }: { pi: ProformaInvoice; onClick: () => void }) {
       </td>
       <td style={tdStyle}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>
-          {/* Exporter name would come from a join — shown as ID fallback until enriched */}
-          —
+          {pi.exporter_name}
         </span>
       </td>
       <td style={tdStyle}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>
-          —
+          {pi.consignee_name}
         </span>
       </td>
       <td style={tdStyle}>

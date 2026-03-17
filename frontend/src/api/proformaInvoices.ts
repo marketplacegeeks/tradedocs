@@ -26,8 +26,11 @@ export interface ProformaInvoice {
   pi_number: string;
   pi_date: string;
   exporter: number;
+  exporter_name: string;
   consignee: number;
+  consignee_name: string;
   buyer: number | null;
+  buyer_name: string | null;
   buyer_order_no: string;
   buyer_order_date: string | null;
   other_references: string;
@@ -40,9 +43,12 @@ export interface ProformaInvoice {
   port_of_discharge: number | null;
   final_destination: number | null;
   payment_terms: number | null;
+  payment_terms_name: string | null;
   incoterms: number | null;
   incoterms_code: string | null;
   bank: number | null;
+  port_of_loading_name: string | null;
+  port_of_discharge_name: string | null;
   validity_for_acceptance: string | null;
   validity_for_shipment: string | null;
   partial_shipment: string;

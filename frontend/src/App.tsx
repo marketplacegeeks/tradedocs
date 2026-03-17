@@ -14,6 +14,7 @@ import ReferenceDataPage from "./pages/master-data/ReferenceDataPage";
 import ProformaInvoiceListPage from "./pages/proforma-invoice/ProformaInvoiceListPage";
 import ProformaInvoiceCreatePage from "./pages/proforma-invoice/ProformaInvoiceCreatePage";
 import ProformaInvoiceDetailPage from "./pages/proforma-invoice/ProformaInvoiceDetailPage";
+import ProformaInvoiceEditPage from "./pages/proforma-invoice/ProformaInvoiceEditPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -121,6 +122,14 @@ export default function App() {
           }
         />
         <Route path="/proforma-invoices/:id" element={<ProformaInvoiceDetailPage />} />
+        <Route
+          path="/proforma-invoices/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+              <ProformaInvoiceEditPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* User Management — Company Admin only */}
         <Route
