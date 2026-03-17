@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     # Project apps
     "apps.accounts",
     "apps.master_data",
+    "apps.workflow",
+    "apps.proforma_invoice",
 ]
 
 MIDDLEWARE = [
@@ -127,3 +129,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Media (user uploads — e.g. signed copies) ---
+# Files are stored on local disk under BASE_DIR/media/ in development.
+# Swap DEFAULT_FILE_STORAGE for S3/R2 in production without touching models.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# Maximum allowed size for signed copy uploads: 3 MB.
+SIGNED_COPY_MAX_BYTES = 3 * 1024 * 1024

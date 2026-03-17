@@ -64,3 +64,59 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   SAVINGS: "Savings",
   CHECKING: "Checking",
 };
+
+export const SHIPMENT_OPTIONS = {
+  ALLOWED: "ALLOWED",
+  NOT_ALLOWED: "NOT_ALLOWED",
+} as const;
+
+export type ShipmentOption = (typeof SHIPMENT_OPTIONS)[keyof typeof SHIPMENT_OPTIONS];
+
+export const SHIPMENT_OPTION_LABELS: Record<ShipmentOption, string> = {
+  ALLOWED: "Allowed",
+  NOT_ALLOWED: "Not Allowed",
+};
+
+// Maps incoterm code → set of cost fields the seller pays (and must fill in on the PI form).
+// Used by the PI form and detail page to conditionally show/hide the cost breakdown section.
+export const INCOTERM_SELLER_FIELDS: Record<string, Set<string>> = {
+  EXW: new Set(),
+  FCA: new Set(["freight"]),
+  FOB: new Set(["freight"]),
+  CFR: new Set(["freight", "insurance_amount"]),
+  CIF: new Set(["freight", "insurance_amount"]),
+  CPT: new Set(["freight", "insurance_amount"]),
+  CIP: new Set(["freight", "insurance_amount"]),
+  DAP: new Set(["freight", "insurance_amount"]),
+  DPU: new Set(["freight", "insurance_amount", "destination_charges"]),
+  DDP: new Set(["freight", "insurance_amount", "import_duty", "destination_charges"]),
+};
+
+// Human-readable labels for PI cost breakdown fields
+export const COST_FIELD_LABELS: Record<string, string> = {
+  freight: "Freight",
+  insurance_amount: "Insurance Amount",
+  import_duty: "Import Duty / Taxes",
+  destination_charges: "Destination Charges",
+};
+
+// Status label + chip color mappings for the PI list
+export const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  PENDING_APPROVAL: "Pending Approval",
+  APPROVED: "Approved",
+  REWORK: "Rework",
+  REJECTED: "Rejected",
+  PERMANENTLY_REJECTED: "Permanently Rejected",
+  DISABLED: "Disabled",
+};
+
+export const DOCUMENT_STATUS_CHIP: Record<string, string> = {
+  DRAFT: "chip-blue",
+  PENDING_APPROVAL: "chip-yellow",
+  APPROVED: "chip-green",
+  REWORK: "chip-orange",
+  REJECTED: "chip-pink",
+  PERMANENTLY_REJECTED: "chip-pink",
+  DISABLED: "chip-purple",
+};

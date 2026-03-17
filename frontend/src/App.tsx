@@ -11,6 +11,10 @@ import TCTemplateFormPage from "./pages/master-data/TCTemplateFormPage";
 import UserListPage from "./pages/users/UserListPage";
 import ReferenceDataPage from "./pages/master-data/ReferenceDataPage";
 
+import ProformaInvoiceListPage from "./pages/proforma-invoice/ProformaInvoiceListPage";
+import ProformaInvoiceCreatePage from "./pages/proforma-invoice/ProformaInvoiceCreatePage";
+import ProformaInvoiceDetailPage from "./pages/proforma-invoice/ProformaInvoiceDetailPage";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import { ROLES } from "./utils/constants";
@@ -105,6 +109,18 @@ export default function App() {
 
         {/* Reference Data — readable by all, writable by Checker/Admin */}
         <Route path="/master-data/reference-data" element={<ReferenceDataPage />} />
+
+        {/* Proforma Invoice — all roles can read; Maker can create/edit */}
+        <Route path="/proforma-invoices" element={<ProformaInvoiceListPage />} />
+        <Route
+          path="/proforma-invoices/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+              <ProformaInvoiceCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/proforma-invoices/:id" element={<ProformaInvoiceDetailPage />} />
 
         {/* User Management — Company Admin only */}
         <Route

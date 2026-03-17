@@ -75,7 +75,7 @@ pbcopy < ~/.ssh/id_ed25519.pub
 ```
 
 3. Go to GitHub → Settings → SSH and GPG Keys → New SSH Key. Paste and save.
-4. Test: `ssh -T ````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
+4. Test: `ssh -T ``````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
 
 ---
 
