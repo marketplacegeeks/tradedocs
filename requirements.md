@@ -1,8 +1,14 @@
 # Product Requirements Document — TradeDocs
 
-**Version:** 1.2
-**Status:** Draft — Pending Review
-**Last Updated:** 2026-03-15
+**Version:** 1.5
+**Status:** Active
+**Last Updated:** 2026-03-19
+
+> **v1.5 Change:** Discrepancy resolution pass. Additional Description removed from FR-14M.2 (not required). HSN Code made mandatory in FR-14M.8A and FR-14M validation rules. US-08 updated: HSN Code and UOM confirmed mandatory, Batch Details optional. US-13 corrected: Disable action available from Any state (not just Approved). AD Code (Authorised Dealer Code) added to FR-05 Bank master.
+
+> **v1.4 Change:** FR-14M wireframe alignment pass. 12 discrepancies resolved against validated wireframes_plci.html: PI Preview Card added to FR-14M.1; Incoterms/Payment Terms and FOB/Freight/Insurance/L/C Details relocated to Page 5 (FR-14M.8B); Drawee field removed entirely; Additional Description added to FR-14M.2 (subsequently removed in v1.5); UOM made mandatory in FR-14M.8A with dynamic Rate label rule; FR-14M.8B and FR-14M.10 extended with Payment & Terms and Break-up in USD sections; FR-14M.14 Document Detail tab layout added; Disable action updated to Any state.
+
+> **v1.3 Change:** FR-14 (standalone Packing List) and FR-15 (5-step CI wizard from Approved PL) have been replaced by **FR-14M — Combined Packing List + Commercial Invoice**. The PL and CI are now created together in a single form flow with joint approval. There is no backward-compatible standalone PL path. All modifiedrequirement.md content has been merged into this file; modifiedrequirement.md is no longer authoritative.
 
 ---
 
@@ -27,8 +33,7 @@ Beyond document generation, TradeDocs will provide:
 ### Goals
 - Provide a centralised, error-free document generation system for export trade documents (commercial invoice, proforma invoice, packing list)
 - Maintain structured 
-- 
-- =ter data to ensure consistency and reuse across all documents
+- Mter data to ensure consistency and reuse across all documents
 - Enforce a maker–checker 
 -  workflow before any document is finalised
 - Allow Company Admins to manage users, roles, and organisation-level master data
@@ -263,7 +268,7 @@ All state definitions are authoritative here. No document section defines or red
 | Rework | Available to Maker, Checker, and Company Admin | Diagonal **"DRAFT"** watermark across all pages |
 | Approved | Available to all authorised roles | No watermark — clean final output |
 
-> **Note:** The Packing List and Commercial Invoice have role-specific PDF download restrictions beyond the above. See FR-14.9 and FR-15.7 respectively.
+> **Note:** The combined Packing List + Commercial Invoice document has role-specific PDF download restrictions. See FR-14M.13 (Watermark Rules).
 
 #### FR-08.4 Signed Copy Upload
 
@@ -577,65 +582,53 @@ The table below shows exactly which master data entity populates each field on t
 | Terms & Conditions | T&C Templates | Template Name, Content (HTML) |
 | *(All line items)* | No master data — entered manually per document | — |
 
-### 5.11 Document Generation — Packing List
+### 5.11 Document Generation — Combined Packing List + Commercial Invoice
 
-- **FR-14** A Maker shall be able to create, edit, and manage Packing Lists. The document is titled **"Packing List, Weight Note"** on the generated PDF. **A Packing List is always created in the context of an existing Proforma Invoice.** The Maker begins by selecting a Proforma Invoice; all overlapping header, shipping, payment, and country fields are then auto-populated from the selected PI and remain editable. The only information the Maker must add manually is the container and item data.
+> **Changed in v1.3:** FR-14 (standalone Packing List) and FR-15 (5-step CI wizard from Approved PL) are replaced by this combined flow. The PL and CI are created together and share a joint approval workflow. There is no backward-compatible standalone PL path.
 
-#### FR-14.1 Data Hierarchy
-
-The Packing List follows a three-level hierarchy:
-
-```
-Packing List (header + references + shipping)
-  └── Container 1
-        └── Item 1
-        └── Item 2
-  └── Container 2
-        └── Item 1
-        ...
-```
-
+- **FR-14M** A Maker shall be able to create, edit, and manage a combined Packing List + Commercial Invoice. Both documents are generated simultaneously from a single creation form. On save, the system generates both a PL number and a CI number. The Packing List PDF section is titled **"Packing List/Weight Note"**; the Commercial Invoice PDF section is titled **"COMMERCIAL INVOICE"**.
 
 ---
 
-#### Header section for packing list - FR-14.2 Header Details
+#### FR-14M.1 Entry Point
+
+The Maker begins the combined creation flow by selecting:
+1. **Consignee** — Dropdown of organisations tagged as **Consignee**
+2. **Proforma Invoice** — Dropdown of all **Approved** Proforma Invoices belonging to the selected Consignee. The dropdown is searchable and the most recently approved PI appears first.
+
+On selecting the Proforma Invoice, all overlapping fields (FR-14M.3 through FR-14M.6) are auto-populated from the PI and become editable by the Maker.
+
+**PI Preview Card:** Once a Proforma Invoice is selected, a read-only preview card is displayed so the Maker can confirm they have selected the correct PI before proceeding. The preview shows the PI's line items:
+
+| Column | Source |
+| --- | --- |
+| Item Code | PI line item |
+| Description of Goods | PI line item |
+| HSN Code | PI line item |
+| No. & Kind of Packages | PI line item |
+| Quantity | PI line item |
+
+---
+
+#### FR-14M.3 Document Header
 
 | Field | Type | Required | Source / Notes |
 | --- | --- | --- | --- |
-| Proforma Invoice | Dropdown | Yes | Select from all Proforma Invoices in the system (any status). On selection, all overlapping fields (Exporter, Consignee, Buyer, Shipping & Logistics, Payment & Terms, Countries) are auto-populated from the selected PI and become editable. The PI number is stored as the authoritative link on the Packing List record. |
-| Exporter | Dropdown | Yes | Auto-populated from the selected Proforma Invoice; editable. Organisations tagged as **Exporter**. |
-| Consignee | Dropdown | Yes | Auto-populated from the selected Proforma Invoice; editable. Organisations tagged as **Consignee**. |
-| Buyer (if different from Consignee) | Dropdown | No | Auto-populated from the selected Proforma Invoice if set; editable. Organisations tagged as **Buyer**. |
-| Packing List No | Text (read-only) | — | Auto-generated by the system on save. Format: PL-YYYY-Serial No |
-| Packing List Date | Date | No | Date of the packing list |
-| Notify Party | Dropdown | No | Organisations tagged as **Notify Party** in the Organisation master |
+| Proforma Invoice | Dropdown | Yes | Select from Approved PIs for the selected Consignee. Stored as the authoritative link on both the PL and CI records. |
+| Exporter | Dropdown | Yes | Auto-populated from the selected PI; editable. Organisations tagged as **Exporter**. If the exporter has registered, office, and factory addresses, all are shown. |
+| Consignee | Dropdown | Yes | Auto-populated from the selected PI; editable. Organisations tagged as **Consignee**. |
+| Buyer (if different from Consignee) | Dropdown | No | Auto-populated from the selected PI if set; editable. Organisations tagged as **Buyer**. |
+| Notify Party | Dropdown | No | Organisations tagged as **Notify Party** in the Organisation master. |
+| Packing List No | Text (read-only) | — | Auto-generated by the system on first save. Format: PL-YYYY-NNNN. |
+| Commercial Invoice No | Text (read-only) | — | Auto-generated by the system on first save. Format: CI-YYYY-NNNN. |
+| Packing List Date | Date | No | Date of the packing list. Defaults to today; editable by Maker. |
+| Commercial Invoice Date | Date | No | Date of the commercial invoice. Defaults to today; editable by Maker. |
 
 ---
 
-#### FR-14.3 Order References
+#### FR-14M.3 Shipping & Logistics
 
-All reference fields are optional. Each number field has a paired date field.
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| PO Number | Free text | Purchase Order number |
-| PO Date | Date | Date of the Purchase Order |
-| LC Number | Free text | Letter of Credit number |
-| LC Date | Date | Date of the Letter of Credit |
-| BL Number | Free text | Bill of Lading number |
-| BL Date | Date | Date of the Bill of Lading |
-| Sales Order (SO) Number | Free text | Internal Sales Order number |
-| SO Date | Date | Date of the Sales Order |
-| Other References | Free text | Any additional reference |
-| Other References Date | Date | Date for the other reference |
-
-References that have a value print on the PDF in the **References block** alongside the exporter details, formatted as: `Label No/Date: value / date`.
-
----
-
-#### FR-14.4 Shipping & Logistics
-
-All fields in this section are auto-populated from the linked Proforma Invoice on creation and remain editable by the Maker.
+All fields auto-populated from the linked Proforma Invoice on creation and remain editable by the Maker. These fields print on both the PL PDF and CI PDF.
 
 | Field | Type | Required | Source / Notes |
 | --- | --- | --- | --- |
@@ -649,9 +642,11 @@ All fields in this section are auto-populated from the linked Proforma Invoice o
 
 ---
 
-#### FR-14.5 Payment & Terms
+#### FR-14M.5 Payment & Terms
 
-Both fields are auto-populated from the linked Proforma Invoice on creation and remain editable by the Maker.
+Both fields auto-populated from the linked PI; remain editable. Print on both PL PDF and CI PDF.
+
+> **Page placement:** These fields appear on **Page 5 — Final Rates** of the creation wizard (below the rates table), not on the header page. See FR-14M.8B for the full Final Rates page definition.
 
 | Field | Type | Required | Source / Notes |
 | --- | --- | --- | --- |
@@ -660,9 +655,9 @@ Both fields are auto-populated from the linked Proforma Invoice on creation and 
 
 ---
 
-#### FR-14.6 Countries
+#### FR-14M.6 Countries
 
-Both fields are auto-populated from the linked Proforma Invoice on creation and remain editable by the Maker.
+Both fields auto-populated from the linked PI; remain editable. Print on both PL PDF and CI PDF.
 
 | Field | Type | Required | Source / Notes |
 | --- | --- | --- | --- |
@@ -671,9 +666,45 @@ Both fields are auto-populated from the linked Proforma Invoice on creation and 
 
 ---
 
-#### FR-14.7 Containers
+#### FR-14M.9 Bank Details (for Commercial Invoice)
 
-A packing list must have **at least one container**. Each container contains at least one item.
+The Bank field is entered on **Page 2 — Header & Details**. The selected bank's full details print on the CI PDF.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| Bank | Dropdown | Yes | **Bank** master; displayed as "Bank Name – Beneficiary Name". Full bank details (Branch, Account No., IFSC, SWIFT) print on the CI PDF. A read-only Bank Details preview card is shown after selection. |
+
+> **Financial break-up fields (FOB Rate, Freight, Insurance, L/C Details)** are entered on **Page 5 — Final Rates** alongside the rates table. See FR-14M.8B.
+
+---
+
+#### FR-14M.2 Order References
+
+All reference fields are optional. Each number/reference field has a paired date field.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| PO Number | Free text | Purchase Order number |
+| PO Date | Date | Date of the Purchase Order |
+| LC Number | Free text | Letter of Credit number |
+| LC Date | Date | Date of the Letter of Credit |
+| BL Number | Free text | Bill of Lading number |
+| BL Date | Date | Date of the Bill of Lading |
+| Sales Order (SO) Number | Free text | Internal Sales Order number |
+| SO Date | Date | Date of the Sales Order |
+| Other References | Free text | Any additional reference |
+| Other References Date | Date | Date for the other reference |
+| Additional Description | Textarea | Optional free-text field for any supplementary document-level description. Printed in the right info panel on both the PL PDF and CI PDF. |
+
+References that have a value print on **both** the PL PDF and CI PDF in the references block, formatted as: `Label No/Date: value / date`.
+
+> **PDF label note:** The "Other References" field prints as **"Other Reference(s):"** on both the PL PDF and the CI PDF.
+
+---
+
+#### FR-14M.4 Containers
+
+The combined document must have **at least one container** before it can be submitted. Each container must have at least one item.
 
 **Per Container:**
 
@@ -681,272 +712,498 @@ A packing list must have **at least one container**. Each container contains at 
 | --- | --- | --- | --- |
 | Container Reference | Free text | Yes | Container identification reference (e.g., CONT001) |
 | Marks and Numbers | Free text | Yes | Shipping marks on packages |
-| Net Weight | Number (3 dp) | Yes | Net weight of goods in this container |
-| Tare Weight | Number (3 dp) | Yes | Weight of the empty container |
-| Gross Weight | Calculated (read-only) | Yes | Auto-calculated: Net Weight + Tare Weight |
-| Seal Number | Free Text | Yes | Free Text |
+| Container Tare Weight | Number (3 dp) | Yes | Weight of the empty container itself (e.g., ISO container tare weight as stamped on the container door) |
+| Container Gross Weight | Calculated (read-only) | — | Auto-calculated: SUM(Item Gross Weight for all items in this container) + Container Tare Weight |
+| Seal Number | Free text | Yes | Seal number on the container |
 
-A Maker may **Copy Container** to duplicate a container and then modify the new copy. This speeds up data entry for shipments with repeated commodity structures across containers. When copying: all items are copied; Net Weight and Tare Weight are pre-filled from the source container (the Maker may adjust them); Container Reference and Marks & Numbers , Seal noare left blank for the Maker to fill in.
+**Copy Container:** A Maker may **Copy Container** to duplicate a container and then modify the copy. When copying:
+- All items are copied (rates are not copied here — they are entered in the Final Rates section)
+- Container Tare Weight is pre-filled from the source container (Maker may adjust)
+- Container Reference, Marks & Numbers, and Seal Number are left blank for the Maker to fill in
 
 ---
 
-#### FR-14.8 Items (per Container)
+#### FR-14M.8A Items (per Container)
 
-Each container must have **at least one item**. Items represent individual commodity lines within that container.
+Each container must have **at least one item**. Items represent individual commodity lines within that container. **Rates are not entered here** — they are entered once per unique Item Code + UOM in the Final Rates section (FR-14M.8B) after all containers have been filled in.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| HSN Code | Free text | No | Harmonized System Nomenclature code |
-| Item Code | Free text | No | Internal product code |
+| HSN Code | Free text | No | Harmonized System Nomenclature code. Regex: `^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$` |
+| Item Code | Free text | Yes | Internal product code; mandatory as it is the aggregation key for the Final Rates section and the Commercial Invoice |
 | No & Kind of Packages | Free text | Yes | e.g., "10 Boxes", "5 Pallets" |
 | Description of Goods | Textarea | Yes | Full commodity description |
-| Quantity | Number | Yes | Quantity of goods |
-| UOM | Dropdown | No | **Units of Measurement** master (e.g., MT, KG, PCS) |
 | Batch Details | Free text | No | Batch or lot number for traceability |
+| UOM | Dropdown | Yes | **Units of Measurement** master (e.g., MT, KG, PCS). Mandatory because UOM is the aggregation key for the Final Rates table; the Rate column header renders dynamically as "Rate (USD per [UOM])" (e.g., "Rate (USD per KG)"). |
+| Quantity | Number (3 dp) | Yes | Quantity of goods in this container for this item |
+| Net Weight | Number (3 dp) | Yes | Weight of the goods only, excluding all packaging |
+| Inner Packing Weight | Number (3 dp) | Yes | Weight of the packaging material directly associated with this item (e.g., individual box, foam, wrapping) |
+| Item Gross Weight | Calculated (read-only) | — | Auto-calculated: Net Weight (per unit) + Inner Packing Weight |
+
+**Shipment-level weight calculations (derived from items and containers):**
+
+| Calculated Field | Formula |
+| --- | --- |
+| Total Net Weight | SUM(Net Weight for all rows) |
+| Total Gross Weight | SUM(Container Gross Weight for all containers) = SUM(SUM(Item Gross Weight) + Container Tare Weight, per container) |
 
 ---
 
-#### FR-14.9 Workflow States
+#### FR-14M.8B Final Rates Section
 
-The Packing List follows the common workflow defined in FR-08. All state definitions and platform-wide rules are in FR-08.
+After all containers and items have been entered, the system presents a **Final Rates** table. This table is auto-generated — it deduplicates all items across all containers, grouping by **Item Code + UOM**. The Maker enters one Rate (USD) per row.
+
+> **Key design decision:** Rates are entered **once per unique Item Code + UOM combination**, not per container line. This ensures pricing consistency across containers for the same commodity and directly populates the Commercial Invoice line items.
+
+| Column | Type | Required | Notes |
+| --- | --- | --- | --- |
+| Item Code | Text (read-only) | — | Auto-derived from container items; aggregation key |
+| Description of Goods | Text (read-only) | — | From the container item with this Item Code + UOM |
+| HSN Code | Text (read-only) | — | From the container item with this Item Code + UOM |
+| Total Quantity | Number (read-only) | — | Sum of Quantity across all containers for this Item Code + UOM |
+| UOM | Text (read-only) | — | Aggregation key |
+| Rate (USD per [UOM]) | Number (2 dp) | Yes | Unit price in USD per UOM. Column header is rendered dynamically — e.g., if UOM is KG, the header reads "Rate (USD per KG)". Entered by Maker once per row. |
+| Amount (USD) | Calculated (read-only) | — | Auto-calculated: Total Quantity × Rate; updates as Maker types |
+
+The Maker must enter a Rate for every row before the document can be saved or submitted.
+
+**Payment & Terms** (on the Final Rates page, below the rates table — auto-populated from the selected PI; editable):
+
+| Field | Type | Required | Source / Notes |
+| --- | --- | --- | --- |
+| Incoterms | Dropdown | No | Auto-populated from PI; editable. **Incoterms** master. See FR-14M.5. |
+| Payment Terms | Dropdown | No | Auto-populated from PI; editable. **Payment Terms** master. See FR-14M.5. |
+
+**Break-up in USD** (on the Final Rates page, below Payment & Terms — financial details for the Commercial Invoice PDF):
+
+> **Incoterm-driven visibility:** The FOB Rate, Freight, and Insurance fields are shown or hidden based on the Incoterm selected in the Payment & Terms section above, using the same rules defined in **FR-09.7.3**. L/C Details is always shown regardless of Incoterm. When the Maker changes the Incoterm, fields re-render immediately; values previously entered in now-hidden fields are cleared. The frontend uses the existing `INCOTERM_SELLER_FIELDS` constant from `src/utils/constants.ts`.
+
+| Field | Type | Visibility | Notes |
+| --- | --- | --- | --- |
+| FOB Rate | Number (2 dp) | See FR-09.7.3 — shown for FCA, FOB, CFR, CIF, CPT, CIP, DAP, DPU, DDP; hidden for EXW | Per-UOM rate in USD. System computes total FOB value as FOB Rate × total shipment quantity. Prints as 0.00 if hidden/not entered. |
+| Freight | Number (2 dp) | See FR-09.7.3 — shown for CFR, CIF, CPT, CIP, DAP, DPU, DDP; hidden for EXW, FCA, FOB | Freight charges in USD. Prints as 0.00 if hidden/not entered. |
+| Insurance | Number (2 dp) | See FR-09.7.3 — shown for CIF, CIP, DAP, DPU, DDP; hidden for all others | Insurance charges in USD. Prints as 0.00 if hidden/not entered. |
+| L/C Details | Free text (multi-line) | Always shown | Letter of Credit reference details. Printed in the bottom-left section of the CI PDF. |
+
+---
+
+#### FR-14M.10 Summary / Review Page
+
+After the Maker saves the combined document for the first time, the system displays a **summary page** showing aggregated line items. This view helps the Maker verify the commercial invoice totals before submission.
+
+**Aggregated Line Items Table** — items aggregated by Item Code + UOM across all containers:
+
+| Column | Source | Notes |
+| --- | --- | --- |
+| Marks & Nos. / Container Nos. | Container → Marks and Numbers + Container Reference | Lists all container references and marks associated with this item |
+| HSN Code | Item → HSN Code |  |
+| No. & Kind of Packages | Item → No & Kind of Packages | Joined values across containers for this item.\nThis field should be editable. Highlight this in different colour for user to notice in creation wizard. |
+| Description of Goods | Item → Description of Goods |  |
+| Item Code | Item → Item Code | Aggregation key (together with UOM) |
+| Quantity | Sum of Quantity across all containers for this Item Code + UOM | Displayed with 3 decimal places |
+| UOM | Item → UOM | Aggregation key |
+| Rate (USD) | Final Rates section (FR-14M.8B) | Single rate per Item Code + UOM |
+| Amount (USD) | Total Quantity × Rate | Auto-calculated |
+
+**Weight Summary:**
+
+| Field | Value |
+| --- | --- |
+| Total Net Weight | SUM(Net Weight per unit × Quantity) for all items across all containers (3 dp) |
+| Total Gross Weight | SUM(Container Gross Weight) across all containers (3 dp) |
+
+**Totals:**
+
+| Field | Value |
+| --- | --- |
+| Total Amount (USD) | Sum of Amount (USD) across all aggregated line items |
+
+**Payment & Terms** (read-only):
+
+| Field | Value |
+| --- | --- |
+| Incoterms | Selected Incoterm (as entered on Page 5) |
+| Payment Terms | Selected Payment Term (as entered on Page 5) |
+
+**Break-up in USD** (read-only):
+
+| Field | Value |
+| --- | --- |
+| FOB Rate (USD per UOM) | As entered on Page 5 |
+| Freight (USD) | As entered on Page 5 |
+| Insurance (USD) | As entered on Page 5 |
+| L/C Details | As entered on Page 5 |
+
+---
+
+#### FR-14M.11 Document Numbers
+
+Both numbers are auto-generated by the system when the combined document is first saved.
+
+| Document | Format | Example |
+| --- | --- | --- |
+| Packing List | `PL-YYYY-NNNN` | `PL-2026-0001` |
+| Commercial Invoice | `CI-YYYY-NNNN` | `CI-2026-0001` |
+
+- YYYY = current calendar year at time of creation
+- NNNN = zero-padded 4-digit sequence, unique per year within the system
+- Both numbers are read-only after generation; neither can be manually overridden by the Maker
+- Numbers must be generated with `select_for_update()` to prevent duplicates (per technical_architecture.md Section 9)
+
+---
+
+#### FR-14M.12 Workflow States
+
+The combined PL + CI document follows the common workflow defined in FR-08. Both the Packing List and Commercial Invoice records are created simultaneously when the form is first saved, both starting in **Draft** status.
+
+**Joint approval:** The PL and CI are treated as a single unit for approval purposes. One Submit action submits both; one Approve action approves both; one Reject/Rework action reworks both; one Permanently Reject action permanently rejects both. The Maker cannot submit only the PL or only the CI independently.
 
 ```
 Draft → Pending Approval → Approved
-                        → Rework → (Maker edits & resubmits) → Pending Approval
-                        → Permanently Rejected  (terminal — see FR-08.1)
+                         → Rework → (Maker edits & resubmits) → Pending Approval
+
+Any state → Permanently Rejected  (terminal — both PL and CI)
+Any state → Disabled              (terminal — both PL and CI)
 ```
 
-**Role-based actions by state:**
+> **Note on Permanently Rejected:** When the combined document is Permanently Rejected, both the PL and CI records move to Permanently Rejected simultaneously. No further edits, submissions, or downloads are possible on either document.
+
+> **Note on Disabled:** The Disable action can be triggered by a Checker or Admin from any state. Both the PL and CI records are disabled simultaneously. Comment is mandatory. This is a terminal state — no further actions are possible after disabling.
+
+**Role-based actions:**
 
 | Action | Who | When |
 | --- | --- | --- |
-| Submit for Approval | Maker | Draft state |
-| Re-submit for Approval | Maker | Rework state |
-| Delete (Deactivate) | Maker | Draft state only |
+| Submit for Approval | Maker / Admin | Draft or Rework state |
+| Delete (Deactivate) | Maker / Admin | Draft state only |
+| Approve | Checker / Admin | Pending Approval state; approves both PL and CI |
+| Reject (→ Rework) | Checker / Admin | Pending Approval state; rejection comments are mandatory; both documents return to Rework |
+| Permanently Reject | Checker / Admin | Any state; comments are mandatory; both PL and CI permanently rejected |
+| Disable | Checker / Admin | Any state; terminal action; comment mandatory; both PL and CI are disabled |
+| Download PDF | See FR-14M.13 |  |
+
+---
+
+#### FR-14M.14 Document Detail / View Page
+
+After first save, the saved document is accessible as a read-only view for all roles. The detail page uses a **tabbed layout** with four tabs:
+
+| Tab | Contents |
+| --- | --- |
+| **Document Header** | Document numbers and dates, Parties (Exporter, Consignee, Buyer, Notify Party), Shipping & Logistics, Countries, Payment & Terms (Incoterms, Payment Terms) |
+| **Containers & Items** | All containers with their items; weight summary per container; shipment-level weight totals |
+| **Final Rates** | Aggregated rates table (Item Code, Description, HSN, Total Qty, UOM, Rate, Amount); Break-up in USD (FOB Rate, Freight, Insurance, L/C Details) |
+| **Bank & Payment** | Selected bank's full details (Beneficiary Name, Bank Name, Branch, Account No., IFSC, SWIFT) |
+
+**Context-sensitive action buttons** (shown in the page header, gated by role and current status):
+
+| Button | Role | When Visible |
+| --- | --- | --- |
+| Edit | Maker / Admin | Draft or Rework state |
+| Submit for Approval | Maker / Admin | Draft or Rework state |
+| Delete | Maker / Admin | Draft state only |
 | Approve | Checker / Admin | Pending Approval state |
-| Reject (→ Rework) | Checker / Admin | Pending Approval state; rejection comments are mandatory |
-| Permanently Reject | Checker / Admin | Any state; comments are mandatory |
+| Reject → Rework | Checker / Admin | Pending Approval state |
+| Permanently Reject | Checker / Admin | Any state |
+| Disable | Checker / Admin | Any state |
 | Download PDF | Maker, Checker | Approved state only |
 | Download PDF | Admin | Any state |
 
----
-
-#### FR-14.10 PDF Output Layout
-
-The generated PDF is titled **"Packing List, Weight Note"** and follows this structure:
-
-1. **Exporter name** — centred, large, bold
-2. **Document title** — "Packing List, Weight Note"
-3. **Summary block — Row 1** (2 columns merged | IEC Code | Invoice No)
-  - "Exporter:" label across columns 0–1 | IEC Code | Invoice Number
-4. **Summary block — Row 2** (4 columns):
-  - Col 0: Exporter corporate office — Name, Address, Country, Email
-  - Col 1: Exporter registered office — sourced from the address within the Organisation's address list that is flagged as type "Registered"; shows Name, Address, Country, Phone, Email
-  - Col 2–3 (merged): Order References (PO, LC, B/L, SO, Other — each with number and date, only if populated)
-5. **Consignee & Buyer block** (2 columns, 90mm each):
-  - Col 0: Consignee — Name, Address, Country, Phone, Email
-  - Col 1: Buyer — Name, Address, Country, Phone, Email (if buyer differs from consignee; otherwise shows consignee details)
-6. **Summary bottom row** (4 equal columns):
-  - Notify Party (merged across cols 0–1) | Country of Origin of Goods | Country of Final Destination
-7. **Shipping block** (6 equal columns, 2 rows):
-  - Row 1: Pre-Carriage By | Place of Receipt by Pre-Carrier | Vessel/Flight No | Incoterms + Payment Terms (merged cols 3–5)
-  - Row 2: Port of Loading | Port of Discharge | Final Destination | *(merged with above)*
-8. **Per-container block** (repeated for each container, kept together on page):
-  - Container header: Container Reference | Marks & Numbers
-  - Container weights: Net Weight | Tare Weight | Gross Weight
-  - Items table: Sr. | HSN/Item Code | No & Kind of Packages | Description of Goods | Qty | UOM | Batch Details
-9. **Totals row**: Total Net Weight | Total Tare Weight | Total Gross Weight (summed across all containers)
-10. **Footer note**: "Quantities and UOM as per container item details."
-11. **Footer** (every page): "This is a computer-generated document. Signature is not required."
+Rejection comments from the Checker (if any) are displayed on the detail page so the Maker can see what needs to be fixed.
 
 ---
 
-### 5.11.1 Master Data → Packing List Field Mapping
+#### FR-14M.13 PDF Output
 
-Fields marked *(auto from PI)* are pre-filled from the linked Proforma Invoice at creation time and remain editable.
+**Single Download, Two Sections:** Downloading the document produces **one PDF file** with two sections separated by a page break:
+1. **Packing List/Weight Note** (Section 1)
+2. **COMMERCIAL INVOICE** (Section 2)
 
-| Packing List Field | Source | Master Data / PI Fields Used |
+Both sections are included in every download. The watermark rules from FR-08.3 apply based on the single shared document status.
+
+---
+
+**PDF Section 1 — Packing List/Weight Note:**
+
+*Page header (above the table):*
+- Top-left: Exporter company logo (if configured)
+- Top-centre: Exporter company name — large, bold
+- Below centre: **"Packing List/Weight Note"** — centred subtitle
+
+*Main table — Row 1 (3-column header row):*
+
+| Exporter: *(label)* | Invoice No & Date: | Import/Export Code No: |
 | --- | --- | --- |
-| Proforma Invoice (link) | Proforma Invoice master | PI number; stored as the authoritative link |
-| Exporter | Organisation (tagged: Exporter) *(auto from PI)* | Name, Selected Address, Country, Email, IEC Code |
-| Exporter Registered Office *(PDF)* | Organisation — address of type "Registered" | Name, Address, Country, Phone, Email |
-| Consignee | Organisation (tagged: Consignee) *(auto from PI)* | Name, Selected Address, Country, Phone, Email |
-| Buyer | Organisation (tagged: Buyer) *(auto from PI)* | Name, Selected Address, Country, Phone, Email |
+| *(empty — content in Row 2)* | PL-YYYY-NNNN, DD.MM.YYYY | IEC Code of the Exporter |
+
+*Main table — Row 2 (exporter addresses + references):*
+
+Left side — 3 equal sub-columns:
+- **Col A — Corporate Address:** Organisation Name, Corporate/Office address lines, City, PIN, Country
+- **Col B — Registered Office:** Address flagged as type "Registered" — lines, City, State, PIN, Country
+- **Col C — Factory Address:** Address flagged as type "Factory" — lines, City, PIN
+
+Right side (merged, same row height):
+- PO No. & Date: [value] [date]
+- LC No. & Date: [value] [date]
+- Other Reference(s): [value] [date]
+- BL No. & Date: [value] [date]
+- SO No. & Date: [value] [date]
+- *(Only populated references are printed; unpopulated lines are omitted)*
+
+*Main table — Row 3 (Consignee + Buyer):*
+
+| Advising Bank/Consignee: [Name, full address] | Buyer (If other than Consignee): [Name, full address, Tel, Fax, Email] |
+| --- | --- |
+
+*Main table — Row 4 (Notify Party + Countries):*
+
+| Consignee2/Importer/Notify Party: [Name, full address, Tel] | Country of Origin of Goods: [Country] | Country of Final Destination: [Country] |
+| --- | --- | --- |
+
+*Main table — Row 5 (Shipping + Info panel):*
+
+| Pre-Carriaged By: [value] | Place of Receipt by Pre-Carrier: [value] | Vessel/Flight No: [value] | **Right info panel** (merged, spans rows 5–6): Incoterms: [Code + Place] Payment Terms: [full text] Additional Description: [text] |
+| --- | --- | --- | --- |
+
+*Main table — Row 6 (Ports):*
+
+| Port of Loading: [Port Name] | Port of Discharge: [Port Name] | Final Destination: [Destination] | *(merged with right panel above)* |
+| --- | --- | --- | --- |
+
+*Items table:* One row per item per container. Containers are grouped visually. Rate and Amount (USD) are **not** printed on the PL — they appear on the CI section only.
+
+| Marks & Nos./Container Nos. | HSN Code | Item Code | No. & Kind of Pkgs. | Description of Goods | Qty | UOM | Net Wt (per unit) | Total Net Wt | Inner Packing Wt | Item Gross Wt | Batch Details |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+- **Total Net Wt** = Net Weight per unit × Qty (calculated, read-only)
+- **Item Gross Wt** = Net Weight per unit + Inner Packing Weight (calculated, read-only)
+
+*Container subtotal row* (appears after all items in each container):
+
+| Sum of Item Gross Weights | Container Tare Weight | Container Total Gross Weight |
+| --- | --- | --- |
+| SUM(Item Gross Wt for this container) | Container Tare Weight (entered) | Sum of Item Gross + Container Tare |
+
+*Bottom section (two-column block):*
+
+Left column:
+
+| Container/TANK No. | Total Net Wt: | [value] [UOM] |
+| --- | --- | --- |
+| [List of Container References, one per line] | Total Gross Wt: | [value] [UOM] |
+
+Right column (per-container tare table):
+
+| Container No. | Tare Wt |
+| --- | --- |
+| [Container Reference 1] | [Tare Weight 1] [UOM] |
+| [Container Reference 2] | [Tare Weight 2] [UOM] |
+| **Total TARE Wt** | **[Sum of all container tare weights] [UOM]** |
+
+*Signature block (bottom right):* "For [Exporter Organisation Name]" / "Authorised Signatory"
+
+---
+
+**PDF Section 2 — Commercial Invoice:**
+
+The Commercial Invoice PDF section starts on a new page (page break after PL section).
+
+*Page header (above the table):*
+- Top-left: Exporter company logo (if configured)
+- Top-centre: Exporter company name — large, bold
+- Below centre: **"COMMERCIAL INVOICE"** — centred subtitle
+
+*Main table — Row 1 (3-column header row):*
+
+| Exporter: *(label)* | Invoice No & Date: | Import/Export Code No: |
+| --- | --- | --- |
+| *(empty — content in Row 2)* | CI-YYYY-NNNN, DD.MM.YYYY | IEC Code of the Exporter |
+
+*Main table — Row 2 (exporter addresses + references):*
+
+Left side — 3 equal sub-columns:
+- **Col A — Corporate Office:** Organisation Name, address lines, City, PIN, Country
+- **Col B — Registered Office:** Address flagged type "Registered" — lines, City, State, PIN, Country
+- **Col C — Factory Address:** Address flagged type "Factory" — lines, City, PIN
+
+Right side (merged): PO No. & Date / LC No. & Date / Other Reference(s) / BL No. & Date / SO No. & Date *(only populated references printed)*
+
+*Main table — Row 3 (Consignee + Buyer):*
+
+| Advising Bank/Consignee1: [Name, full address] | Buyer if other than Consignee: [Name, full address, Tel, Fax, Email] |
+| --- | --- |
+
+*Main table — Row 4 (Notify Party + Countries):*
+
+| Consignee2/Importer/Notify Party: [Name, full address, Tel] | Country of Origin of Goods: [Country] | Country of Final Destination: [Country] |
+| --- | --- | --- |
+
+*Main table — Row 5 (Shipping + Info panel):*
+
+| Pre-Carriaged By: [value] | Place of Receipt by Pre-Carrier: [value] | Vessel/Flight No: [value] | **Right info panel** (merged rows 5–6): Incoterms: [Code + Place] Payment Terms: [full text] Batch: [value] Additional Description: [text] |
+| --- | --- | --- | --- |
+
+*Main table — Row 6 (Ports):*
+
+| Port of Loading: [Port Name] | Port of Discharge: [Port Name] | Final Destination: [Destination] | *(merged with right panel above)* |
+| --- | --- | --- | --- |
+
+*Items table (aggregated by Item Code + UOM):*
+
+| Marks & Nos./Container Nos. | HSN Code | No. & Kind of Pkgs. | Description of Goods | Item Code | Qty | UOM | Net Wt (per unit) | Total Net Wt | Rate (USD) per [UOM] | Amount (USD) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+- Items aggregated by Item Code + UOM across all containers
+- **Marks & Nos./Container Nos.** — all container references and marks containing this item, combined
+- **Qty** — sum of Quantity for this Item Code + UOM across all containers
+- **Total Net Wt** = Net Weight per unit × Total Qty (calculated, read-only)
+- **Rate (USD) per [UOM]** — column header is dynamic (e.g., "Rate (USD) per KG")
+- **Amount (USD)** = Total Qty × Rate
+
+*Bottom section — two-part row:*
+
+Left part:
+
+| Total Net Weight: | [value] [UOM] |
+| --- | --- |
+| Total Gross Weight: | [value] [UOM] |
+| L/C Details: | [L/C Details text, if populated] |
+
+Right part — "Break-up in USD(Approx.)":
+
+| FOB Rate | [value] |
+| --- | --- |
+| Freight | [value] |
+| Insurance | [value] |
+
+*(FOB Rate, Freight, Insurance print as 0.00 if not entered)*
+
+*Totals row:* "Amount Chargeable in currency: USD" | **Total: [Total Amount USD]**
+
+*Amount in Words:* "Amount in Words: [Total amount in English] US-Dollar(s) Only."
+
+*Declaration block:* "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct."
+
+*Bank details block:*
+- **BENEFICIARY NAME:** [Beneficiary Name]
+- **BANK NAME:** [Bank Name]
+- **BRANCH NAME:** [Branch Name]
+- **BRANCH ADDRESS:** [Branch Address]
+- **A/C NO.:** [Account Number] &nbsp; **IFSC CODE:** [IFSC / Routing Number] *(only if present)* &nbsp; **SWIFT CODE:** [SWIFT Code]
+- *(If intermediary bank configured):* Intermediary Institution Routing For Currency [Currency] A/C No.: [Account No.] [Bank Name] SWIFT Code: [SWIFT Code]
+
+*Signature block (bottom right):* "For [Exporter Organisation Name]" / "Authorised Signatory"
+
+---
+
+**Watermark Rules:**
+
+| Document Status | Watermark (both PL and CI sections) |
+| --- | --- |
+| Draft | Diagonal "DRAFT" watermark on both sections |
+| Pending Approval | Diagonal "DRAFT" watermark on both sections |
+| Rework | Diagonal "DRAFT" watermark on both sections |
+| Approved | No watermark — clean output on both sections |
+
+**PDF download access:**
+
+| Who | When | Result |
+| --- | --- | --- |
+| Maker, Checker | Approved state only | Clean PDF (both PL and CI sections, no watermark) |
+| Admin | Any state | PDF with appropriate watermark based on current status |
+
+---
+
+### 5.11.1 Master Data → Combined PL + CI Field Mapping
+
+| Field | Source | Master Data / PI Fields Used |
+| --- | --- | --- |
+| Proforma Invoice (link) | Proforma Invoice master | PI number; stored as authoritative link on both PL and CI |
+| Exporter | Organisation (tagged: Exporter) *(auto from PI)* | Name, IEC Code; Corporate Office address, Registered Office address (type "Registered"), Factory address (type "Factory") — all three printed on PDF |
+| Consignee | Organisation (tagged: Consignee) *(auto from PI)* | Name, full address, Tel, Fax, Email — printed as "Advising Bank/Consignee1" (CI) / "Advising Bank/Consignee" (PL) |
+| Buyer | Organisation (tagged: Buyer) *(auto from PI)* | Name, full address, Tel, Fax, Email |
+| Notify Party | Organisation (tagged: Notify Party) | Name, full address, Tel — printed as "Consignee2/Importer/Notify Party" on both PDFs |
+| Batch | Free text field on form | Printed in right info panel on CI PDF only |
 | Country of Origin of Goods | Countries *(auto from PI)* | Country Name |
 | Country of Final Destination | Countries *(auto from PI)* | Country Name |
 | Pre-Carriage By | Pre-Carriage By *(auto from PI)* | Name |
-| Place of Receipt | Place of Receipt *(auto from PI)* | Name |
-| Place of Receipt by Pre-Carrier | Place of Receipt *(auto from PI)* | Name |
-| Port of Loading | Ports *(auto from PI)* | Port Name |
-| Port of Discharge | Ports *(auto from PI)* | Port Name |
-| Final Destination | Final Destinations *(auto from PI)* | Destination Name |
-| Incoterms | Incoterms *(auto from PI)* | Code |
+| Place of Receipt | Locations *(auto from PI)* | Location Name, Country |
+| Place of Receipt by Pre-Carrier | Locations *(auto from PI)* | Location Name, Country |
+| Port of Loading | Ports *(auto from PI)* | Port Name, Country |
+| Port of Discharge | Ports *(auto from PI)* | Port Name, Country |
+| Final Destination | Locations *(auto from PI)* | Location Name, Country |
+| Incoterms | Incoterms *(auto from PI)* | Code, Description |
 | Payment Terms | Payment Terms *(auto from PI)* | Term Name |
-| Notify Party | Organisation (tagged: Notify Party) | Name, Selected Address, Country, Phone, Email |
 | Item UOM | Units of Measurement | Unit Name / Abbreviation |
-| *(All container and item fields)* | No master data — entered manually per document | — |
+| Bank | Bank master | Beneficiary Name, Bank Name, Branch Name, Branch Address, Account Number, IFSC Code, SWIFT Code; Intermediary block if configured |
+| Weight Unit (kg/lbs) | Entered by Maker at shipment level | Applied to all weight fields on both PDFs |
+| Container Tare Weight | Entered by Maker per container | Used to calculate Container Gross Weight |
+| Container Gross Weight | Calculated: SUM(Item Gross Weight) + Container Tare | Shown in container subtotal row on PL PDF |
+| Net Weight per unit | Entered by Maker per item | Used to calculate Total Net Weight |
+| Inner Packing Weight | Entered by Maker per item | Used to calculate Item Gross Weight |
+| Item Gross Weight | Calculated: Net Weight + Inner Packing Weight | Shown in item rows on PL PDF |
+| Total Net Weight | Calculated: SUM(Net per unit × Qty) | Shown on both PL and CI PDFs |
+| Total Gross Weight | Calculated: SUM(Container Gross Weight) | Shown on both PL and CI PDFs |
+| *(All other container, item, and reference fields)* | No master data — entered manually | — |
 
 ---
 
-### 5.12 Document Generation — Commercial Invoice
+### 5.11.2 Validation Rules
 
-- **FR-15** A Maker shall be able to create and manage Commercial Invoices. The document is titled **"COMMERCIAL INVOICE"** on the generated PDF. **A Commercial Invoice can only be created from an existing Approved Packing List.** There is no standalone creation path. Upon creation, the system auto-generates a CI number in the format **`CI-YYYY-NNNN`** (e.g., `CI-2026-0001`), where YYYY is the current year and NNNN is a zero-padded 4-digit sequence unique per exporter account. The Maker may manually override the auto-generated number if needed. The CI number is displayed in the index list and on the PDF.
+| Rule | Error Message |
+| --- | --- |
+| Exporter is required | "Exporter is required." |
+| Proforma Invoice is required | "Please select a Proforma Invoice." |
+| Consignee is required | "Consignee is required." |
+| At least one container required | "Add at least one container before submitting." |
+| Each container must have at least one item | "Container [ref] must have at least one item." |
+| Container Reference is required | "Container Reference is required." |
+| Marks and Numbers is required | "Marks and Numbers is required." |
+| Container Tare Weight is required | "Container Tare Weight is required." |
+| Seal Number is required | "Seal Number is required." |
+| Net Weight (per unit) is required on each item | "Net Weight is required." |
+| Inner Packing Weight is required on each item | "Inner Packing Weight is required." |
+| Weight Unit (kg/lbs) is required at shipment level | "Weight unit is required." |
+| No & Kind of Packages is required | "No & Kind of Packages is required." |
+| Description of Goods is required | "Description of Goods is required." |
+| Quantity is required | "Quantity is required." |
+| Item Code is required on each item | "Item Code is required." |
+| HSN Code is required on each item | "HSN Code is required." |
+| HSN Code format validation | HSN Code must match `^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$` |
+| UOM is required on each item | "UOM is required." |
+| All rates in Final Rates section must be filled | "Rate (USD) is required for all items before saving." |
+| Bank is required | "Bank is required." |
+| All monetary amounts | Stored as `DecimalField(max_digits=15, decimal_places=2)`. Never FloatField. |
+| All weights | Stored as `DecimalField(max_digits=12, decimal_places=3)`. Never FloatField. |
 
-#### FR-15.1 Creation Overview — 5-Step Wizard
+---
 
-The Commercial Invoice creation follows a guided 5-step wizard. All data sourced from the linked Approved Packing List is read-only and cannot be overridden during creation. The wizard steps are:
+### 5.11.3 Weight Fields Specification
 
-| Step | Name | Purpose |
+**Item level (entered per line item in each container):**
+
+| Field | Type | Notes |
 | --- | --- | --- |
-| 1 | Select Consignee | Choose the consignee; only consignees that have at least one Approved Packing List are shown |
-| 2 | Select Packing List | Choose one Approved Packing List linked to the selected consignee |
-| 3 | Review & Price Line Items | Review aggregated line items derived from the Packing List; enter unit price per item |
-| 4 | Select Bank | Choose the bank account for payment details on the document |
-| 5 | Charges & L/C Details | Enter FOB Rate, Freight, Insurance, and Letter of Credit details |
+| Net Weight (per unit) | Number (3 dp) | Weight of the goods only, excluding all packaging |
+| Inner Packing Weight | Number (3 dp) | Weight of the packaging directly associated with this item (box, foam, wrapping, etc.) |
+| Item Gross Weight | Calculated (read-only) | = Net Weight (per unit) + Inner Packing Weight |
 
-On completion of Step 5, the system creates the Commercial Invoice in **Draft** status. Incoterms and Payment Terms are automatically carried over from the linked Packing List — no additional wizard step is required for these fields. The Buyer is also automatically carried over from the linked Packing List.
+**Container level:**
 
-A CI in **Draft** or **Rejected** status can be reopened for editing by double-clicking the record in the CI index. The same wizard fields (pricing, bank, charges, L/C details) become editable. A CI in any other state (Pending Approval, Approved, Disabled) is fully read-only.
-
----
-
-#### FR-15.2 Step 1 — Consignee Selection
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| Consignee | Dropdown | Yes | Shows only organisations tagged as **Consignee** that have at least one Approved Packing List |
-
-The system filters the consignee list to only those for whom an Approved Packing List exists. A consignee with no Approved Packing Lists will not appear.
-
----
-
-#### FR-15.3 Step 2 — Packing List Selection
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| Packing List | Dropdown | Yes | Shows Approved Packing Lists for the selected consignee only; each entry shows the PL number |
-
-Selecting a Packing List locks the document to that PL. All references (PO, LC, BL, SO, Other), all shipping fields, all container weights, the exporter, and the consignee are sourced from the linked Packing List and cannot be changed on the Commercial Invoice.
-
----
-
-#### FR-15.4 Step 3 — Aggregated Line Items and Pricing
-
-The system automatically aggregates all items from all containers in the selected Packing List. Items are aggregated by **Item Code + Unit of Measurement (UOM)**. Each aggregated row represents the total quantity of that item across all containers.
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| Item Code | Text (read-only) | — | Sourced from PL container items; aggregated key |
-| UOM | Text (read-only) | — | Unit of measurement; aggregated key |
-| HSN Code | Text (read-only) | — | Sourced from PL container items |
-| Description of Goods | Text (read-only) | — | Sourced from PL container items |
-| No & Kind of Packages | Text (read-only) | — | Sourced from PL container items; multiple values joined across containers |
-| Total Quantity | Number (read-only) | — | Sum of item quantity across all containers (for this item_code + unit_id combination) |
-| Rate (USD) | Number (2 dp) | Yes | Unit price in USD; entered by Maker per aggregated row |
-| Amount (USD) | Calculated (read-only) | — | Auto-calculated: Total Quantity × Rate |
-
-The Maker must enter a Rate (USD) for every aggregated line item row. Amount is calculated and displayed automatically. The Maker cannot change item codes, quantities, descriptions, or UOM — these are fixed from the Packing List.
-
----
-
-#### FR-15.5 Step 4 — Bank Selection
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| Bank | Dropdown | Yes | Shows all bank records from the **Bank** master; displayed as "Bank Name – Account Number" or similar |
-
-Bank selection is mandatory. The selected bank's details (Bank Name, Branch Name, Branch Address, Account Number, SWIFT Code) print on the Commercial Invoice PDF.
-
----
-
-#### FR-15.6 Step 5 — Charges & L/C Details
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| FOB Rate | Number (2 dp) | No | Per-UOM rate in USD (e.g., USD per MT). The system computes the total FOB value as FOB Rate × total shipment quantity across all line items. |
-| Freight | Number (2 dp) | No | Freight charges in USD |
-| Insurance | Number (2 dp) | No | Insurance charges in USD |
-| L/C Details | Free text (multi-line) | No | Letter of Credit reference details |
-
----
-
-#### FR-15.7 Workflow States
-
-The Commercial Invoice follows the common workflow defined in FR-08. All state definitions and platform-wide rules are in FR-08.
-
-```
-Draft → Pending Approval → Approved → Disabled  (terminal — see FR-08.1)
-                         → Rejected → (Maker re-submits) → Pending Approval
-```
-
-**Role-based actions by state:**
-
-| Action | Who | When |
+| Field | Type | Notes |
 | --- | --- | --- |
-| Submit for Approval | Maker | Draft or Rejected state |
-| Download Draft PDF | Maker | Draft or Rejected state |
-| Download Draft PDF | Admin | Any non-Approved state |
-| Download Final PDF | Maker, Checker, Admin | Approved state only |
-| Approve | Checker / Admin | Pending Approval state only |
-| Reject (with mandatory comments) | Checker / Admin | Pending Approval state |
-| Disable (with mandatory comment) | Checker / Admin | Approved state only; terminal action |
-| View Rejection Comments | Maker, Checker | Rejected state; opens audit trail |
+| Container Tare Weight | Number (3 dp) | Weight of the empty container. For FCL, this is the ISO container tare weight stamped on the container door. |
+| Container Gross Weight | Calculated (read-only) | = SUM(Item Gross Weight for all items in this container) + Container Tare Weight |
 
+**Shipment level (auto-calculated across all containers):**
 
----
+| Field | Formula |
+| --- | --- |
+| Total Net Weight | SUM(Net Weight per unit × Quantity) for all items across all containers |
+| Total Gross Weight | SUM(Container Gross Weight) for all containers |
 
-#### FR-15.8 PDF Output
-
-The Commercial Invoice supports **two PDF modes**:
-
-| Mode | When Available | Visual Indicator |
-| --- | --- | --- |
-| **Draft PDF** | Draft, Rejected states (Maker and Admin) | Diagonal watermark: "DRAFT" in light red across the document |
-| **Final PDF** | Approved state only (all roles) | No watermark; clean output |
-
-**PDF Layout:**
-
-1. **Exporter name** — centred, large, bold (from linked Packing List → Exporter Organisation)
-2. **Document title** — "COMMERCIAL INVOICE" | **CI Number** (auto-generated `CI-YYYY-NNNN`, overridable by Maker)
-3. **Main information block**:
-  - Col 0: Exporter — Name, IEC Code, Address, Country, Email, Registered Office details
-  - Col 1: References (PO, LC, BL, SO, Other — each with number and date; only populated references printed)
-  - Col 2: Consignee — Name, Address, Country
-  - Col 3: Buyer — Name, Address, Country (if buyer differs from consignee)
-4. **Shipping block** (sourced from linked Packing List):
-  - Pre-Carriage By | Place of Receipt by Pre-Carrier | Vessel/Flight No | Incoterms | Payment Terms
-  - Port of Loading | Port of Discharge | Final Destination
-5. **Line items table**: Sr. | HSN Code | No & Kind of Packages | Item Code | Description of Goods | Qty | Rate (USD) | Amount (USD)
-6. **Weight summary**: Total Net Weight | Total Gross Weight (summed from PL containers)
-7. **Totals block**:
-  - Total Amount (USD)
-  - Amount in Words
-8. **Charges block**: FOB Rate (per UOM) | Total FOB Value (computed: FOB Rate × total quantity) | Freight | Insurance
-9. **L/C Details**
-10. **Bank details**: Bank Name | Branch Name | Branch Address | Account Number | SWIFT Code
-11. **Footer** (every page): "This is a computer-generated document. Signature is not required."
-
----
-
-### 5.12.1 Master Data → Commercial Invoice Field Mapping
-
-The table below shows which master data entities and linked-document fields populate each section of the Commercial Invoice.
-
-| Commercial Invoice Field | Source | Fields Used |
-| --- | --- | --- |
-| Exporter | Linked Packing List → Organisation (tagged: Exporter) | Name, IEC Code, Address, Country, Email, Registered Office Address |
-| Consignee | Linked Packing List → Organisation (tagged: Consignee) | Name, Address, Country |
-| Buyer | Linked Packing List → Organisation (tagged: Buyer) | Name, Address, Country |
-| References (PO, LC, BL, SO, Other) | Linked Packing List → Order References | Number and Date per reference type |
-| Shipping fields (Pre-Carriage, Ports, Vessel, Final Destination) | Linked Packing List → Shipping fields | All shipping field values |
-| Incoterms | Linked Packing List → Incoterms | Code, Description (automatically carried over; not re-entered on CI) |
-| Payment Terms | Linked Packing List → Payment Terms | Term Name (automatically carried over; not re-entered on CI) |
-| Container Weights | Linked Packing List → Containers | Net Weight, Gross Weight (summed) |
-| Line items (Item Code, HSN Code, Description, Packages, Qty, UOM) | Aggregated from PL Container Items (by Item Code + UOM) | All item fields; quantity is sum across containers |
-| Rate (USD) per line item | Entered by Maker in Step 3 of wizard | unit_price_usd |
-| Bank | Bank master | Bank Name, Branch Name, Branch Address, Account Number, SWIFT Code |
-| FOB Rate, Freight, Insurance | Entered by Maker in Step 5 | Numeric values |
-| L/C Details | Entered by Maker in Step 5 | Free text |
+All weight fields use a single unit of measure (kg or lbs) selected at the shipment level. This unit is applied consistently across the Packing List, Commercial Invoice, and all PDFs.
 
 ---
 
@@ -1028,143 +1285,85 @@ The table below shows which master data entities and linked-document fields popu
 - [ ] The Total Amount in Words is correctly computed and displayed in the PDF
 - [ ] The PDF file is named after the Proforma Invoice number
 
-### US-08: Create a Packing List
-**As a** Maker, **I want to** create a packing list by first selecting a Proforma Invoice and then adding container data, **so that** I can accurately document the physical shipment contents and weights without re-entering information that already exists on the PI.
+### US-08: Create a Combined Packing List + Commercial Invoice
+**As a** Maker, **I want to** create a combined PL + CI by selecting an Approved PI, entering container and item data, and pricing each item in the Final Rates section, **so that** both documents are generated together without re-entering shipment information.
 
 **Acceptance Criteria:**
-- [ ] The Packing List creation form opens with a mandatory Proforma Invoice dropdown as the first field; the form is blocked until a PI is selected
-- [ ] On PI selection, the following fields are immediately auto-populated and become editable: Exporter, Consignee, Buyer, Pre-Carriage By, Place of Receipt, Place of Receipt by Pre-Carrier, Vessel / Flight No, Port of Loading, Port of Discharge, Final Destination, Incoterms, Payment Terms, Country of Origin of Goods, Country of Final Destination
-- [ ] Changing the PI selection updates all auto-populated fields to reflect the newly selected PI
-- [ ] Exporter and Consignee remain required; the Maker cannot clear them
-- [ ] Packing List No is auto-generated and read-only
+- [ ] The creation flow begins with selecting a Consignee, then an Approved Proforma Invoice belonging to that Consignee; the PI dropdown is searchable and shows the most recently approved PI first
+- [ ] On PI selection, all overlapping header, shipping, payment, and country fields are auto-populated from the PI and become editable
+- [ ] Both Packing List No and Commercial Invoice No are auto-generated on first save; neither is editable by the Maker
 - [ ] All Order Reference fields (PO, LC, BL, SO, Other) are optional; each has a paired date field
 - [ ] Notify Party is an optional dropdown from organisations tagged as "Notify Party"
-- [ ] At least one container must be added before the form can be submitted
-- [ ] Each container requires Net Weight and Tare Weight (numeric, 3 decimal places); Gross Weight is auto-calculated and read-only
-- [ ] Each container must have at least one item before the form can be submitted
-- [ ] Each item requires No & Kind of Packages, Description of Goods, and Quantity; HSN Code, Item Code, UOM, and Batch Details are optional
-- [ ] If the Proforma Invoice, Exporter, Consignee, or any required container/item field is missing on submit, a validation error lists every issue and the form is not submitted
-- [ ] On successful save, the packing list appears in the Packing List index with status Draft and the linked PI number is displayed
+- [ ] At least one container must be added before the form can be submitted; each container requires Container Reference, Marks and Numbers, Container Tare Weight (3 dp), and Seal Number; Container Gross Weight is auto-calculated (read-only)
+- [ ] Each container must have at least one item; each item requires HSN Code, Item Code, No & Kind of Packages, Description of Goods, UOM, Quantity (3 dp), Net Weight per unit (3 dp), and Inner Packing Weight (3 dp); Batch Details is optional
+- [ ] Item Gross Weight is auto-calculated as Net Weight + Inner Packing Weight (read-only)
+- [ ] After all containers and items are entered, the Final Rates section shows a deduplicated table of Item Code + UOM combinations; the Maker must enter a Rate (USD) for every row
+- [ ] Amount (USD) per row is auto-calculated as Total Quantity × Rate and updates as the Maker types
+- [ ] Bank is required; FOB Rate, Freight, Insurance, and L/C Details are optional
+- [ ] On successful save, both a PL number and a CI number are generated; the system shows a summary/review page with aggregated line items and totals
+- [ ] If any required field is missing on submit, a validation error is shown and the form is not submitted
 
-### US-09: Edit a Packing List
-**As a** Maker, **I want to** edit a packing list in Draft or Rework status, **so that** I can correct errors or respond to a Checker's rejection comments before resubmitting.
+### US-09: Edit a Combined PL + CI Document
+**As a** Maker, **I want to** edit a combined PL + CI in Draft or Rework status, **so that** I can correct errors or respond to a Checker's rejection comments before resubmitting.
 
 **Acceptance Criteria:**
-- [ ] Maker can reopen a Draft or Rework packing list via the same create/edit form
-- [ ] All header, reference, shipping, container, and item fields are editable in Draft and Rework states
+- [ ] Maker can reopen a Draft or Rework combined document via the same create/edit form
+- [ ] All header, reference, shipping, container, item, rate, and bank fields are editable in Draft and Rework states
 - [ ] Maker can add new containers, remove containers, add items, and remove items
-- [ ] Maker can use "Copy Container" to duplicate an existing container's item list; the copy opens with a blank Container Reference, blank Marks & Numbers, and blank weights for the Maker to fill in
-- [ ] Gross Weight continues to auto-calculate as Net + Tare whenever either weight field changes
-- [ ] A packing list in Pending Approval or Approved state cannot be edited by the Maker
-- [ ] Saving updates the existing record; the Packing List No does not change
+- [ ] Maker can use "Copy Container" to duplicate an existing container; the copy opens with blank Container Reference, Marks & Numbers, and Seal Number; Container Tare Weight is pre-filled from the source container
+- [ ] The Final Rates section updates automatically as containers and items are added or removed
+- [ ] A document in Pending Approval or Approved state cannot be edited by the Maker
+- [ ] Saving updates the existing record; neither PL No nor CI No changes after first save
 
-### US-10: Submit a Packing List for Approval
-**As a** Maker, **I want to** submit a completed packing list for approval, **so that** a Checker can verify the contents and weights before the document is finalised.
+### US-10: Submit a Combined PL + CI for Approval
+**As a** Maker, **I want to** submit a completed combined PL + CI for approval, **so that** a Checker can verify both the packing and pricing before the documents are finalised.
 
 **Acceptance Criteria:**
-- [ ] Maker can submit from the Packing List index using the "Submit for Approval" action when status is Draft
-- [ ] Maker can re-submit using "Re-submit for Approval" when status is Rework
-- [ ] Status changes to Pending Approval upon submission
-- [ ] The Checker and Company Admin are notified of the pending review
+- [ ] Maker can submit a combined document when status is Draft or Rework
+- [ ] One Submit action submits both the Packing List and the Commercial Invoice simultaneously; they cannot be submitted separately
+- [ ] Status changes to Pending Approval for both documents upon submission
+- [ ] The Checker and Company Admin are notified that a document awaits review
 - [ ] The submission event is recorded in the audit trail with actor name and timestamp
-- [ ] The packing list becomes non-editable once submitted
+- [ ] The document becomes non-editable once submitted
 
-### US-11: Approve, Reject, or Permanently Reject a Packing List
-**As a** Checker, **I want to** approve, reject, or permanently reject a submitted packing list, **so that** only verified documents are finalised or closed out appropriately.
+### US-11: Approve, Reject, or Permanently Reject a Combined PL + CI
+**As a** Checker, **I want to** approve, reject, or permanently reject a submitted combined PL + CI, **so that** only verified documents are finalised or closed out appropriately.
 
 **Acceptance Criteria:**
-- [ ] Checker can Approve a Pending Approval packing list; status changes to Approved
-- [ ] Checker can Reject a Pending Approval packing list with mandatory comments; status changes to Rework; Maker is notified
-- [ ] Checker or Company Admin can Permanently Reject a packing list; status changes to Permanently Rejected, which is a terminal state — no further submissions or edits are possible; a comment is mandatory
+- [ ] Checker can Approve a Pending Approval combined document; status changes to Approved for both PL and CI simultaneously
+- [ ] Checker can Reject a Pending Approval document with mandatory comments; status changes to Rework for both; Maker is notified
+- [ ] Checker or Company Admin can Permanently Reject a combined document; both PL and CI move to Permanently Rejected — a terminal state; a comment is mandatory
 - [ ] All approval, rejection, and permanent rejection events are recorded in the audit trail with actor, timestamp, and comments
 - [ ] A Maker cannot approve their own document
 
-### US-12: Download Packing List PDF
-**As a** Maker or Checker, **I want to** download the approved packing list as a print-ready PDF, **so that** it can be included in the shipment documents handed to the freight forwarder or customs.
+### US-12: Download the Combined PL + CI PDF
+**As a** Maker or Checker, **I want to** download the approved combined PL + CI as a single print-ready PDF, **so that** I can share both documents with the freight forwarder and buyer in one file.
 
 **Acceptance Criteria:**
-- [ ] "Download PDF" action is available for Maker and Checker only when the packing list status is Approved
+- [ ] "Download PDF" action is available for Maker and Checker only when the document status is Approved
 - [ ] Company Admin can download the PDF at any workflow state
-- [ ] The PDF includes: exporter details (corporate and registered office), consignee, buyer, notify party, all order references, shipping details, per-container blocks (weights + item table), grand total weights, and footer
-- [ ] Weights are formatted to 3 decimal places
-- [ ] Only references that have a value are printed (empty PO/LC/BL/SO/Other fields are omitted from the PDF)
-- [ ] The PDF filename is derived from the Packing List number
-- [ ] The PDF footer reads: "This is a computer-generated document. Signature is not required."
+- [ ] The PDF is a single file: Packing List/Weight Note section first, then a page break, then the Commercial Invoice section
+- [ ] Draft, Pending Approval, and Rework states display a diagonal "DRAFT" watermark on both sections; Approved state produces a clean PDF with no watermark
+- [ ] The PL section includes: exporter details (corporate, registered, and factory addresses), consignee, buyer, notify party, all order references (only populated ones printed), shipping details, per-container item rows with weights, container subtotal rows, and bottom summary with total weights and per-container tare table
+- [ ] The CI section includes: exporter details, consignee, buyer, notify party, shipping details, aggregated line items (by Item Code + UOM) with rates and amounts, weight totals, FOB/Freight/Insurance break-up, bank details, declaration, and Amount in Words
+- [ ] Weights are formatted to 3 decimal places; monetary amounts to 2 decimal places
+- [ ] The PDF filename is derived from the PL and CI numbers
 
-### US-13: Create a Commercial Invoice from an Approved Packing List
-**As a** Maker, **I want to** create a commercial invoice using a 5-step wizard starting from an Approved Packing List, **so that** the invoice is directly tied to the shipment details without re-keying data.
-
-**Acceptance Criteria:**
-- [ ] The "Create Commercial Invoice" entry point is accessible only via the Commercial Invoice module; no standalone form exists
-- [ ] Step 1 shows only consignees that have at least one Approved Packing List; consignees without Approved PLs are not shown
-- [ ] Step 2 shows only Approved Packing Lists for the selected consignee; Maker cannot select a PL in any other state
-- [ ] Step 3 displays aggregated line items: each row represents a unique Item Code + UOM combination summed across all containers of the selected PL; the Maker must enter a Rate (USD) for every row
-- [ ] Amount (USD) per line item is auto-calculated as Total Quantity × Rate and updates in real time as the Maker types
-- [ ] Maker cannot edit Item Code, Quantity, Description, HSN Code, or UOM — these are fixed from the Packing List
-- [ ] Step 4 requires a bank to be selected; the Maker cannot proceed past Step 4 without selecting a bank
-- [ ] Step 5 allows optional entry of FOB Rate, Freight, Insurance, and L/C Details
-- [ ] On successful save, the Commercial Invoice is created in Draft status and appears in the CI index
-- [ ] The linked Packing List number is associated with the created CI and the shipping/reference data from the PL is non-editable on the CI
-
-### US-14: Submit a Commercial Invoice for Approval
-**As a** Maker, **I want to** submit a Commercial Invoice for approval, **so that** a Checker can review and finalise it before it is used for customs clearance.
+### US-13: Disable an Approved Combined PL + CI Document
+**As a** Checker, **I want to** disable an Approved combined PL + CI document, **so that** it can be voided after it has been finalised if required.
 
 **Acceptance Criteria:**
-- [ ] Maker can submit a CI from the index "Actions" menu when status is Draft or Rejected
-- [ ] Status changes to Pending Approval upon submission
-- [ ] The Checker and Company Admin are notified that a document awaits review
-- [ ] The CI becomes non-editable once submitted
-- [ ] The submission event is recorded in the audit trail with actor name and timestamp
-
-### US-15: Approve or Reject a Commercial Invoice
-**As a** Checker, **I want to** approve or reject a submitted commercial invoice, **so that** only verified documents are finalised for customs use.
-
-**Acceptance Criteria:**
-- [ ] Checker can Approve a Pending Approval CI; status changes to Approved and the document becomes fully read-only
-- [ ] Checker cannot approve a CI in Rejected status directly; the Maker must re-submit it first (moving it to Pending Approval) before the Checker can act
-- [ ] Checker can Reject a Pending Approval CI with mandatory rejection comments; status changes to Rejected; Maker is notified
-- [ ] Maker can view the rejection comments via "View Rejection Comments" in the Actions menu when status is Rejected
-- [ ] Approval and rejection events are recorded in the audit trail with actor name, timestamp, and comments
-- [ ] A Maker cannot approve their own document
-
-### US-16: Download a Commercial Invoice PDF
-**As a** Maker or Checker, **I want to** download a Draft PDF during review and a Final PDF once approved, **so that** I can preview the document at any stage and produce the final clean copy for submission.
-
-**Acceptance Criteria:**
-- [ ] "Download Draft PDF" action is available to Maker when CI status is Draft or Rejected
-- [ ] "Download Draft PDF" action is available to Company Admin at any non-Approved state
-- [ ] The Draft PDF displays a diagonal "DRAFT" watermark in light red across all pages
-- [ ] "Download Final PDF" action is available to Maker, Checker, and Company Admin only when status is Approved
-- [ ] The Final PDF has no watermark
-- [ ] Both PDF modes include: exporter details, consignee, buyer, all order references (only populated ones), shipping fields, line items table, weight totals, amounts, bank details
-- [ ] Line item amounts are formatted to 2 decimal places; quantities are formatted to 3 decimal places
-- [ ] The Total Amount in Words is correctly computed and displayed
-
-### US-17: Disable an Approved Commercial Invoice
-**As a** Checker, **I want to** disable an Approved Commercial Invoice, **so that** it can be voided after it has been finalised if required.
-
-**Acceptance Criteria:**
-- [ ] "Disable" action is available to Checker and Company Admin only when CI status is Approved
+- [ ] "Disable" action is available to Checker and Company Admin only when the document status is Approved
 - [ ] A mandatory comment is required when disabling; the system must block the action if the comment is empty
-- [ ] On confirmation, status changes to Disabled — a terminal state; no further actions (submit, approve, reject, or download) are possible
+- [ ] On confirmation, status changes to Disabled — a terminal state; no further actions (submit, approve, reject, or download) are possible for either PL or CI
 - [ ] The disable event is recorded in the audit trail with actor name, timestamp, and the mandatory comment
-- [ ] A Maker cannot disable a CI
-
-### US-06: Approve a Commercial Invoice
-**As a** Checker, **I want to** review and approve a submitted commercial invoice, **so that** the trading house can use it for customs clearance and present it under a Letter of Credit.
-
-**Acceptance Criteria:**
-- [ ] Checker receives a notification when a document is submitted for approval
-- [ ] Checker can view the complete document and its revision history
-- [ ] Checker can approve the document, making it read-only and final
-- [ ] Checker can reject the document with mandatory comments
-- [ ] Maker is notified upon rejection and can view the Checker's comments
+- [ ] A Maker cannot disable a combined document
 
 ---
 
 ## 8. Data Requirements
 
-- **Core Entities:** Organisation, User, Role, Bank, Country, Port, Place of Receipt, Incoterm, UOM, Payment Term, Final Destination, Pre-Carriage By, Terms & Conditions Template, Proforma Invoice, Proforma Invoice Line Item, Commercial Invoice, Commercial Invoice Line Item (aggregated from Packing List container items by Item Code + UOM; stores unit_price_usd), Packing List, Packing List Container, Packing List Container Item, Document Approval Log (Audit Trail)
+- **Core Entities:** Organisation, User, Role, Bank, Country, Port, Place of Receipt, Incoterm, UOM, Payment Term, Final Destination, Pre-Carriage By, Terms & Conditions Template, Proforma Invoice, Proforma Invoice Line Item, Combined PL+CI Document (single record linking both a Packing List record and a Commercial Invoice record), Packing List Container, Packing List Container Item, Commercial Invoice Line Item (aggregated by Item Code + UOM from container items; stores rate_usd), Document Approval Log (Audit Trail)
 - **Data Flow:** Master data is created by Company Admins → referenced by Makers during document creation → documents pass through approval workflow → final approved documents are archived and available for reporting and PDF export
 - **Retention:** Document records and approval audit logs must be retained for a minimum of 7 years in accordance with trade compliance requirements
 - **Privacy:** Personally identifiable information (contact names, email addresses, phone numbers) must be handled in accordance with applicable data protection regulations (e.g., GDPR where applicable)
