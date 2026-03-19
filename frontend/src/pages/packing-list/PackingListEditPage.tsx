@@ -135,7 +135,10 @@ export default function PackingListEditPage() {
     }
   }, [pl, user]);
 
-  const { data: organisations = [] } = useQuery({ queryKey: ["organisations"], queryFn: () => listOrganisations() });
+  const { data: exporters = [] } = useQuery({ queryKey: ["organisations", "EXPORTER"], queryFn: () => listOrganisations("EXPORTER") });
+  const { data: consignees = [] } = useQuery({ queryKey: ["organisations", "CONSIGNEE"], queryFn: () => listOrganisations("CONSIGNEE") });
+  const { data: buyers = [] } = useQuery({ queryKey: ["organisations", "BUYER"], queryFn: () => listOrganisations("BUYER") });
+  const { data: notifyParties = [] } = useQuery({ queryKey: ["organisations", "NOTIFY_PARTY"], queryFn: () => listOrganisations("NOTIFY_PARTY") });
   const { data: banks = [] } = useQuery({ queryKey: ["banks"], queryFn: listBanks });
   const { data: incoterms = [] } = useQuery({ queryKey: ["incoterms"], queryFn: listIncoterms });
   const { data: paymentTerms = [] } = useQuery({ queryKey: ["payment-terms"], queryFn: listPaymentTerms });
@@ -293,10 +296,6 @@ export default function PackingListEditPage() {
     return <div style={{ padding: 32, fontFamily: "var(--font-body)", color: "var(--text-muted)" }}>Loading…</div>;
   }
 
-  const exporters = organisations.filter((o: any) => o.tags?.includes("EXPORTER"));
-  const consignees = organisations.filter((o: any) => o.tags?.includes("CONSIGNEE"));
-  const buyers = organisations.filter((o: any) => o.tags?.includes("BUYER"));
-  const notifyParties = organisations.filter((o: any) => o.tags?.includes("NOTIFY_PARTY"));
 
   return (
     <div style={PAGE}>

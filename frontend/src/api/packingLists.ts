@@ -167,47 +167,47 @@ export interface AuditEntry {
 
 export function listPackingLists(params?: Record<string, string>) {
   return axiosInstance
-    .get<PackingList[]>("/api/v1/packing-lists/", { params })
+    .get<PackingList[]>("/packing-lists/", { params })
     .then((r) => r.data);
 }
 
 export function getPackingList(id: number) {
   return axiosInstance
-    .get<PackingList>(`/api/v1/packing-lists/${id}/`)
+    .get<PackingList>(`/packing-lists/${id}/`)
     .then((r) => r.data);
 }
 
 export function createPackingList(data: Record<string, unknown>) {
   return axiosInstance
-    .post<PackingList>("/api/v1/packing-lists/", data)
+    .post<PackingList>("/packing-lists/", data)
     .then((r) => r.data);
 }
 
 export function updatePackingList(id: number, data: Record<string, unknown>) {
   return axiosInstance
-    .patch<PackingList>(`/api/v1/packing-lists/${id}/`, data)
+    .patch<PackingList>(`/packing-lists/${id}/`, data)
     .then((r) => r.data);
 }
 
 export function deletePackingList(id: number) {
-  return axiosInstance.delete(`/api/v1/packing-lists/${id}/`).then((r) => r.data);
+  return axiosInstance.delete(`/packing-lists/${id}/`).then((r) => r.data);
 }
 
 export function packingListWorkflow(id: number, action: string, comment = "") {
   return axiosInstance
-    .post<{ status: string }>(`/api/v1/packing-lists/${id}/workflow/`, { action, comment })
+    .post<{ status: string }>(`/packing-lists/${id}/workflow/`, { action, comment })
     .then((r) => r.data);
 }
 
 export function getPlAuditLog(id: number) {
   return axiosInstance
-    .get<AuditEntry[]>(`/api/v1/packing-lists/${id}/audit-log/`)
+    .get<AuditEntry[]>(`/packing-lists/${id}/audit-log/`)
     .then((r) => r.data);
 }
 
 // Downloads the combined PL+CI PDF and triggers a browser save-as dialog.
 export async function downloadPackingListPDF(id: number, filename: string) {
-  const response = await axiosInstance.get(`/api/v1/packing-lists/${id}/pdf/`, {
+  const response = await axiosInstance.get(`/packing-lists/${id}/pdf/`, {
     responseType: "blob",
   });
   const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
@@ -224,63 +224,63 @@ export async function downloadPackingListPDF(id: number, filename: string) {
 
 export function listContainers(packingListId: number) {
   return axiosInstance
-    .get<Container[]>("/api/v1/containers/", { params: { packing_list: packingListId } })
+    .get<Container[]>("/containers/", { params: { packing_list: packingListId } })
     .then((r) => r.data);
 }
 
 export function createContainer(data: Record<string, unknown>) {
-  return axiosInstance.post<Container>("/api/v1/containers/", data).then((r) => r.data);
+  return axiosInstance.post<Container>("/containers/", data).then((r) => r.data);
 }
 
 export function updateContainer(id: number, data: Record<string, unknown>) {
   return axiosInstance
-    .patch<Container>(`/api/v1/containers/${id}/`, data)
+    .patch<Container>(`/containers/${id}/`, data)
     .then((r) => r.data);
 }
 
 export function deleteContainer(id: number) {
-  return axiosInstance.delete(`/api/v1/containers/${id}/`).then((r) => r.data);
+  return axiosInstance.delete(`/containers/${id}/`).then((r) => r.data);
 }
 
 export function copyContainer(id: number) {
-  return axiosInstance.post<Container>(`/api/v1/containers/${id}/copy/`).then((r) => r.data);
+  return axiosInstance.post<Container>(`/containers/${id}/copy/`).then((r) => r.data);
 }
 
 // ---- ContainerItem endpoints ------------------------------------------------
 
 export function createContainerItem(data: Record<string, unknown>) {
   return axiosInstance
-    .post<ContainerItem>("/api/v1/container-items/", data)
+    .post<ContainerItem>("/container-items/", data)
     .then((r) => r.data);
 }
 
 export function updateContainerItem(id: number, data: Record<string, unknown>) {
   return axiosInstance
-    .patch<ContainerItem>(`/api/v1/container-items/${id}/`, data)
+    .patch<ContainerItem>(`/container-items/${id}/`, data)
     .then((r) => r.data);
 }
 
 export function deleteContainerItem(id: number) {
-  return axiosInstance.delete(`/api/v1/container-items/${id}/`).then((r) => r.data);
+  return axiosInstance.delete(`/container-items/${id}/`).then((r) => r.data);
 }
 
 // ---- Commercial Invoice endpoints -------------------------------------------
 
 export function getCommercialInvoice(id: number) {
   return axiosInstance
-    .get<CommercialInvoice>(`/api/v1/commercial-invoices/${id}/`)
+    .get<CommercialInvoice>(`/commercial-invoices/${id}/`)
     .then((r) => r.data);
 }
 
 export function listCommercialInvoices(params?: Record<string, string>) {
   return axiosInstance
-    .get<CommercialInvoice[]>("/api/v1/commercial-invoices/", { params })
+    .get<CommercialInvoice[]>("/commercial-invoices/", { params })
     .then((r) => r.data);
 }
 
 export function updateCILineItem(id: number, data: { rate_usd?: string; packages_kind?: string }) {
   return axiosInstance
-    .patch<CILineItem>(`/api/v1/ci-line-items/${id}/`, data)
+    .patch<CILineItem>(`/ci-line-items/${id}/`, data)
     .then((r) => r.data);
 }
 
@@ -290,7 +290,7 @@ export function uploadPlSignedCopy(plId: number, file: File) {
   const formData = new FormData();
   formData.append("file", file);
   return axiosInstance
-    .post<{ signed_copy_url: string }>(`/api/v1/packing-lists/${plId}/signed-copy/`, formData, {
+    .post<{ signed_copy_url: string }>(`/packing-lists/${plId}/signed-copy/`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((r) => r.data);
@@ -300,7 +300,7 @@ export function uploadCiSignedCopy(ciId: number, file: File) {
   const formData = new FormData();
   formData.append("file", file);
   return axiosInstance
-    .post<{ signed_copy_url: string }>(`/api/v1/commercial-invoices/${ciId}/signed-copy/`, formData, {
+    .post<{ signed_copy_url: string }>(`/commercial-invoices/${ciId}/signed-copy/`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((r) => r.data);

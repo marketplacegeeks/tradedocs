@@ -1,10 +1,11 @@
 // Bank accounts list page — design system table layout.
 
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Pencil } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import { message } from "antd";
 
-import { listBanks } from "../../api/banks";
+import { listBanks, deactivateBank } from "../../api/banks";
 import type { Bank } from "../../api/banks";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES, ACCOUNT_TYPE_LABELS } from "../../utils/constants";
@@ -18,6 +19,7 @@ const ACCOUNT_TYPE_CHIP: Record<string, string> = {
 
 export default function BankListPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
 
@@ -25,6 +27,23 @@ export default function BankListPage() {
     queryKey: ["banks"],
     queryFn: listBanks,
   });
+
+  const deactivateMutation = useMutation({
+    mutationFn: (id: number) => deactivateBank(id),
+    onSuccess: () => {
+      message.success("Bank account deactivated.");
+      queryClient.invalidateQueries({ queryKey: ["banks"] });
+    },
+    onError: () => {
+      message.error("Failed to deactivate bank account.");
+    },
+  });
+
+  function handleDeactivate(bank: Bank) {
+    if (window.confirm(`Deactivate "${bank.nickname}"? It will no longer appear in document dropdowns.`)) {
+      deactivateMutation.mutate(bank.id);
+    }
+  }
 
   return (
     <div>
@@ -185,32 +204,60 @@ export default function BankListPage() {
                     </td>
                     {canWrite && (
                       <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", textAlign: "right" }}>
-                        <button
-                          onClick={() => navigate(`/master-data/banks/${bank.id}/edit`)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            padding: "5px 10px",
-                            background: "transparent",
-                            border: "1px solid var(--border-medium)",
-                            borderRadius: 6,
-                            fontFamily: "var(--font-body)",
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                          }}
-                          onMouseEnter={(e) =>
-                            ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
-                          }
-                          onMouseLeave={(e) =>
-                            ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-                          }
-                        >
-                          <Pencil size={12} strokeWidth={1.5} />
-                          Edit
-                        </button>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <button
+                            onClick={() => navigate(`/master-data/banks/${bank.id}/edit`)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "5px 10px",
+                              background: "transparent",
+                              border: "1px solid var(--border-medium)",
+                              borderRadius: 6,
+                              fontFamily: "var(--font-body)",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: "var(--text-secondary)",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
+                            }
+                            onMouseLeave={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                            }
+                          >
+                            <Pencil size={12} strokeWidth={1.5} />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeactivate(bank)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "5px 10px",
+                              background: "transparent",
+                              border: "1px solid var(--pastel-pink-text)",
+                              borderRadius: 6,
+                              fontFamily: "var(--font-body)",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: "var(--pastel-pink-text)",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "var(--pastel-pink)")
+                            }
+                            onMouseLeave={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                            }
+                          >
+                            <Trash2 size={12} strokeWidth={1.5} />
+                            Deactivate
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>

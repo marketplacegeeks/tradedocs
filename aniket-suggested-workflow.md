@@ -70,3 +70,4 @@ His job is product decisions and browser testing.
 
 The test cases have to be written in plain English because I do not understand the test cases which you are technically writing. 
 Create git branch after every workflow and test is finished, commit it, when I go to next step first comit to git etc.
+ by default, we should never push any PDF file to Git

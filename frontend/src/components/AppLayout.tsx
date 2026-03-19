@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
-  FileText, Package, DollarSign, Database, Users, BarChart2,
+  FileText, Package, Database, Users, BarChart2,
   Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft,
 } from "lucide-react";
 
@@ -27,13 +27,7 @@ const NAV_ITEMS = [
   {
     key: "/packing-lists",
     icon: Package,
-    label: "Packing List",
-    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
-  },
-  {
-    key: "/commercial-invoices",
-    icon: DollarSign,
-    label: "Commercial Invoice",
+    label: "P.List & C. Invoice",
     roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
   },
   {

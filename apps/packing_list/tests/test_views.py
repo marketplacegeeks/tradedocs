@@ -575,3 +575,287 @@ class TestPlSignedCopyUpload:
         resp = auth_client(maker).get(pl_detail_url(pl.pk))
         assert resp.status_code == 200
         assert resp.data["signed_copy_url"] is not None
+
+# ---- Extended coverage: shipping fields, bank propagation, CI rates,
+#      references, container validation, copy, final rates, CI aggregation ----
+
+def ci_line_item_detail_url(pk):
+    return f"/api/v1/ci-line-items/{pk}/"
+
+
+def ci_detail_url(pk):
+    return f"/api/v1/commercial-invoices/{pk}/"
+
+
+@pytest.mark.django_db
+class TestPlExtendedCoverage:
+    """12 tests covering gaps identified in wireframe audit."""
+
+    # ---- 1. Shipping fields saved on create --------------------------------
+
+    def test_create_pl_saves_shipping_fields(self):
+        """POST with port_of_loading, port_of_discharge, vessel_flight_no
+        should return those values in the response."""
+        from apps.master_data.tests.factories import PortFactory
+        maker = MakerFactory()
+        pi = _approved_pi(maker)
+        port_load = PortFactory()
+        port_discharge = PortFactory()
+        payload = _pl_payload(pi)
+        payload.update({
+            "port_of_loading": port_load.pk,
+            "port_of_discharge": port_discharge.pk,
+            "vessel_flight_no": "MV ATLAS",
+        })
+        resp = auth_client(maker).post(PL_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["port_of_loading"] == port_load.pk
+        assert data["port_of_discharge"] == port_discharge.pk
+        assert data["vessel_flight_no"] == "MV ATLAS"
+
+    # ---- 2. Country of final destination saved on create -------------------
+
+    def test_create_pl_saves_country_of_final_destination(self):
+        """country_of_final_destination FK should round-trip through create."""
+        from apps.master_data.tests.factories import CountryFactory
+        maker = MakerFactory()
+        pi = _approved_pi(maker)
+        country = CountryFactory()
+        payload = _pl_payload(pi)
+        payload["country_of_final_destination"] = country.pk
+        resp = auth_client(maker).post(PL_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
+        assert resp.json()["country_of_final_destination"] == country.pk
+
+    # ---- 3. Bank PATCH propagates to linked CI -----------------------------
+
+    def test_patch_bank_propagates_to_ci(self):
+        """PATCH bank on a PL in DRAFT → the linked CI's bank must update."""
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        CommercialInvoiceFactory(packing_list=pl, created_by=maker, bank=None)
+        new_bank = BankFactory()
+        resp = auth_client(maker).patch(
+            pl_detail_url(pl.pk),
+            {"bank": new_bank.pk},
+            format="json",
+        )
+        assert resp.status_code == 200
+        # Verify the CI now references the same bank
+        pl.refresh_from_db()
+        pl.commercial_invoice.refresh_from_db()
+        assert pl.commercial_invoice.bank_id == new_bank.pk
+
+    # ---- 4. Order references round-trip ------------------------------------
+
+    def test_patch_pl_order_references(self):
+        """All reference fields should be patchable and returned correctly."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        payload = {
+            "po_number": "PO-2026-001",
+            "po_date": "2026-01-15",
+            "lc_number": "LC/2026/SBI/001",
+            "lc_date": "2026-01-20",
+            "bl_number": "BL-2026-001",
+            "bl_date": "2026-02-01",
+            "so_number": "SO-001",
+            "so_date": "2026-01-10",
+            "other_references": "REF-CUSTOM",
+            "other_references_date": "2026-01-05",
+            "additional_description": "Extra notes here.",
+        }
+        resp = auth_client(maker).patch(pl_detail_url(pl.pk), payload, format="json")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["po_number"] == "PO-2026-001"
+        assert data["lc_number"] == "LC/2026/SBI/001"
+        assert data["bl_number"] == "BL-2026-001"
+        assert data["so_number"] == "SO-001"
+        assert data["other_references"] == "REF-CUSTOM"
+        assert data["other_references_date"] == "2026-01-05"
+
+    # ---- 5. CI line item rate_usd update -----------------------------------
+
+    def test_ci_line_item_rate_update(self):
+        """PATCH /ci-line-items/{id}/ should update rate_usd and amount_usd."""
+        from decimal import Decimal
+        from apps.commercial_invoice.tests.factories import (
+            CommercialInvoiceFactory,
+            CommercialInvoiceLineItemFactory,
+        )
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        uom = UOMFactory()
+        line = CommercialInvoiceLineItemFactory(ci=ci, uom=uom, total_quantity=Decimal("100.000"), rate_usd=Decimal("0.00"))
+        resp = auth_client(maker).patch(
+            ci_line_item_detail_url(line.pk),
+            {"rate_usd": "500.00"},
+            format="json",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert Decimal(data["rate_usd"]) == Decimal("500.00")
+        # amount_usd = qty × rate = 100.000 × 500.00
+        assert Decimal(data["amount_usd"]) == Decimal("50000.00")
+
+    # ---- 6. Container requires container_ref --------------------------------
+
+    def test_container_create_requires_container_ref(self):
+        """POST /containers/ without container_ref → 400."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        payload = {
+            "packing_list": pl.pk,
+            # container_ref intentionally omitted
+            "marks_numbers": "MARK-001",
+            "seal_number": "SEAL-001",
+            "tare_weight": "2200.000",
+        }
+        resp = auth_client(maker).post(container_list_url(), payload, format="json")
+        assert resp.status_code == 400
+
+    # ---- 7. Container requires seal_number ----------------------------------
+
+    def test_container_create_requires_seal_number(self):
+        """POST /containers/ without seal_number → 400."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        payload = {
+            "packing_list": pl.pk,
+            "container_ref": "CONT001",
+            "marks_numbers": "MARK-001",
+            # seal_number intentionally omitted
+            "tare_weight": "2200.000",
+        }
+        resp = auth_client(maker).post(container_list_url(), payload, format="json")
+        assert resp.status_code == 400
+
+    # ---- 8. Copy container blanks ref/marks/seal but keeps tare_weight ------
+
+    def test_copy_container_blanks_ref_marks_seal_keeps_tare(self):
+        """POST /containers/{id}/copy/ → new container has blank ref/marks/seal
+        but tare_weight matches the original."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        original = ContainerFactory(
+            packing_list=pl,
+            container_ref="CONT001",
+            marks_numbers="MARK-001",
+            seal_number="SEAL-001",
+            tare_weight=Decimal("2200.000"),
+        )
+        resp = auth_client(maker).post(container_copy_url(original.pk))
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["container_ref"] == ""
+        assert data["marks_numbers"] == ""
+        assert data["seal_number"] == ""
+        assert Decimal(data["tare_weight"]) == Decimal("2200.000")
+
+    # ---- 9. Final rates PATCH on PL (incoterms, payment_terms, fob_rate...) -
+
+    def test_patch_final_rates_on_pl(self):
+        """PATCH PL with incoterms, payment_terms, fob_rate, freight, insurance,
+        lc_details → all fields saved and returned."""
+        from apps.master_data.tests.factories import IncotermFactory, PaymentTermFactory
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        incoterm = IncotermFactory()
+        payment_term = PaymentTermFactory()
+        payload = {
+            "incoterms": incoterm.pk,
+            "payment_terms": payment_term.pk,
+            "fob_rate": "1250.00",
+            "freight": "12000.00",
+            "insurance": "1500.00",
+            "lc_details": "LC/2026/SBI/00123",
+        }
+        resp = auth_client(maker).patch(pl_detail_url(pl.pk), payload, format="json")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["incoterms"] == incoterm.pk
+        assert data["payment_terms"] == payment_term.pk
+        # CI fields are returned on the PL response
+        assert Decimal(data["fob_rate"]) == Decimal("1250.00")
+        assert Decimal(data["freight"]) == Decimal("12000.00")
+
+    # ---- 10. CI aggregation: same item_code+UOM → 1 line item ---------------
+
+    def test_ci_line_items_aggregate_by_item_code_uom(self):
+        """Items with the same item_code+UOM across multiple containers must
+        produce a single aggregated CI line item."""
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.commercial_invoice.models import CommercialInvoiceLineItem
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        uom = UOMFactory()
+        c1 = ContainerFactory(packing_list=pl)
+        c2 = ContainerFactory(packing_list=pl)
+        # Same item_code + same uom in both containers → should aggregate
+        payload_base = {
+            "item_code": "ITEM-AGG",
+            "packages_kind": "10 Drums",
+            "description": "Castor Oil",
+            "uom": uom.pk,
+            "quantity": "100.000",
+            "net_weight": "100.000",
+            "inner_packing_weight": "2.000",
+        }
+        auth_client(maker).post(item_list_url(), {**payload_base, "container": c1.pk}, format="json")
+        auth_client(maker).post(item_list_url(), {**payload_base, "container": c2.pk}, format="json")
+        line_items = CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM-AGG")
+        assert line_items.count() == 1
+        assert Decimal(line_items.first().total_quantity) == Decimal("200.000")
+
+    # ---- 11. CI aggregation: different UOM → separate line items ------------
+
+    def test_ci_line_items_separate_for_different_uom(self):
+        """Same item_code but different UOM must produce 2 separate line items."""
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.commercial_invoice.models import CommercialInvoiceLineItem
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        uom_a = UOMFactory()
+        uom_b = UOMFactory()
+        container = ContainerFactory(packing_list=pl)
+        base = {
+            "container": container.pk,
+            "item_code": "ITEM-SPLIT",
+            "packages_kind": "10 Drums",
+            "description": "Castor Oil",
+            "quantity": "50.000",
+            "net_weight": "50.000",
+            "inner_packing_weight": "1.000",
+        }
+        auth_client(maker).post(item_list_url(), {**base, "uom": uom_a.pk}, format="json")
+        auth_client(maker).post(item_list_url(), {**base, "uom": uom_b.pk}, format="json")
+        line_items = CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM-SPLIT")
+        assert line_items.count() == 2
+
+    # ---- 12. Incoterms null is allowed on PATCH -----------------------------
+
+    def test_patch_incoterms_null_allowed(self):
+        """PATCH PL with incoterms=null → 200, incoterms field is null."""
+        from apps.master_data.tests.factories import IncotermFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(
+            status=DRAFT,
+            created_by=maker,
+            incoterms=IncotermFactory(),
+        )
+        resp = auth_client(maker).patch(
+            pl_detail_url(pl.pk),
+            {"incoterms": None},
+            format="json",
+        )
+        assert resp.status_code == 200
+        pl.refresh_from_db()
+        assert pl.incoterms is None

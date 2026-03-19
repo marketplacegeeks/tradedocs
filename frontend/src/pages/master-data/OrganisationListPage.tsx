@@ -12,12 +12,13 @@ import { useAuth } from "../../store/AuthContext";
 import { ROLES, ORG_TAG_LABELS } from "../../utils/constants";
 import type { OrgTag } from "../../utils/constants";
 
-// Pastel chip class per document-role tag
+// Pastel chip class per organisation type tag
 const TAG_CHIP: Record<string, string> = {
   EXPORTER: "chip-blue",
   CONSIGNEE: "chip-green",
   BUYER: "chip-orange",
   NOTIFY_PARTY: "chip-purple",
+  VENDOR: "chip-yellow",
 };
 
 export default function OrganisationListPage() {

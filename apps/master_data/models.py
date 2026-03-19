@@ -252,6 +252,8 @@ class Bank(models.Model):
         help_text="Currency for which this intermediary routing applies (e.g. USD)",
     )
 
+    is_active = models.BooleanField(default=True)
+
     class Meta:
         db_table = "master_data_bank"
         ordering = ["bank_name", "nickname"]
@@ -314,6 +316,7 @@ class OrganisationTag(models.Model):
         CONSIGNEE = "CONSIGNEE", "Consignee"
         BUYER = "BUYER", "Buyer"
         NOTIFY_PARTY = "NOTIFY_PARTY", "Notify Party"
+        VENDOR = "VENDOR", "Vendor"
 
     # CASCADE: if the parent Organisation is removed, its tags go with it.
     organisation = models.ForeignKey(

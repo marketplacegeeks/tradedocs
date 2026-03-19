@@ -7,6 +7,7 @@ import api from "./axiosInstance";
 
 export interface Bank {
   id: number;
+  is_active: boolean;
   organisation: number;             // Organisation ID
   organisation_name: string;        // read-only, returned by API
   nickname: string;
@@ -76,5 +77,11 @@ export async function createBank(payload: BankPayload): Promise<Bank> {
 /** Update an existing bank account via PATCH (partial update). */
 export async function updateBank(id: number, payload: Partial<BankPayload>): Promise<Bank> {
   const { data } = await api.patch<Bank>(`/master-data/banks/${id}/`, payload);
+  return data;
+}
+
+/** Deactivate a bank account. It will no longer appear in document dropdowns. */
+export async function deactivateBank(id: number): Promise<Bank> {
+  const { data } = await api.patch<Bank>(`/master-data/banks/${id}/`, { is_active: false });
   return data;
 }

@@ -435,7 +435,7 @@ def generate_pi_pdf(pi) -> io.BytesIO:
                 bank.intermediary_bank_name,
                 f"<b>SWIFT Code:</b> {bank.intermediary_swift_code or '—'}",
             ])
-        story.append(_p("<br/>".join(bank_lines), STYLE_NORMAL))
+        story.append(_p("<br/>".join(bank_lines), _BODY))
         story.append(Spacer(1, 3 * mm))
 
     # 10. Terms & Conditions (new page) ----------------------------------------

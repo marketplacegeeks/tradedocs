@@ -151,7 +151,7 @@ export default function App() {
           path="/packing-lists/:id/edit"
           element={
             <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
-              <PackingListEditPage />
+              <PackingListCreatePage />
             </ProtectedRoute>
           }
         />

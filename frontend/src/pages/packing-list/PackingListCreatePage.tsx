@@ -1,16 +1,19 @@
 // Packing List + CI creation page — FR-14M.
-// 5-step wizard: 1) Header & Parties, 2) Order References,
-//                3) Shipping & Logistics, 4) Containers & Items, 5) Final Rates
+// Step 0: Consignee + PI selection (pre-wizard, no step bar)
+// Steps 1–4 wizard: 1) Header & Details, 2) Order References,
+//                   3) Containers & Items, 4) Final Rates
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Select, DatePicker, message, Modal } from "antd";
+import { Select, DatePicker, message } from "antd";
 import { Plus, Trash2, Copy, ChevronRight, ChevronLeft } from "lucide-react";
 import dayjs from "dayjs";
 
 import {
+  getPackingList,
   createPackingList,
+  updatePackingList,
   createContainer,
   updateContainer,
   deleteContainer,
@@ -77,6 +80,14 @@ const INPUT: React.CSSProperties = {
   boxSizing: "border-box" as const,
 };
 
+const INPUT_READONLY: React.CSSProperties = {
+  ...INPUT,
+  background: "var(--bg-base)",
+  color: "var(--text-muted)",
+  cursor: "not-allowed",
+  borderColor: "var(--border-light)",
+};
+
 const FORM_ROW: React.CSSProperties = {
   display: "grid",
   gap: 16,
@@ -135,12 +146,11 @@ const TD: React.CSSProperties = {
   verticalAlign: "middle",
 };
 
-// ---- Step indicators --------------------------------------------------------
+// ---- Step indicators (shown for steps 1–5 only) -----------------------------
 
 const STEP_LABELS = [
-  "Header & Parties",
+  "Header & Details",
   "Order References",
-  "Shipping & Logistics",
   "Containers & Items",
   "Final Rates",
 ];
@@ -192,200 +202,510 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
-// ---- Step 1: Header & Parties -----------------------------------------------
+// ---- Step 0: Consignee + PI selection (pre-wizard) --------------------------
+
+function Step0({
+  form, setForm, onContinue, onCancel,
+}: {
+  form: Record<string, any>;
+  setForm: (f: Record<string, any>) => void;
+  onContinue: () => void;
+  onCancel: () => void;
+}) {
+  // Fetch all approved PIs once; derive consignees from that list.
+  const { data: piList = [], isLoading } = useQuery({
+    queryKey: ["proforma-invoices", "APPROVED"],
+    queryFn: () => listProformaInvoices({ status: DOCUMENT_STATUS.APPROVED }),
+  });
+
+  // Build a deduplicated consignee list from the approved PI list.
+  const consigneeMap = new Map<number, string>();
+  for (const pi of piList as any[]) {
+    if (!consigneeMap.has(pi.consignee)) {
+      consigneeMap.set(pi.consignee, pi.consignee_name);
+    }
+  }
+  const consignees = Array.from(consigneeMap.entries()).map(([id, name]) => ({ id, name }));
+
+  // Approved PIs for the selected consignee, sorted most-recent first.
+  const filteredPIs = (piList as any[])
+    .filter((pi) => !form.consignee || pi.consignee === form.consignee)
+    .sort((a, b) => {
+      if (b.pi_date !== a.pi_date) return b.pi_date.localeCompare(a.pi_date);
+      return b.pi_number.localeCompare(a.pi_number);
+    });
+
+  const selectedPi: any = (piList as any[]).find((pi) => pi.id === form.proforma_invoice);
+
+  function handleConsigneeChange(v: number) {
+    // Clearing the PI selection when consignee changes.
+    setForm({ ...form, consignee: v, proforma_invoice: undefined, _selectedPi: undefined });
+  }
+
+  function handlePiChange(v: number) {
+    const pi = (piList as any[]).find((p) => p.id === v);
+    if (pi) {
+      // Pre-populate all PI-derived fields so Step 1 shows them auto-filled and editable.
+      setForm({
+        ...form,
+        proforma_invoice: v,
+        exporter: pi.exporter,
+        consignee: pi.consignee,
+        buyer: pi.buyer ?? null,
+        bank: pi.bank ?? null,
+        pre_carriage_by: pi.pre_carriage_by ?? null,
+        place_of_receipt: pi.place_of_receipt ?? null,
+        place_of_receipt_by_pre_carrier: pi.place_of_receipt_by_pre_carrier ?? null,
+        vessel_flight_no: pi.vessel_flight_no ?? "",
+        port_of_loading: pi.port_of_loading ?? null,
+        port_of_discharge: pi.port_of_discharge ?? null,
+        final_destination: pi.final_destination ?? null,
+        country_of_origin: pi.country_of_origin ?? null,
+        country_of_final_destination: pi.country_of_final_destination ?? null,
+        incoterms: pi.incoterms ?? null,
+        payment_terms: pi.payment_terms ?? null,
+        _selectedPi: pi,
+      });
+    }
+  }
+
+  function handleContinue() {
+    if (!form.consignee) { message.error("Please select a Consignee."); return; }
+    if (!form.proforma_invoice) { message.error("Please select a Proforma Invoice."); return; }
+    onContinue();
+  }
+
+  return (
+    <div>
+      {/* Info banner */}
+      <div style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-light)",
+        borderRadius: 10,
+        padding: "12px 16px",
+        marginBottom: 24,
+        fontFamily: "var(--font-body)",
+        fontSize: 13,
+        color: "var(--text-secondary)",
+      }}>
+        Select a Consignee, then select an Approved Proforma Invoice. All matching fields will be auto-populated from the PI.
+      </div>
+
+      <div style={CARD}>
+        {/* Consignee */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ ...LABEL, fontSize: 13, color: "var(--text-primary)" }}>
+            Consignee <span style={{ color: "var(--error, #e53e3e)", fontWeight: 400 }}>*required</span>
+          </label>
+          <Select
+            showSearch
+            loading={isLoading}
+            style={{ width: "100%" }}
+            placeholder="Select Consignee"
+            value={form.consignee}
+            onChange={handleConsigneeChange}
+            options={consignees.map((c) => ({ value: c.id, label: c.name }))}
+            filterOption={(input, opt) => (opt?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+            size="large"
+          />
+          <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+            Organisations tagged as Consignee
+          </p>
+        </div>
+
+        {/* Proforma Invoice */}
+        <div style={{ marginBottom: selectedPi ? 20 : 0 }}>
+          <label style={{ ...LABEL, fontSize: 13, color: "var(--text-primary)" }}>
+            Proforma Invoice <span style={{ color: "var(--error, #e53e3e)", fontWeight: 400 }}>*required</span>
+          </label>
+          <Select
+            showSearch
+            style={{ width: "100%" }}
+            placeholder={form.consignee ? "Select approved PI" : "Select a Consignee first"}
+            disabled={!form.consignee}
+            value={form.proforma_invoice}
+            onChange={handlePiChange}
+            options={filteredPIs.map((pi, idx) => ({
+              value: pi.id,
+              label: `${pi.pi_number} (${dayjs(pi.pi_date).format("DD MMM YYYY")})${idx === 0 ? " ← most recent" : ""}`,
+            }))}
+            filterOption={(input, opt) => (opt?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+            size="large"
+          />
+          <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+            Shows only Approved PIs for the selected Consignee. Searchable. Most recently approved PI appears first.
+          </p>
+        </div>
+
+        {/* PI Preview — shown after a PI is selected */}
+        {selectedPi && (
+          <div style={{ border: "1px solid var(--border-light)", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
+            <div style={{ background: "var(--bg-base)", padding: "10px 16px", borderBottom: "1px solid var(--border-light)" }}>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                PI Preview (read-only — auto-populated from selected PI)
+              </span>
+            </div>
+            <div style={{ padding: 16 }}>
+              {/* Exporter + Consignee read-only */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                <div>
+                  <label style={LABEL}>Exporter</label>
+                  <div style={INPUT_READONLY}>{selectedPi.exporter_name || "—"}</div>
+                </div>
+                <div>
+                  <label style={LABEL}>Consignee</label>
+                  <div style={INPUT_READONLY}>{selectedPi.consignee_name || "—"}</div>
+                </div>
+              </div>
+
+              {/* Line items table */}
+              <p style={{ ...LABEL, fontWeight: 600, marginBottom: 8 }}>Line Items (from original PI)</p>
+              {(selectedPi.line_items ?? []).length === 0 ? (
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)" }}>No line items on this PI.</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["Item Code", "Description", "HSN", "Qty"].map((h) => (
+                        <th key={h} style={TH}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedPi.line_items ?? []).map((li: any) => (
+                      <tr key={li.id}>
+                        <td style={TD}>{li.item_code}</td>
+                        <td style={TD}>{li.description}</td>
+                        <td style={TD}>{li.hsn_code || "—"}</td>
+                        <td style={TD}>{li.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 12 }}>
+        <button style={BTN_SECONDARY} onClick={onCancel}>Cancel</button>
+        <button
+          style={{ ...BTN_PRIMARY, opacity: (!form.consignee || !form.proforma_invoice) ? 0.5 : 1 }}
+          onClick={handleContinue}
+          disabled={!form.consignee || !form.proforma_invoice}
+        >
+          Continue <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Step 1: Header & Details -----------------------------------------------
+// Combined page: Document numbers (read-only), dates, parties, shipping &
+// logistics, countries, and bank details. All fields auto-populated from the
+// selected PI and remain editable. The PL record is created on save.
 
 function Step1({
-  form, setForm, onNext,
+  form, setForm, onNext, onBack, existingPl,
 }: {
   form: Record<string, any>;
   setForm: (f: Record<string, any>) => void;
   onNext: (pl: PackingList) => void;
+  onBack: () => void;
+  existingPl?: PackingList;
 }) {
   const [saving, setSaving] = useState(false);
 
-  const { data: organisations = [] } = useQuery({
-    queryKey: ["organisations"],
-    queryFn: () => listOrganisations(),
-  });
-  const { data: piList = [] } = useQuery({
-    queryKey: ["proforma-invoices", "APPROVED"],
-    queryFn: () => listProformaInvoices({ status: DOCUMENT_STATUS.APPROVED }),
-  });
-  const { data: banks = [] } = useQuery({
-    queryKey: ["banks"],
-    queryFn: () => listBanks(),
-  });
+  const { data: exporters = [] } = useQuery({ queryKey: ["organisations", "EXPORTER"], queryFn: () => listOrganisations("EXPORTER") });
+  const { data: consignees = [] } = useQuery({ queryKey: ["organisations", "CONSIGNEE"], queryFn: () => listOrganisations("CONSIGNEE") });
+  const { data: buyers = [] } = useQuery({ queryKey: ["organisations", "BUYER"], queryFn: () => listOrganisations("BUYER") });
+  const { data: notifyParties = [] } = useQuery({ queryKey: ["organisations", "NOTIFY_PARTY"], queryFn: () => listOrganisations("NOTIFY_PARTY") });
+  const { data: banks = [] } = useQuery({ queryKey: ["banks"], queryFn: listBanks });
+  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: listPorts });
+  const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
+  const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
+  const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
 
-  const exporters = organisations.filter((o: any) => o.tags?.includes("EXPORTER"));
-  const consignees = organisations.filter((o: any) => o.tags?.includes("CONSIGNEE"));
-  const buyers = organisations.filter((o: any) => o.tags?.includes("BUYER"));
-  const notifyParties = organisations.filter((o: any) => o.tags?.includes("NOTIFY_PARTY"));
+  // When editing, the saved organisation might not appear in the tag-filtered list (e.g. an exporter
+  // not tagged as EXPORTER). This helper injects a fallback option so the Select always shows the
+  // name rather than the raw ID.
+  function withFallback(
+    list: any[],
+    currentId: number | null | undefined,
+    currentName: string | null | undefined,
+  ): { value: number; label: string }[] {
+    const opts = list.map((o: any) => ({ value: o.id, label: o.name }));
+    if (currentId && !opts.find((o) => o.value === currentId)) {
+      opts.unshift({ value: currentId, label: currentName || String(currentId) });
+    }
+    return opts;
+  }
+
+  // Find the currently selected bank object to show its details in the preview card.
+  const selectedBank: any = banks.find((b: any) => b.id === form.bank);
 
   async function handleSave() {
-    if (!form.proforma_invoice || !form.exporter || !form.consignee) {
-      message.error("Proforma Invoice, Exporter, and Consignee are required.");
+    if (!form.exporter || !form.consignee) {
+      message.error("Exporter and Consignee are required.");
+      return;
+    }
+    if (!existingPl && !form.proforma_invoice) {
+      message.error("Proforma Invoice is required.");
       return;
     }
     setSaving(true);
+    const sharedFields = {
+      pl_date: form.pl_date || dayjs().format("YYYY-MM-DD"),
+      ci_date: form.ci_date || dayjs().format("YYYY-MM-DD"),
+      exporter: form.exporter,
+      consignee: form.consignee,
+      buyer: form.buyer || null,
+      notify_party: form.notify_party || null,
+      bank: form.bank || null,
+      pre_carriage_by: form.pre_carriage_by || null,
+      place_of_receipt: form.place_of_receipt || null,
+      place_of_receipt_by_pre_carrier: form.place_of_receipt_by_pre_carrier || null,
+      vessel_flight_no: form.vessel_flight_no || "",
+      port_of_loading: form.port_of_loading || null,
+      port_of_discharge: form.port_of_discharge || null,
+      final_destination: form.final_destination || null,
+      country_of_origin: form.country_of_origin || null,
+      country_of_final_destination: form.country_of_final_destination || null,
+    };
     try {
-      const pl = await createPackingList({
-        proforma_invoice: form.proforma_invoice,
-        pl_date: form.pl_date || dayjs().format("YYYY-MM-DD"),
-        ci_date: form.ci_date || dayjs().format("YYYY-MM-DD"),
-        exporter: form.exporter,
-        consignee: form.consignee,
-        buyer: form.buyer || null,
-        notify_party: form.notify_party || null,
-        bank: form.bank || null,
-      });
-      onNext(pl);
+      let result: PackingList;
+      if (existingPl) {
+        result = await updatePackingList(existingPl.id, sharedFields);
+      } else {
+        result = await createPackingList({ proforma_invoice: form.proforma_invoice, ...sharedFields });
+      }
+      onNext(result);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.response?.data?.proforma_invoice || "Failed to create.";
-      message.error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const data = err?.response?.data;
+      let errorMsg = existingPl ? "Failed to save." : "Failed to create.";
+      if (data) {
+        if (typeof data === "string") {
+          errorMsg = data;
+        } else if (typeof data === "object") {
+          const parts = Object.entries(data).map(([field, msgs]) =>
+            `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`
+          );
+          errorMsg = parts.join(" | ");
+        }
+      }
+      message.error(errorMsg, 6);
     } finally {
       setSaving(false);
     }
   }
 
-  const selectedPi = piList.find((pi: any) => pi.id === form.proforma_invoice);
-
   return (
-    <div style={CARD}>
-      <p style={SECTION_TITLE}>Header & Parties</p>
-
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={LABEL}>Consignee (to filter PIs) *</label>
-          <Select
-            showSearch
-            style={{ width: "100%" }}
-            placeholder="Select Consignee first"
-            value={form.consignee}
-            onChange={(v) => setForm({ ...form, consignee: v, proforma_invoice: undefined })}
-            options={consignees.map((o: any) => ({ value: o.id, label: o.name }))}
-            filterOption={(input, opt) => (opt?.label ?? "").toLowerCase().includes(input.toLowerCase())}
-          />
-        </div>
-        <div>
-          <label style={LABEL}>Proforma Invoice *</label>
-          <Select
-            showSearch
-            style={{ width: "100%" }}
-            placeholder="Select approved PI"
-            value={form.proforma_invoice}
-            onChange={(v) => {
-              const pi = piList.find((p: any) => p.id === v);
-              if (pi) {
-                setForm({
-                  ...form,
-                  proforma_invoice: v,
-                  exporter: pi.exporter,
-                  buyer: pi.buyer,
-                });
-              }
-            }}
-            options={piList
-              .filter((pi: any) => !form.consignee || pi.consignee === form.consignee)
-              .map((pi: any) => ({ value: pi.id, label: pi.pi_number }))}
-            filterOption={(input, opt) => (opt?.label ?? "").toLowerCase().includes(input.toLowerCase())}
-          />
+    <div>
+      {/* ── Document Numbers & Dates ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Document Numbers &amp; Dates</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Packing List No</label>
+            <div style={INPUT_READONLY}>{existingPl ? existingPl.pl_number : "— generated on save —"}</div>
+          </div>
+          <div>
+            <label style={LABEL}>Commercial Invoice No</label>
+            <div style={INPUT_READONLY}>{existingPl ? (existingPl.ci_number || "—") : "— generated on save —"}</div>
+          </div>
+          <div>
+            <label style={LABEL}>PL Date</label>
+            <DatePicker
+              style={{ width: "100%" }}
+              value={form.pl_date ? dayjs(form.pl_date) : dayjs()}
+              onChange={(d) => setForm({ ...form, pl_date: d?.format("YYYY-MM-DD") })}
+            />
+          </div>
+          <div>
+            <label style={LABEL}>CI Date</label>
+            <DatePicker
+              style={{ width: "100%" }}
+              value={form.ci_date ? dayjs(form.ci_date) : dayjs()}
+              onChange={(d) => setForm({ ...form, ci_date: d?.format("YYYY-MM-DD") })}
+            />
+          </div>
         </div>
       </div>
 
-      {/* PI Preview card */}
-      {selectedPi && (
-        <div style={{ background: "var(--pastel-blue)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
-          <p style={{ margin: "0 0 8px", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--pastel-blue-text)" }}>
-            PI Preview — {selectedPi.pi_number}
-          </p>
-          {(selectedPi.line_items ?? []).length === 0 ? (
-            <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)" }}>No line items on this PI.</p>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["Item Code", "Description", "HSN Code", "Quantity"].map((h) => (
-                    <th key={h} style={{ ...TH, background: "transparent", fontSize: 10 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(selectedPi.line_items ?? []).map((li: any) => (
-                  <tr key={li.id}>
-                    <td style={{ ...TD, fontSize: 12 }}>{li.item_code}</td>
-                    <td style={{ ...TD, fontSize: 12 }}>{li.description}</td>
-                    <td style={{ ...TD, fontSize: 12 }}>{li.hsn_code || "—"}</td>
-                    <td style={{ ...TD, fontSize: 12 }}>{li.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {/* ── Parties ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Parties</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Exporter *</label>
+            <Select
+              showSearch
+              style={{ width: "100%" }}
+              value={form.exporter}
+              onChange={(v) => setForm({ ...form, exporter: v })}
+              options={withFallback(exporters, existingPl?.exporter, existingPl?.exporter_name)}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
+            />
+          </div>
+          <div>
+            <label style={LABEL}>Consignee *</label>
+            <Select
+              showSearch
+              style={{ width: "100%" }}
+              value={form.consignee}
+              onChange={(v) => setForm({ ...form, consignee: v })}
+              options={withFallback(consignees, existingPl?.consignee, existingPl?.consignee_name)}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
+            />
+          </div>
         </div>
-      )}
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Buyer (optional)</label>
+            <Select
+              allowClear
+              style={{ width: "100%" }}
+              value={form.buyer}
+              onChange={(v) => setForm({ ...form, buyer: v })}
+              options={withFallback(buyers, existingPl?.buyer, existingPl?.buyer_name)}
+            />
+          </div>
+          <div>
+            <label style={LABEL}>Notify Party (optional)</label>
+            <Select
+              allowClear
+              style={{ width: "100%" }}
+              value={form.notify_party}
+              onChange={(v) => setForm({ ...form, notify_party: v })}
+              options={withFallback(notifyParties, existingPl?.notify_party, existingPl?.notify_party_name)}
+            />
+          </div>
+        </div>
+      </div>
 
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-        <div>
-          <label style={LABEL}>Exporter *</label>
-          <Select
-            style={{ width: "100%" }}
-            value={form.exporter}
-            onChange={(v) => setForm({ ...form, exporter: v })}
-            options={exporters.map((o: any) => ({ value: o.id, label: o.name }))}
-          />
+      {/* ── Shipping & Logistics ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Shipping &amp; Logistics</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Pre-Carriage By</label>
+            <Select allowClear style={{ width: "100%" }} value={form.pre_carriage_by}
+              onChange={(v) => setForm({ ...form, pre_carriage_by: v })}
+              options={preCarriage.map((p: any) => ({ value: p.id, label: p.name }))} />
+          </div>
+          <div>
+            <label style={LABEL}>Place of Receipt</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt}
+              onChange={(v) => setForm({ ...form, place_of_receipt: v })}
+              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Place of Receipt by Pre-Carrier</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt_by_pre_carrier}
+              onChange={(v) => setForm({ ...form, place_of_receipt_by_pre_carrier: v })}
+              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Vessel / Flight No</label>
+            <input style={INPUT} value={form.vessel_flight_no || ""}
+              onChange={(e) => setForm({ ...form, vessel_flight_no: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>Port of Loading</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_loading}
+              onChange={(v) => setForm({ ...form, port_of_loading: v })}
+              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Port of Discharge</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_discharge}
+              onChange={(v) => setForm({ ...form, port_of_discharge: v })}
+              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Final Destination</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.final_destination}
+              onChange={(v) => setForm({ ...form, final_destination: v })}
+              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
         </div>
-        <div>
-          <label style={LABEL}>Buyer (optional)</label>
+      </div>
+
+      {/* ── Countries ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Countries</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Country of Origin of Goods</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_origin}
+              onChange={(v) => setForm({ ...form, country_of_origin: v })}
+              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Country of Final Destination</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_final_destination}
+              onChange={(v) => setForm({ ...form, country_of_final_destination: v })}
+              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bank Details ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Bank Details (for Commercial Invoice)</p>
+        <div style={{ maxWidth: 480, marginBottom: selectedBank ? 16 : 0 }}>
+          <label style={LABEL}>Bank *required</label>
           <Select
             allowClear
+            showSearch
             style={{ width: "100%" }}
-            value={form.buyer}
-            onChange={(v) => setForm({ ...form, buyer: v })}
-            options={buyers.map((o: any) => ({ value: o.id, label: o.name }))}
-          />
-        </div>
-        <div>
-          <label style={LABEL}>Notify Party (optional)</label>
-          <Select
-            allowClear
-            style={{ width: "100%" }}
-            value={form.notify_party}
-            onChange={(v) => setForm({ ...form, notify_party: v })}
-            options={notifyParties.map((o: any) => ({ value: o.id, label: o.name }))}
-          />
-        </div>
-        <div>
-          <label style={LABEL}>Bank (for CI)</label>
-          <Select
-            allowClear
-            style={{ width: "100%" }}
+            placeholder="Select Bank (Bank Name – Beneficiary Name)"
             value={form.bank}
             onChange={(v) => setForm({ ...form, bank: v })}
             options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` }))}
+            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
           />
+          <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+            Full bank details (branch, account, IFSC, SWIFT) print on the CI PDF
+          </p>
         </div>
+
+        {/* Bank preview card — shown once a bank is selected */}
+        {selectedBank && (
+          <div style={{
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-light)",
+            borderRadius: 10,
+            padding: "14px 18px",
+            maxWidth: 480,
+            lineHeight: 2,
+          }}>
+            <p style={{ ...LABEL, fontWeight: 600, marginBottom: 8 }}>Bank Details Preview (read-only)</p>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)" }}>
+              <div><strong>Beneficiary Name:</strong> {selectedBank.beneficiary_name}</div>
+              <div><strong>Bank Name:</strong> {selectedBank.bank_name}</div>
+              {selectedBank.branch_address && <div><strong>Branch Address:</strong> {selectedBank.branch_address}</div>}
+              <div><strong>A/C No:</strong> {selectedBank.account_number}</div>
+              {selectedBank.swift_code && <div><strong>SWIFT:</strong> {selectedBank.swift_code}</div>}
+              {selectedBank.iban && <div><strong>IBAN:</strong> {selectedBank.iban}</div>}
+              {selectedBank.routing_number && <div><strong>Routing No:</strong> {selectedBank.routing_number}</div>}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={LABEL}>Packing List Date</label>
-          <DatePicker
-            style={{ width: "100%" }}
-            value={form.pl_date ? dayjs(form.pl_date) : dayjs()}
-            onChange={(d) => setForm({ ...form, pl_date: d?.format("YYYY-MM-DD") })}
-          />
-        </div>
-        <div>
-          <label style={LABEL}>Commercial Invoice Date</label>
-          <DatePicker
-            style={{ width: "100%" }}
-            value={form.ci_date ? dayjs(form.ci_date) : dayjs()}
-            onChange={(d) => setForm({ ...form, ci_date: d?.format("YYYY-MM-DD") })}
-          />
-        </div>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+        <button style={BTN_SECONDARY} onClick={onBack}><ChevronLeft size={14} /> Back</button>
         <button style={BTN_PRIMARY} onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save & Continue"}
           <ChevronRight size={14} />
@@ -459,9 +779,19 @@ function Step2({
       {ref("lc_number", "LC")}
       {ref("bl_number", "BL")}
       {ref("so_number", "SO")}
-      <div style={{ marginBottom: 12 }}>
-        <label style={LABEL}>Other References</label>
-        <input style={INPUT} value={form.other_references || ""} onChange={(e) => setForm({ ...form, other_references: e.target.value })} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <div>
+          <label style={LABEL}>Other References</label>
+          <input style={INPUT} value={form.other_references || ""} onChange={(e) => setForm({ ...form, other_references: e.target.value })} />
+        </div>
+        <div>
+          <label style={LABEL}>Other References Date</label>
+          <DatePicker
+            style={{ width: "100%" }}
+            value={form.other_references_date ? dayjs(form.other_references_date) : null}
+            onChange={(d) => setForm({ ...form, other_references_date: d?.format("YYYY-MM-DD") })}
+          />
+        </div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label style={LABEL}>Additional Description</label>
@@ -477,124 +807,11 @@ function Step2({
   );
 }
 
-// ---- Step 3: Shipping & Logistics -------------------------------------------
+// ---- Step 3: Containers & Items (fully inline — no modals) ------------------
+// Wireframe S07: containers use inline cards. S08/S09 removed — add/edit
+// container fields and items are all done inline on this page.
 
 function Step3({
-  pl, form, setForm, onNext, onBack,
-}: {
-  pl: PackingList;
-  form: Record<string, any>;
-  setForm: (f: Record<string, any>) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [saving, setSaving] = useState(false);
-
-  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: listPorts });
-  const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
-  const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
-  const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const { updatePackingList } = await import("../../api/packingLists");
-      await updatePackingList(pl.id, {
-        pre_carriage_by: form.pre_carriage_by || null,
-        place_of_receipt: form.place_of_receipt || null,
-        place_of_receipt_by_pre_carrier: form.place_of_receipt_by_pre_carrier || null,
-        vessel_flight_no: form.vessel_flight_no || "",
-        port_of_loading: form.port_of_loading || null,
-        port_of_discharge: form.port_of_discharge || null,
-        final_destination: form.final_destination || null,
-        country_of_origin: form.country_of_origin || null,
-        country_of_final_destination: form.country_of_final_destination || null,
-      });
-      onNext();
-    } catch {
-      message.error("Failed to save shipping details.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={CARD}>
-      <p style={SECTION_TITLE}>Shipping & Logistics (all optional)</p>
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
-        <div>
-          <label style={LABEL}>Pre-Carriage By</label>
-          <Select allowClear style={{ width: "100%" }} value={form.pre_carriage_by}
-            onChange={(v) => setForm({ ...form, pre_carriage_by: v })}
-            options={preCarriage.map((p: any) => ({ value: p.id, label: p.name }))} />
-        </div>
-        <div>
-          <label style={LABEL}>Place of Receipt</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt}
-            onChange={(v) => setForm({ ...form, place_of_receipt: v })}
-            options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Place of Receipt by Pre-Carrier</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt_by_pre_carrier}
-            onChange={(v) => setForm({ ...form, place_of_receipt_by_pre_carrier: v })}
-            options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Vessel / Flight No</label>
-          <input style={INPUT} value={form.vessel_flight_no || ""} onChange={(e) => setForm({ ...form, vessel_flight_no: e.target.value })} />
-        </div>
-        <div>
-          <label style={LABEL}>Port of Loading</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_loading}
-            onChange={(v) => setForm({ ...form, port_of_loading: v })}
-            options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Port of Discharge</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_discharge}
-            onChange={(v) => setForm({ ...form, port_of_discharge: v })}
-            options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Final Destination</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.final_destination}
-            onChange={(v) => setForm({ ...form, final_destination: v })}
-            options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Country of Origin of Goods</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_origin}
-            onChange={(v) => setForm({ ...form, country_of_origin: v })}
-            options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-        <div>
-          <label style={LABEL}>Country of Final Destination</label>
-          <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_final_destination}
-            onChange={(v) => setForm({ ...form, country_of_final_destination: v })}
-            options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
-        </div>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-        <button style={BTN_SECONDARY} onClick={onBack}><ChevronLeft size={14} /> Back</button>
-        <button style={BTN_PRIMARY} onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save & Continue"} <ChevronRight size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---- Step 4: Containers & Items ---------------------------------------------
-
-function Step4({
   pl, onNext, onBack,
 }: {
   pl: PackingList;
@@ -602,8 +819,15 @@ function Step4({
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [addingItem, setAddingItem] = useState<{ containerId: number } | null>(null);
-  const [itemForm, setItemForm] = useState<Record<string, any>>({});
+
+  // pendingContainers: unsaved new container forms (dashed-border cards). Each entry embeds _item for the first item.
+  // Start with one blank only if there are no saved containers yet (create mode first visit).
+  // In edit mode (containers already exist), start empty so we don't force a blank form.
+  const [pendingContainers, setPendingContainers] = useState<Record<string, any>[]>(
+    (pl.containers?.length ?? 0) > 0 ? [] : [{ _item: {} }]
+  );
+  // pendingItems: unsaved new item rows, keyed by container ID
+  const [pendingItems, setPendingItems] = useState<Record<number, Record<string, any>[]>>({});
 
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
 
@@ -614,16 +838,49 @@ function Step4({
 
   const containers = currentPl?.containers ?? pl.containers ?? [];
 
-  async function addContainer() {
+  // Invalidate helper used by onBlur saves
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+  }
+
+  async function savePendingContainer(idx: number) {
+    const { _item, ...c } = pendingContainers[idx];
+    if (!c.container_ref || !c.marks_numbers || !c.seal_number || !c.tare_weight) {
+      message.error("Container Ref, Marks & Numbers, Seal Number, and Tare Weight are required.");
+      return;
+    }
+    const item = _item as Record<string, any> | undefined;
+    const itemReady = item && item.item_code && item.uom && item.quantity && item.net_weight && item.inner_packing_weight && item.packages_kind && item.description;
     try {
-      await createContainer({
+      const newContainer = await createContainer({
         packing_list: pl.id,
-        container_ref: "",
-        marks_numbers: "",
-        seal_number: "",
-        tare_weight: "0.000",
+        container_ref: c.container_ref,
+        marks_numbers: c.marks_numbers,
+        seal_number: c.seal_number,
+        tare_weight: c.tare_weight,
       });
-      queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+      setPendingContainers((prev) => prev.filter((_, i) => i !== idx));
+      if (itemReady && item) {
+        await createContainerItem({
+          container: newContainer.id,
+          hsn_code: item.hsn_code || "",
+          item_code: item.item_code,
+          packages_kind: item.packages_kind,
+          description: item.description,
+          batch_details: item.batch_details || "",
+          uom: item.uom,
+          quantity: item.quantity,
+          net_weight: item.net_weight,
+          inner_packing_weight: item.inner_packing_weight,
+        });
+        invalidate();
+        message.success("Container and item added.");
+      } else {
+        invalidate();
+        message.success("Container added. Add items below.");
+        // Auto-open a pending item row for the new container
+        setPendingItems((prev) => ({ ...prev, [newContainer.id]: [{}] }));
+      }
     } catch {
       message.error("Failed to add container.");
     }
@@ -632,7 +889,7 @@ function Step4({
   async function removeContainer(id: number) {
     try {
       await deleteContainer(id);
-      queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+      invalidate();
     } catch {
       message.error("Cannot remove container.");
     }
@@ -641,34 +898,48 @@ function Step4({
   async function handleCopy(id: number) {
     try {
       await copyContainer(id);
-      queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+      invalidate();
     } catch {
       message.error("Failed to copy container.");
     }
   }
 
-  async function saveItem() {
-    if (!addingItem) return;
-    if (!itemForm.item_code || !itemForm.uom || !itemForm.quantity || !itemForm.net_weight || !itemForm.inner_packing_weight || !itemForm.packages_kind || !itemForm.description) {
+  function updatePendingItem(containerId: number, idx: number, patch: Record<string, any>) {
+    setPendingItems((prev) => {
+      const items = [...(prev[containerId] ?? [])];
+      items[idx] = { ...items[idx], ...patch };
+      return { ...prev, [containerId]: items };
+    });
+  }
+
+  function removePendingItem(containerId: number, idx: number) {
+    setPendingItems((prev) => {
+      const items = (prev[containerId] ?? []).filter((_, i) => i !== idx);
+      return { ...prev, [containerId]: items };
+    });
+  }
+
+  async function savePendingItem(containerId: number, idx: number) {
+    const item = (pendingItems[containerId] ?? [])[idx];
+    if (!item || !item.item_code || !item.uom || !item.quantity || !item.net_weight || !item.inner_packing_weight || !item.packages_kind || !item.description) {
       message.error("Item Code, Packages, Description, UOM, Quantity, Net Weight, and Inner Packing Weight are required.");
       return;
     }
     try {
       await createContainerItem({
-        container: addingItem.containerId,
-        hsn_code: itemForm.hsn_code || "",
-        item_code: itemForm.item_code,
-        packages_kind: itemForm.packages_kind,
-        description: itemForm.description,
-        batch_details: itemForm.batch_details || "",
-        uom: itemForm.uom,
-        quantity: itemForm.quantity,
-        net_weight: itemForm.net_weight,
-        inner_packing_weight: itemForm.inner_packing_weight,
+        container: containerId,
+        hsn_code: item.hsn_code || "",
+        item_code: item.item_code,
+        packages_kind: item.packages_kind,
+        description: item.description,
+        batch_details: item.batch_details || "",
+        uom: item.uom,
+        quantity: item.quantity,
+        net_weight: item.net_weight,
+        inner_packing_weight: item.inner_packing_weight,
       });
-      setAddingItem(null);
-      setItemForm({});
-      queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+      removePendingItem(containerId, idx);
+      invalidate();
       message.success("Item added.");
     } catch (err: any) {
       const detail = err?.response?.data || "Failed to add item.";
@@ -679,15 +950,19 @@ function Step4({
   async function removeItem(id: number) {
     try {
       await deleteContainerItem(id);
-      queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+      invalidate();
     } catch {
       message.error("Cannot remove item.");
     }
   }
 
   async function handleNext() {
-    if (containers.length === 0) {
+    if (containers.length === 0 && pendingContainers.length === 0) {
       message.error("At least one container is required.");
+      return;
+    }
+    if (containers.length === 0) {
+      message.error("Save your containers before continuing.");
       return;
     }
     for (const c of containers) {
@@ -696,163 +971,515 @@ function Step4({
         return;
       }
     }
-    const refreshed = currentPl ?? pl;
-    onNext(refreshed);
+    onNext(currentPl ?? pl);
   }
+
+  // Header row for container field labels
+  const containerHeaderStyle: React.CSSProperties = {
+    padding: "4px 10px",
+    background: "var(--bg-base)",
+    color: "var(--text-muted)",
+    borderRight: "1px solid var(--border-light)",
+    fontSize: 10,
+    fontFamily: "var(--font-body)",
+    fontWeight: 600,
+  };
 
   return (
     <div style={CARD}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ ...SECTION_TITLE, margin: 0 }}>Containers & Items</p>
-        <button style={BTN_PRIMARY} onClick={addContainer}>
-          <Plus size={14} /> Add Container
-        </button>
-      </div>
+      <p style={SECTION_TITLE}>Containers &amp; Items</p>
 
-      {containers.length === 0 && (
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)", marginBottom: 16 }}>
-          No containers yet. Add at least one container.
-        </p>
-      )}
-
+      {/* ── Saved containers ── */}
       {containers.map((c, idx) => (
-        <div key={c.id} style={{ border: "1px solid var(--border-light)", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14 }}>
-              Container {idx + 1}
-            </span>
+        <div
+          key={c.id}
+          style={{ border: "2px solid var(--border-medium)", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}
+        >
+          {/* Container header bar */}
+          <div style={{ background: "var(--primary-light)", color: "var(--primary)", padding: "8px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ background: "var(--primary)", color: "#fff", fontWeight: 700, width: 22, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 4, fontSize: 12, flexShrink: 0 }}>
+                {idx + 1}
+              </span>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>
+                Container {c.container_ref ? `— ${c.container_ref}` : ""}
+              </span>
+              {(!c.items || c.items.length === 0) && (
+                <span style={{ fontSize: 11, color: "var(--pastel-yellow-text)" }}>⚠ needs at least 1 item</span>
+              )}
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ ...BTN_SECONDARY, padding: "6px 12px", fontSize: 12 }} onClick={() => handleCopy(c.id)}>
-                <Copy size={12} /> Copy
+              <button
+                style={{ padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                onClick={() => handleCopy(c.id)}
+              >
+                <Copy size={11} /> Copy Container
               </button>
-              <button style={{ ...BTN_SECONDARY, padding: "6px 12px", fontSize: 12, color: "var(--pastel-pink-text)" }} onClick={() => removeContainer(c.id)}>
-                <Trash2 size={12} />
+              <button
+                style={{ padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid var(--error, #f87171)", background: "transparent", color: "var(--error, #f87171)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                onClick={() => removeContainer(c.id)}
+              >
+                <Trash2 size={11} /> Remove Container
               </button>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-            {[
-              ["container_ref", "Container Ref *"],
-              ["marks_numbers", "Marks & Numbers *"],
-              ["seal_number", "Seal Number *"],
-              ["tare_weight", "Tare Weight (kg) *"],
-            ].map(([field, label]) => (
-              <div key={field}>
-                <label style={LABEL}>{label}</label>
-                <input
-                  style={INPUT}
-                  defaultValue={(c as any)[field]}
-                  onBlur={(e) => updateContainer(c.id, { [field]: e.target.value }).then(() =>
-                    queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] })
-                  )}
-                />
-              </div>
-            ))}
+          {/* Field label headers row 1 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+            <div style={containerHeaderStyle}>Container Reference *</div>
+            <div style={{ ...containerHeaderStyle, borderRight: "none" }}>Marks and Numbers *</div>
+          </div>
+          {/* Field inputs row 1 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
+            <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+              <input
+                style={{ ...INPUT, fontSize: 13 }}
+                defaultValue={c.container_ref}
+                onBlur={(e) => updateContainer(c.id, { container_ref: e.target.value }).then(invalidate)}
+              />
+            </div>
+            <div style={{ padding: "6px 10px" }}>
+              <input
+                style={{ ...INPUT, fontSize: 13 }}
+                defaultValue={c.marks_numbers}
+                onBlur={(e) => updateContainer(c.id, { marks_numbers: e.target.value }).then(invalidate)}
+              />
+            </div>
           </div>
 
-          {/* Items table */}
-          {c.items && c.items.length > 0 && (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
+          {/* Field label headers row 2 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+            {["Tare Weight (kg) *", "Seal Number *", "Gross Weight (auto)"].map((h, i) => (
+              <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 2 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
+            ))}
+          </div>
+          {/* Field inputs row 2 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
+            <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+              <input
+                style={{ ...INPUT, fontSize: 13 }}
+                defaultValue={c.tare_weight}
+                onBlur={(e) => updateContainer(c.id, { tare_weight: e.target.value }).then(invalidate)}
+              />
+            </div>
+            <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+              <input
+                style={{ ...INPUT, fontSize: 13 }}
+                defaultValue={c.seal_number}
+                onBlur={(e) => updateContainer(c.id, { seal_number: e.target.value }).then(invalidate)}
+              />
+            </div>
+            <div style={{ padding: "6px 10px" }}>
+              <input style={INPUT_READONLY} readOnly value={c.gross_weight || "—"} />
+            </div>
+          </div>
+
+          {/* Items section */}
+          <div style={{ padding: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 600 }}>
+                Items in this Container
+              </span>
+              <button
+                style={{ ...BTN_PRIMARY, padding: "5px 12px", fontSize: 12 }}
+                onClick={() => setPendingItems((prev) => ({ ...prev, [c.id]: [...(prev[c.id] ?? []), {}] }))}
+              >
+                <Plus size={11} /> Add Item
+              </button>
+            </div>
+
+            {/* Items table — all saved rows are always editable (auto-save on blur/change) */}
+            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
               <thead>
                 <tr>
+                  <th style={{ ...TH, width: 24 }}>#</th>
+                  <th style={TH}>HSN Code</th>
                   <th style={TH}>Item Code</th>
+                  <th style={TH}>No &amp; Kind of Pkgs</th>
                   <th style={TH}>Description</th>
-                  <th style={TH}>HSN</th>
-                  <th style={TH}>Pkgs</th>
                   <th style={TH}>Qty</th>
                   <th style={TH}>UOM</th>
-                  <th style={TH}>Net Wt</th>
+                  <th style={TH}>Net Weight</th>
                   <th style={TH}>Inner Pkg Wt</th>
-                  <th style={TH}></th>
+                  <th style={TH}>Gross Wt (auto)</th>
+                  <th style={{ ...TH, width: 36 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {c.items.map((item) => (
+                {(!c.items || c.items.length === 0) && !(pendingItems[c.id]?.length) && (
+                  <tr>
+                    <td colSpan={11} style={{ ...TD, textAlign: "center", fontStyle: "italic", color: "var(--text-muted)" }}>
+                      No items yet — click "+ Add Item" to add the first item.
+                    </td>
+                  </tr>
+                )}
+                {/* Saved item rows — inputs save on blur / UOM saves on change */}
+                {(c.items ?? []).map((item, itemIdx) => (
                   <tr key={item.id}>
-                    <td style={TD}>{item.item_code}</td>
-                    <td style={TD}>{item.description}</td>
-                    <td style={TD}>{item.hsn_code || "—"}</td>
-                    <td style={TD}>{item.packages_kind}</td>
-                    <td style={TD}>{item.quantity}</td>
-                    <td style={TD}>{item.uom_abbr ?? item.uom ?? "—"}</td>
-                    <td style={TD}>{item.net_weight}</td>
-                    <td style={TD}>{item.inner_packing_weight}</td>
+                    <td style={{ ...TD, textAlign: "center", color: "var(--text-muted)", fontSize: 11 }}>{itemIdx + 1}</td>
                     <td style={TD}>
-                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--pastel-pink-text)" }} onClick={() => removeItem(item.id)}>
-                        <Trash2 size={14} />
+                      <input
+                        key={`hsn-${item.id}`}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
+                        defaultValue={item.hsn_code || ""}
+                        onBlur={(e) => { if (e.target.value !== (item.hsn_code || "")) updateContainerItem(item.id, { hsn_code: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`ic-${item.id}`}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
+                        defaultValue={item.item_code}
+                        onBlur={(e) => { if (e.target.value !== item.item_code) updateContainerItem(item.id, { item_code: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`pk-${item.id}`}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
+                        defaultValue={item.packages_kind}
+                        onBlur={(e) => { if (e.target.value !== item.packages_kind) updateContainerItem(item.id, { packages_kind: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`desc-${item.id}`}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
+                        defaultValue={item.description}
+                        onBlur={(e) => { if (e.target.value !== item.description) updateContainerItem(item.id, { description: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`qty-${item.id}`}
+                        type="number"
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }}
+                        defaultValue={item.quantity}
+                        onBlur={(e) => { if (e.target.value !== String(item.quantity)) updateContainerItem(item.id, { quantity: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <Select
+                        size="small"
+                        style={{ width: 80 }}
+                        defaultValue={item.uom}
+                        onChange={(v) => updateContainerItem(item.id, { uom: v }).then(invalidate)}
+                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation }))}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`nw-${item.id}`}
+                        type="number"
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }}
+                        defaultValue={item.net_weight}
+                        onBlur={(e) => { if (e.target.value !== String(item.net_weight)) updateContainerItem(item.id, { net_weight: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
+                        key={`ipw-${item.id}`}
+                        type="number"
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }}
+                        defaultValue={item.inner_packing_weight}
+                        onBlur={(e) => { if (e.target.value !== String(item.inner_packing_weight)) updateContainerItem(item.id, { inner_packing_weight: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
+                      {item.item_gross_weight ?? (
+                        item.net_weight && item.inner_packing_weight
+                          ? (parseFloat(String(item.net_weight)) + parseFloat(String(item.inner_packing_weight))).toFixed(3)
+                          : "—"
+                      )}
+                    </td>
+                    <td style={TD}>
+                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--error, #f87171)", padding: 2 }} onClick={() => removeItem(item.id)}>
+                        <Trash2 size={13} />
                       </button>
+                    </td>
+                  </tr>
+                ))}
+                {/* Pending (new) item rows — controlled inputs + Save/Cancel */}
+                {(pendingItems[c.id] ?? []).map((pItem, pIdx) => (
+                  <tr key={`pending-item-${c.id}-${pIdx}`} style={{ background: "var(--bg-base)" }}>
+                    <td style={{ ...TD, textAlign: "center", color: "var(--primary)", fontWeight: 700, fontSize: 12 }}>+</td>
+                    <td style={TD}>
+                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="HSN"
+                        value={pItem.hsn_code || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { hsn_code: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="Item Code *"
+                        value={pItem.item_code || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { item_code: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="e.g. 10 Bags *"
+                        value={pItem.packages_kind || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { packages_kind: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="Description *"
+                        value={pItem.description || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { description: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }} placeholder="0"
+                        value={pItem.quantity || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { quantity: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <Select size="small" style={{ width: 80 }} placeholder="UOM *"
+                        value={pItem.uom}
+                        onChange={(v) => updatePendingItem(c.id, pIdx, { uom: v })}
+                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation }))} />
+                    </td>
+                    <td style={TD}>
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000"
+                        value={pItem.net_weight || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { net_weight: e.target.value })} />
+                    </td>
+                    <td style={TD}>
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000"
+                        value={pItem.inner_packing_weight || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { inner_packing_weight: e.target.value })} />
+                    </td>
+                    <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
+                      {pItem.net_weight && pItem.inner_packing_weight
+                        ? (parseFloat(pItem.net_weight) + parseFloat(pItem.inner_packing_weight)).toFixed(3)
+                        : "—"}
+                    </td>
+                    <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                      <button
+                        style={{ ...BTN_PRIMARY, padding: "3px 10px", fontSize: 12, marginRight: 4 }}
+                        onClick={() => savePendingItem(c.id, pIdx)}
+                      >Save</button>
+                      <button
+                        title="Cancel"
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-muted)" }}
+                        onClick={() => removePendingItem(c.id, pIdx)}
+                      >✕</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-
-          <button
-            style={{ ...BTN_SECONDARY, padding: "6px 14px", fontSize: 12 }}
-            onClick={() => { setAddingItem({ containerId: c.id }); setItemForm({}); }}
-          >
-            <Plus size={12} /> Add Item
-          </button>
+          </div>
         </div>
       ))}
 
+      {/* ── Pending (unsaved) container cards — dashed border ── */}
+      {pendingContainers.map((data, pendingIdx) => {
+        const displayIdx = containers.length + pendingIdx;
+        return (
+          <div
+            key={`pending-${pendingIdx}`}
+            style={{ border: "2px dashed var(--border-medium)", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}
+          >
+            <div style={{ background: "var(--primary-light)", color: "var(--primary)", padding: "8px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ background: "var(--primary)", color: "#fff", fontWeight: 700, width: 22, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 4, fontSize: 12, flexShrink: 0 }}>
+                  {displayIdx + 1}
+                </span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>
+                  Container <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>(new — fill in fields below)</span>
+                </span>
+              </div>
+              <button
+                style={{ padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid var(--error, #f87171)", background: "transparent", color: "var(--error, #f87171)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                onClick={() => setPendingContainers((prev) => prev.filter((_, i) => i !== pendingIdx))}
+              >
+                <Trash2 size={11} /> Remove
+              </button>
+            </div>
+
+            {/* Row 1 labels */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+              <div style={containerHeaderStyle}>Container Reference *</div>
+              <div style={{ ...containerHeaderStyle, borderRight: "none" }}>Marks and Numbers *</div>
+            </div>
+            {/* Row 1 inputs */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
+              <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+                <input style={{ ...INPUT, fontSize: 13 }} placeholder="e.g. CONT001" value={data.container_ref || ""}
+                  onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, container_ref: e.target.value };
+                    setPendingContainers(next);
+                  }} />
+              </div>
+              <div style={{ padding: "6px 10px" }}>
+                <input style={{ ...INPUT, fontSize: 13 }} placeholder="Shipping marks on packages" value={data.marks_numbers || ""}
+                  onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, marks_numbers: e.target.value };
+                    setPendingContainers(next);
+                  }} />
+              </div>
+            </div>
+
+            {/* Row 2 labels */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+              {["Tare Weight (kg) *", "Seal Number *", "Gross Weight (auto)"].map((h, i) => (
+                <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 2 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
+              ))}
+            </div>
+            {/* Row 2 inputs */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
+              <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+                <input type="number" style={{ ...INPUT, fontSize: 13 }} placeholder="0.000" value={data.tare_weight || ""}
+                  onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, tare_weight: e.target.value };
+                    setPendingContainers(next);
+                  }} />
+              </div>
+              <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
+                <input style={{ ...INPUT, fontSize: 13 }} placeholder="e.g. SEAL-9901" value={data.seal_number || ""}
+                  onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, seal_number: e.target.value };
+                    setPendingContainers(next);
+                  }} />
+              </div>
+              <div style={{ padding: "6px 10px" }}>
+                <input style={INPUT_READONLY} readOnly value={(() => {
+                  const tare = parseFloat(data.tare_weight || "0");
+                  const netW = parseFloat(data._item?.net_weight || "0");
+                  const innerW = parseFloat(data._item?.inner_packing_weight || "0");
+                  return data.tare_weight ? (tare + netW + innerW).toFixed(3) : "—";
+                })()} />
+              </div>
+            </div>
+
+            {/* Inline first-item form — embedded directly in the pending container card */}
+            <div style={{ borderTop: "1px solid var(--border-light)", background: "var(--bg-base)", padding: "12px 14px" }}>
+              <div style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Item 1
+              </div>
+              <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
+                <div>
+                  <label style={LABEL}>Item Code *</label>
+                  <input style={INPUT} value={data._item?.item_code || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, item_code: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+                <div>
+                  <label style={LABEL}>HSN Code</label>
+                  <input style={INPUT} value={data._item?.hsn_code || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, hsn_code: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+                <div>
+                  <label style={LABEL}>No &amp; Kind of Packages *</label>
+                  <input style={INPUT} value={data._item?.packages_kind || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, packages_kind: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={LABEL}>Description of Goods *</label>
+                <textarea style={{ ...INPUT, height: 40, resize: "vertical" }} value={data._item?.description || ""} onChange={(e) => {
+                  const next = [...pendingContainers];
+                  next[pendingIdx] = { ...data, _item: { ...data._item, description: e.target.value } };
+                  setPendingContainers(next);
+                }} />
+              </div>
+              <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
+                <div>
+                  <label style={LABEL}>Quantity *</label>
+                  <input type="number" style={INPUT} value={data._item?.quantity || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, quantity: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+                <div>
+                  <label style={LABEL}>UOM *</label>
+                  <Select style={{ width: "100%" }} value={data._item?.uom} onChange={(v) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, uom: v } };
+                    setPendingContainers(next);
+                  }} options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` }))} />
+                </div>
+                <div>
+                  <label style={LABEL}>Net Weight/unit (kg) *</label>
+                  <input type="number" style={INPUT} value={data._item?.net_weight || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, net_weight: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+                <div>
+                  <label style={LABEL}>Inner Packing Wt (kg) *</label>
+                  <input type="number" style={INPUT} value={data._item?.inner_packing_weight || ""} onChange={(e) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, inner_packing_weight: e.target.value } };
+                    setPendingContainers(next);
+                  }} />
+                </div>
+                <div>
+                  <label style={LABEL}>Item Gross Wt (auto)</label>
+                  <input style={INPUT_READONLY} readOnly value={
+                    data._item?.net_weight && data._item?.inner_packing_weight
+                      ? (parseFloat(data._item.net_weight) + parseFloat(data._item.inner_packing_weight)).toFixed(3)
+                      : "—"
+                  } />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid var(--border-light)" }}>
+              <button style={{ ...BTN_PRIMARY, padding: "7px 16px", fontSize: 13 }} onClick={() => savePendingContainer(pendingIdx)}>
+                Save Container &amp; Item
+              </button>
+              <button style={{ ...BTN_SECONDARY, padding: "7px 16px", fontSize: 13 }} onClick={() => setPendingContainers((prev) => prev.filter((_, i) => i !== pendingIdx))}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Full-width Add New Container button */}
+      <button
+        style={{
+          width: "100%",
+          background: "var(--primary-light)",
+          color: "var(--primary)",
+          border: "2px dashed var(--primary)",
+          borderRadius: 8,
+          padding: "12px 0",
+          fontFamily: "var(--font-heading)",
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          marginBottom: 20,
+        }}
+        onClick={() => setPendingContainers([...pendingContainers, { _item: {} }])}
+      >
+        <Plus size={14} /> Add New Container
+      </button>
+
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
         <button style={BTN_SECONDARY} onClick={onBack}><ChevronLeft size={14} /> Back</button>
-        <button style={BTN_PRIMARY} onClick={handleNext}>
-          Save & Continue <ChevronRight size={14} />
-        </button>
-      </div>
-
-      {/* Add item modal */}
-      <Modal
-        title="Add Item to Container"
-        open={addingItem !== null}
-        onOk={saveItem}
-        onCancel={() => { setAddingItem(null); setItemForm({}); }}
-        okText="Add Item"
-        width={640}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {[
-            ["item_code", "Item Code *", "text"],
-            ["packages_kind", "No & Kind of Packages *", "text"],
-            ["description", "Description *", "text"],
-            ["hsn_code", "HSN Code", "text"],
-            ["batch_details", "Batch Details", "text"],
-            ["quantity", "Quantity *", "number"],
-            ["net_weight", "Net Weight (kg) *", "number"],
-            ["inner_packing_weight", "Inner Packing Weight (kg) *", "number"],
-          ].map(([field, label, type]) => (
-            <div key={field} style={field === "description" ? { gridColumn: "1 / -1" } : {}}>
-              <label style={LABEL}>{label as string}</label>
-              <input
-                style={INPUT}
-                type={type as string}
-                value={itemForm[field as string] || ""}
-                onChange={(e) => setItemForm({ ...itemForm, [field as string]: e.target.value })}
-              />
-            </div>
-          ))}
-          <div>
-            <label style={LABEL}>UOM *</label>
-            <Select
-              style={{ width: "100%" }}
-              value={itemForm.uom}
-              onChange={(v) => setItemForm({ ...itemForm, uom: v })}
-              options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` }))}
-            />
-          </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={BTN_SECONDARY} onClick={() => invalidate()}>Refresh</button>
+          <button style={BTN_PRIMARY} onClick={handleNext}>
+            Next: Final Rates <ChevronRight size={14} />
+          </button>
         </div>
-      </Modal>
+      </div>
     </div>
   );
 }
 
-// ---- Step 5: Final Rates ----------------------------------------------------
+// ---- Step 4: Final Rates ----------------------------------------------------
 
-function Step5({
+function Step4({
   pl, onDone, onBack,
 }: {
   pl: PackingList;
@@ -877,8 +1504,8 @@ function Step5({
     freight: "",
     insurance: "",
     lc_details: "",
-    incoterms: String(pl.incoterms ?? ""),
-    payment_terms: String(pl.payment_terms ?? ""),
+    incoterms: pl.incoterms != null ? String(pl.incoterms) : "",
+    payment_terms: pl.payment_terms != null ? String(pl.payment_terms) : "",
   });
 
   // Derive which cost fields are visible based on the selected Incoterm code (FR-14M.8B).
@@ -945,7 +1572,7 @@ function Step5({
               <th style={TH}>Description</th>
               <th style={TH}>Total Qty</th>
               <th style={TH}>UOM</th>
-              <th style={TH}>Rate (USD per UOM) *</th>
+              <th style={TH}>Rate (USD) *</th>
               <th style={TH}>Amount (USD)</th>
             </tr>
           </thead>
@@ -966,6 +1593,11 @@ function Step5({
                       value={rate}
                       onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })}
                     />
+                    {li.uom_abbr && (
+                      <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                        USD per {li.uom_abbr}
+                      </div>
+                    )}
                   </td>
                   <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
                 </tr>
@@ -1028,48 +1660,117 @@ function Step5({
 }
 
 // ---- Main wizard ------------------------------------------------------------
+// Create mode: step 0 (PI selection) → steps 1–4 wizard
+// Edit mode (/packing-lists/:id/edit?step=N): skip step 0, jump straight to step N
 
 export default function PackingListCreatePage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const isEditMode = !!id;
+
+  // In edit mode, read ?step=N (1–4). Default to 1 if not provided or out of range.
+  const requestedStep = isEditMode
+    ? Math.min(Math.max(parseInt(searchParams.get("step") ?? "1", 10), 1), 4)
+    : 0;
+
+  const [step, setStep] = useState(requestedStep);
   const [form, setForm] = useState<Record<string, any>>({});
   const [pl, setPl] = useState<PackingList | null>(null);
 
-  function handleStep1Done(createdPl: PackingList) {
-    setPl(createdPl);
-    setStep(1);
+  // In edit mode: fetch the existing PL and pre-populate state
+  const { data: fetchedPl, isLoading: plLoading } = useQuery({
+    queryKey: ["packing-list", Number(id)],
+    queryFn: () => getPackingList(Number(id)),
+    enabled: isEditMode && !!id,
+  });
+
+  useEffect(() => {
+    if (!fetchedPl || !isEditMode) return;
+    setPl(fetchedPl);
+    setForm({
+      proforma_invoice: fetchedPl.proforma_invoice,
+      exporter: fetchedPl.exporter,
+      consignee: fetchedPl.consignee,
+      buyer: fetchedPl.buyer,
+      notify_party: fetchedPl.notify_party,
+      pl_date: fetchedPl.pl_date,
+      ci_date: fetchedPl.ci_date,
+      bank: fetchedPl.bank_id,
+      pre_carriage_by: fetchedPl.pre_carriage_by,
+      place_of_receipt: fetchedPl.place_of_receipt,
+      place_of_receipt_by_pre_carrier: fetchedPl.place_of_receipt_by_pre_carrier,
+      vessel_flight_no: fetchedPl.vessel_flight_no,
+      port_of_loading: fetchedPl.port_of_loading,
+      port_of_discharge: fetchedPl.port_of_discharge,
+      final_destination: fetchedPl.final_destination,
+      country_of_origin: fetchedPl.country_of_origin,
+      country_of_final_destination: fetchedPl.country_of_final_destination,
+      po_number: fetchedPl.po_number,
+      po_date: fetchedPl.po_date,
+      lc_number: fetchedPl.lc_number,
+      lc_date: fetchedPl.lc_date,
+      bl_number: fetchedPl.bl_number,
+      bl_date: fetchedPl.bl_date,
+      so_number: fetchedPl.so_number,
+      so_date: fetchedPl.so_date,
+      other_references: fetchedPl.other_references,
+      other_references_date: (fetchedPl as any).other_references_date ?? null,
+      additional_description: fetchedPl.additional_description,
+    });
+  // Run only once when the PL first loads (id won't change mid-session)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchedPl?.id]);
+
+  if (isEditMode && plLoading) {
+    return <div style={PAGE}><p style={{ fontFamily: "var(--font-body)", color: "var(--text-muted)", padding: 32 }}>Loading…</p></div>;
   }
+
+  const backToDetail = () => navigate(`/packing-lists/${id}`);
 
   return (
     <div style={PAGE}>
+      {/* Breadcrumb + page title */}
       <div style={{ marginBottom: 24 }}>
-        <button
-          onClick={() => navigate("/packing-lists")}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-body)", fontSize: 13, padding: 0, marginBottom: 12 }}
-        >
-          <ChevronLeft size={14} /> Back to Packing Lists
-        </button>
+        <p style={{
+          fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)",
+          margin: "0 0 8px", letterSpacing: "0.02em",
+        }}>
+          Documents / PL+CI / {isEditMode ? "Edit" : "New"}
+        </p>
         <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-          New Packing List + Commercial Invoice
+          {isEditMode ? `Edit ${pl?.pl_number ?? "Packing List"}` : "Create Packing List + Commercial Invoice"}
         </h1>
       </div>
 
-      <StepBar current={step} />
+      {/* Step bar only for wizard steps 1–4 */}
+      {step >= 1 && <StepBar current={step - 1} />}
 
       {step === 0 && (
-        <Step1 form={form} setForm={setForm} onNext={handleStep1Done} />
+        <Step0
+          form={form}
+          setForm={setForm}
+          onContinue={() => setStep(1)}
+          onCancel={() => navigate("/packing-lists")}
+        />
       )}
-      {step === 1 && pl && (
-        <Step2 pl={pl} form={form} setForm={setForm} onNext={() => setStep(2)} onBack={() => setStep(0)} />
+      {step === 1 && (
+        <Step1
+          form={form}
+          setForm={setForm}
+          existingPl={isEditMode ? (pl ?? undefined) : undefined}
+          onNext={(savedPl) => { setPl(savedPl); setStep(2); }}
+          onBack={() => isEditMode ? backToDetail() : setStep(0)}
+        />
       )}
       {step === 2 && pl && (
-        <Step3 pl={pl} form={form} setForm={setForm} onNext={() => setStep(3)} onBack={() => setStep(1)} />
+        <Step2 pl={pl} form={form} setForm={setForm} onNext={() => setStep(3)} onBack={() => setStep(1)} />
       )}
       {step === 3 && pl && (
-        <Step4 pl={pl} onNext={(refreshed) => { setPl(refreshed); setStep(4); }} onBack={() => setStep(2)} />
+        <Step3 pl={pl} onNext={(refreshed) => { setPl(refreshed); setStep(4); }} onBack={() => setStep(2)} />
       )}
       {step === 4 && pl && (
-        <Step5 pl={pl} onDone={() => navigate(`/packing-lists/${pl.id}`)} onBack={() => setStep(3)} />
+        <Step4 pl={pl} onDone={() => navigate(`/packing-lists/${pl.id}`)} onBack={() => setStep(3)} />
       )}
     </div>
   );

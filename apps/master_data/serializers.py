@@ -89,6 +89,7 @@ class BankSerializer(serializers.ModelSerializer):
             "intermediary_bank_name", "intermediary_account_number",
             "intermediary_swift_code",
             "intermediary_currency", "intermediary_currency_code",
+            "is_active",
         ]
 
     def validate_organisation(self, value):

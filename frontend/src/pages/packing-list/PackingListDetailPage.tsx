@@ -301,7 +301,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                 <th style={TH}>No. & Kind of Pkgs</th>
                 <th style={TH}>Total Qty</th>
                 <th style={TH}>UOM</th>
-                <th style={TH}>Rate (USD per UOM)</th>
+                <th style={TH}>Rate (USD)</th>
                 <th style={TH}>Amount (USD)</th>
               </tr>
             </thead>
@@ -341,20 +341,27 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                   <td style={TD}>{li.uom_abbr ?? "—"}</td>
                   <td style={TD}>
                     {isEditable && editingRate?.id === li.id ? (
-                      <input
-                        autoFocus
-                        type="number"
-                        style={{ background: "var(--bg-input)", border: "1px solid var(--border-medium)", borderRadius: 6, padding: "4px 8px", fontSize: 13, width: 100, fontFamily: "var(--font-body)" }}
-                        value={editingRate.value}
-                        onChange={(e) => setEditingRate({ id: li.id, value: e.target.value })}
-                        onBlur={() => {
-                          if (editingRate.value !== li.rate_usd) {
-                            updateMutation.mutate({ id: li.id, data: { rate_usd: editingRate.value } });
-                          }
-                          setEditingRate(null);
-                        }}
-                        onKeyDown={(e) => e.key === "Escape" && setEditingRate(null)}
-                      />
+                      <>
+                        <input
+                          autoFocus
+                          type="number"
+                          style={{ background: "var(--bg-input)", border: "1px solid var(--border-medium)", borderRadius: 6, padding: "4px 8px", fontSize: 13, width: 100, fontFamily: "var(--font-body)" }}
+                          value={editingRate.value}
+                          onChange={(e) => setEditingRate({ id: li.id, value: e.target.value })}
+                          onBlur={() => {
+                            if (editingRate.value !== li.rate_usd) {
+                              updateMutation.mutate({ id: li.id, data: { rate_usd: editingRate.value } });
+                            }
+                            setEditingRate(null);
+                          }}
+                          onKeyDown={(e) => e.key === "Escape" && setEditingRate(null)}
+                        />
+                        {li.uom_abbr && (
+                          <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                            USD per {li.uom_abbr}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <span
                         style={{ cursor: isEditable ? "pointer" : "default", color: isEditable ? "var(--primary)" : "inherit" }}
@@ -362,6 +369,11 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                         onClick={() => isEditable && setEditingRate({ id: li.id, value: li.rate_usd })}
                       >
                         {li.rate_usd}
+                        {li.uom_abbr && (
+                          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
+                            / {li.uom_abbr}
+                          </span>
+                        )}
                       </span>
                     )}
                   </td>
@@ -553,7 +565,17 @@ export default function PackingListDetailPage() {
 
           {canEdit && (
             <button
-              onClick={() => navigate(`/packing-lists/${pl.id}/edit`)}
+              onClick={() => {
+                // Map active detail tab → wizard step number
+                const stepMap: Record<string, number> = {
+                  "Document Header": 1,
+                  "Containers & Items": 3,
+                  "Final Rates": 4,
+                  "Bank & Payment": 1,
+                };
+                const step = stepMap[activeTab] ?? 1;
+                navigate(`/packing-lists/${pl.id}/edit?step=${step}`);
+              }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}
             >
               <Edit2 size={14} /> Edit

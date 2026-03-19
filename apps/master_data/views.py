@@ -115,7 +115,14 @@ class BankViewSet(viewsets.ModelViewSet):
         return [IsCheckerOrAdmin()]
 
     def get_queryset(self):
-        return Bank.objects.select_related("bank_country", "currency").all()
+        queryset = Bank.objects.select_related("bank_country", "currency")
+        # Default: only active banks. Pass ?is_active=false to see deactivated ones.
+        is_active_param = self.request.query_params.get("is_active")
+        if is_active_param is not None:
+            queryset = queryset.filter(is_active=is_active_param.lower() == "true")
+        else:
+            queryset = queryset.filter(is_active=True)
+        return queryset
 
 
 # ---------------------------------------------------------------------------

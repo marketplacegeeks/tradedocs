@@ -19,7 +19,7 @@ import {
   createOrganisation, getOrganisation, updateOrganisation,
 } from "../../api/organisations";
 import { listCountries } from "../../api/countries";
-import { ADDRESS_TYPES, ADDRESS_TYPE_LABELS, ORG_TAGS, ORG_TAG_LABELS } from "../../utils/constants";
+import { ADDRESS_TYPES, ADDRESS_TYPE_LABELS, ORG_TAGS, ORG_TAG_LABELS, COUNTRY_DIAL_CODES } from "../../utils/constants";
 
 // ---- Zod schema -----------------------------------------------------------
 
@@ -200,6 +200,7 @@ export default function OrganisationFormPage() {
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -250,11 +251,41 @@ export default function OrganisationFormPage() {
 
   const selectedTags = watch("tags");
 
+  // Recursively flatten a DRF error value into a plain string.
+  // Handles: string, string[], object (nested serializer errors), array of objects.
+  function flattenDrfError(value: unknown): string {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      return value.map(flattenDrfError).filter(Boolean).join(", ");
+    }
+    if (value && typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${flattenDrfError(v)}`)
+        .join("; ");
+    }
+    return String(value ?? "");
+  }
+
+  // Extract a human-readable message from DRF error responses.
+  // DRF returns either { detail: "..." } for auth/permission errors,
+  // or { field: [...], ... } for validation errors (potentially nested).
+  function extractApiError(err: unknown): string {
+    const data = (err as { response?: { data?: unknown } })?.response?.data;
+    if (!data || typeof data !== "object") return "Failed to save organisation.";
+    const record = data as Record<string, unknown>;
+    if (typeof record.detail === "string") return record.detail;
+    const lines = Object.entries(record).map(
+      ([field, msgs]) => `${field}: ${flattenDrfError(msgs)}`
+    );
+    return lines.length > 0 ? lines.join("\n") : "Failed to save organisation.";
+  }
+
   const createMutation = useMutation({
     mutationFn: (values: FormValues) =>
       createOrganisation({
         name: values.name,
-        iec_code: values.iec_code || null,
+        // Uppercase before sending so backend regex ([A-Z0-9]{10}) always matches.
+        iec_code: values.iec_code ? values.iec_code.toUpperCase() : null,
         tags: values.tags.map((tag) => ({ tag })),
         addresses: values.addresses,
         tax_codes: values.tax_codes,
@@ -265,9 +296,7 @@ export default function OrganisationFormPage() {
       navigate("/master-data/organisations");
     },
     onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail ?? "Failed to save organisation.";
-      message.error(msg);
+      message.error(extractApiError(err));
     },
   });
 
@@ -275,7 +304,7 @@ export default function OrganisationFormPage() {
     mutationFn: (values: FormValues) =>
       updateOrganisation(Number(id), {
         name: values.name,
-        iec_code: values.iec_code || null,
+        iec_code: values.iec_code ? values.iec_code.toUpperCase() : null,
         tags: values.tags.map((tag) => ({ tag })),
         addresses: values.addresses,
         tax_codes: values.tax_codes,
@@ -287,9 +316,7 @@ export default function OrganisationFormPage() {
       navigate("/master-data/organisations");
     },
     onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail ?? "Failed to save organisation.";
-      message.error(msg);
+      message.error(extractApiError(err));
     },
   });
 
@@ -366,7 +393,7 @@ export default function OrganisationFormPage() {
         </Section>
 
         {/* ── Section 2: Document Role Tags ─────────────────────────────── */}
-        <Section title="Document Role Tags" subtitle="* At least one required">
+        <Section title="Organisation Type" subtitle="* At least one required">
           {errors.tags && (
             <p style={{ color: "#F5222D", fontSize: 12, marginBottom: 12, fontFamily: "var(--font-body)" }}>
               {errors.tags.message}
@@ -502,7 +529,19 @@ export default function OrganisationFormPage() {
                 </Field>
                 <Field label="Country" required error={errors.addresses?.[index]?.country?.message}>
                   <Controller name={`addresses.${index}.country`} control={control} render={({ field: f }) =>
-                    <StyledSelect value={f.value} onChange={f.onChange} options={countryOptions} placeholder="Select country" hasError={!!errors.addresses?.[index]?.country} />
+                    <StyledSelect
+                      value={f.value}
+                      onChange={(v) => {
+                        f.onChange(v);
+                        // Always update the dial code when the country changes.
+                        const iso2 = countries.find((c) => c.id === Number(v))?.iso2 ?? "";
+                        const dialCode = COUNTRY_DIAL_CODES[iso2] ?? "";
+                        setValue(`addresses.${index}.phone_country_code`, dialCode, { shouldValidate: false });
+                      }}
+                      options={countryOptions}
+                      placeholder="Select country"
+                      hasError={!!errors.addresses?.[index]?.country}
+                    />
                   } />
                 </Field>
               </Row3>

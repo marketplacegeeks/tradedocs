@@ -519,7 +519,7 @@ VITE_API_BASE_URL          ← The Django API URL; used by Vite at build time
 
 ### Auto-Generated Numbers
 
-16. **PI, PL, and CI numbers are generated inside a \****`select_for_update()`****\*\* [database lock] transaction.**** The sequence for each document type is determined by \`COUNT(*) + 1` within a locked query. This prevents duplicate numbers if two users save simultaneously. Implement this in `apps/{document_app}/services.py` in a function called `generate_document_number()`.
+16. **PI, PL, and CI numbers are generated inside a \****`select_for_update()`****\*\*\* [database lock] transaction.****\* The sequence for each document type is determined by \`COUNT(*) + 1` within a locked query. This prevents duplicate numbers if two users save simultaneously. Implement this in `apps/{document_app}/services.py` in a function called `generate_document_number()`.
 
 17. **Number formats are fixed:**
   - Proforma Invoice: `PI-YYYY-NNNN` (4-digit, zero-padded)

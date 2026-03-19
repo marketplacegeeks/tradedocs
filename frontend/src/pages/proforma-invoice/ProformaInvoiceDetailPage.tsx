@@ -21,6 +21,8 @@ import {
   getAuditLog,
   uploadSignedCopy,
 } from "../../api/proformaInvoices";
+import { listUOMs } from "../../api/referenceData";
+import type { UOM } from "../../api/referenceData";
 import type { ProformaInvoiceLineItem, ProformaInvoiceCharge, AuditLogEntry } from "../../api/proformaInvoices";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import { useAuth } from "../../store/AuthContext";
@@ -153,6 +155,11 @@ export default function ProformaInvoiceDetailPage() {
     enabled: auditDrawerOpen,
   });
 
+  const { data: uoms = [] } = useQuery<UOM[]>({
+    queryKey: ["uoms"],
+    queryFn: listUOMs,
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["proforma-invoice", piId] });
     queryClient.invalidateQueries({ queryKey: ["proforma-invoices"] });
@@ -270,7 +277,7 @@ export default function ProformaInvoiceDetailPage() {
                 editingLineItem?.id === item.id ? (
                   <tr key={item.id} style={{ background: "var(--primary-light)" }}>
                     <td style={TD}>{idx + 1}</td>
-                    {(["hsn_code", "item_code", "description", "quantity", "uom", "rate_usd"] as const).map((f) => (
+                    {(["hsn_code", "item_code", "description", "quantity"] as const).map((f) => (
                       <td key={f} style={TD}>
                         <input
                           style={INPUT}
@@ -280,10 +287,33 @@ export default function ProformaInvoiceDetailPage() {
                         />
                       </td>
                     ))}
+                    <td style={TD}>
+                      <select
+                        style={INPUT}
+                        value={lineItemForm.uom}
+                        onChange={(e) => setLineItemForm((prev) => ({ ...prev, uom: e.target.value }))}
+                      >
+                        <option value="">— UOM —</option>
+                        {uoms.map((u) => (
+                          <option key={u.id} value={String(u.id)}>{u.abbreviation}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={TD}>
+                      <input
+                        style={INPUT}
+                        value={lineItemForm.rate_usd}
+                        onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
+                        placeholder="rate usd"
+                      />
+                    </td>
                     <td style={TD}>—</td>
                     <td style={TD}>
                       <button
-                        onClick={() => updateLineItemMutation.mutate({ lid: item.id, data: lineItemForm })}
+                        onClick={() => updateLineItemMutation.mutate({
+                          lid: item.id,
+                          data: { ...lineItemForm, uom: lineItemForm.uom ? parseInt(lineItemForm.uom) : null },
+                        })}
                         style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12 }}
                       >Save</button>
                       <button
@@ -306,7 +336,7 @@ export default function ProformaInvoiceDetailPage() {
                       <td style={TD}>
                         <div style={{ display: "flex", gap: 4 }}>
                           <button
-                            onClick={() => { setEditingLineItem(item); setLineItemForm({ description: item.description, quantity: item.quantity, rate_usd: item.rate_usd, hsn_code: item.hsn_code, item_code: item.item_code, uom: String(item.uom ?? "") }); }}
+                            onClick={() => { setEditingLineItem(item); setLineItemForm({ description: item.description, quantity: item.quantity, rate_usd: item.rate_usd, hsn_code: item.hsn_code, item_code: item.item_code, uom: String((item.uom as any)?.id ?? item.uom ?? "") }); }}
                             style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
                           >
                             <Edit2 size={14} strokeWidth={1.5} />
@@ -328,7 +358,7 @@ export default function ProformaInvoiceDetailPage() {
               {addingLineItem && (
                 <tr style={{ background: "var(--primary-light)" }}>
                   <td style={TD}>—</td>
-                  {(["hsn_code", "item_code", "description", "quantity", "uom", "rate_usd"] as const).map((f) => (
+                  {(["hsn_code", "item_code", "description", "quantity"] as const).map((f) => (
                     <td key={f} style={TD}>
                       <input
                         style={INPUT}
@@ -338,6 +368,26 @@ export default function ProformaInvoiceDetailPage() {
                       />
                     </td>
                   ))}
+                  <td style={TD}>
+                    <select
+                      style={INPUT}
+                      value={lineItemForm.uom}
+                      onChange={(e) => setLineItemForm((prev) => ({ ...prev, uom: e.target.value }))}
+                    >
+                      <option value="">— UOM —</option>
+                      {uoms.map((u) => (
+                        <option key={u.id} value={String(u.id)}>{u.abbreviation}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={TD}>
+                    <input
+                      style={INPUT}
+                      value={lineItemForm.rate_usd}
+                      onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
+                      placeholder="rate usd"
+                    />
+                  </td>
                   <td style={TD}>—</td>
                   <td style={TD}>
                     <button
@@ -673,7 +723,11 @@ export default function ProformaInvoiceDetailPage() {
             <Clock size={14} strokeWidth={1.5} /> History
           </button>
           <button
-            onClick={() => downloadPiPdf(piId, `${pi.pi_number}.pdf`)}
+            onClick={() =>
+              downloadPiPdf(piId, `${pi.pi_number}.pdf`).catch(() =>
+                message.error("PDF download failed. Please try again.")
+              )
+            }
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               background: "var(--pastel-green)", color: "var(--pastel-green-text)",
