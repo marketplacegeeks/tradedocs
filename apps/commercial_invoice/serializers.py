@@ -48,6 +48,7 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
     pl_number_display = serializers.SerializerMethodField()
     bank_display = serializers.SerializerMethodField()
     bank_details = serializers.SerializerMethodField()
+    signed_copy_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CommercialInvoice
@@ -57,6 +58,8 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
             "bank", "bank_display", "bank_details",
             "fob_rate", "freight", "insurance", "lc_details",
             "created_by", "created_at", "updated_at",
+            # Signed copy (FR-08.4)
+            "signed_copy_url",
             "line_items",
         ]
         read_only_fields = [
@@ -72,6 +75,15 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
         if obj.bank_id:
             return f"{obj.bank.bank_name} – {obj.bank.beneficiary_name}"
         return None
+
+    def get_signed_copy_url(self, obj):
+        """Return the absolute URL to the signed copy file, or None if not uploaded."""
+        if not obj.signed_copy:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.signed_copy.url)
+        return obj.signed_copy.url
 
     def get_bank_details(self, obj):
         """Full bank details for the Bank & Payment tab on the detail page."""

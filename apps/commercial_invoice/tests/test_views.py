@@ -8,6 +8,7 @@ Every endpoint has at minimum:
 
 import pytest
 from decimal import Decimal
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory
@@ -184,3 +185,94 @@ class TestCILineItemUpdate:
             format="json",
         )
         assert resp.status_code == 400
+
+
+# ---- Signed copy upload — Commercial Invoice (FR-08.4) ----------------------
+
+def ci_signed_copy_url(pk):
+    return f"/api/v1/commercial-invoices/{pk}/signed-copy/"
+
+
+def _small_pdf():
+    """Return a tiny fake PDF file for upload tests."""
+    return SimpleUploadedFile("signed.pdf", b"%PDF-1.4 fake content", content_type="application/pdf")
+
+
+@pytest.mark.django_db
+class TestCiSignedCopyUpload:
+
+    def test_upload_succeeds_for_approved_ci(self):
+        pl = PackingListFactory(status=APPROVED)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=APPROVED)
+        resp = auth_client(MakerFactory()).post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        assert resp.status_code == 200
+        assert resp.data["signed_copy_url"] is not None
+
+    def test_upload_blocked_for_draft_ci(self):
+        pl = PackingListFactory(status=DRAFT)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=DRAFT)
+        resp = auth_client(MakerFactory()).post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        assert resp.status_code == 400
+
+    def test_upload_blocked_for_pending_approval(self):
+        pl = PackingListFactory(status=PENDING_APPROVAL)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=PENDING_APPROVAL)
+        resp = auth_client(CheckerFactory()).post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        assert resp.status_code == 400
+
+    def test_upload_requires_file_field(self):
+        pl = PackingListFactory(status=APPROVED)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=APPROVED)
+        resp = auth_client(MakerFactory()).post(
+            ci_signed_copy_url(ci.pk),
+            {},  # no file
+            format="multipart",
+        )
+        assert resp.status_code == 400
+
+    def test_upload_rejects_oversized_file(self, settings):
+        settings.SIGNED_COPY_MAX_BYTES = 10  # 10 bytes — anything real will exceed this
+        pl = PackingListFactory(status=APPROVED)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=APPROVED)
+        resp = auth_client(MakerFactory()).post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        assert resp.status_code == 400
+
+    def test_unauthenticated_upload_denied(self):
+        pl = PackingListFactory(status=APPROVED)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=APPROVED)
+        resp = APIClient().post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        assert resp.status_code == 401
+
+    def test_signed_copy_url_appears_in_detail_response(self):
+        """After upload, GET on the CI returns a non-null signed_copy_url."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=APPROVED)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=APPROVED, created_by=maker)
+        auth_client(maker).post(
+            ci_signed_copy_url(ci.pk),
+            {"file": _small_pdf()},
+            format="multipart",
+        )
+        resp = auth_client(maker).get(f"/api/v1/commercial-invoices/{ci.pk}/")
+        assert resp.status_code == 200
+        assert resp.data["signed_copy_url"] is not None

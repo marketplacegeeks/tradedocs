@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal, Drawer, Input } from "antd";
-import { ArrowLeft, Edit2, Clock, Trash2, FileDown } from "lucide-react";
+import { ArrowLeft, Edit2, Clock, Trash2, FileDown, Upload, Paperclip } from "lucide-react";
 
 import {
   getPackingList,
@@ -16,6 +16,8 @@ import {
   getCommercialInvoice,
   updateCILineItem,
   downloadPackingListPDF,
+  uploadPlSignedCopy,
+  uploadCiSignedCopy,
 } from "../../api/packingLists";
 import type { PackingList, CILineItem } from "../../api/packingLists";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
@@ -456,6 +458,13 @@ export default function PackingListDetailPage() {
     enabled: auditOpen && !!id,
   });
 
+  // Fetch CI to read signed_copy_url (FR-08.4). Only needed when Approved.
+  const { data: ciData } = useQuery({
+    queryKey: ["commercial-invoice", pl?.ci_id],
+    queryFn: () => getCommercialInvoice(pl!.ci_id!),
+    enabled: !!pl?.ci_id && pl?.status === DOCUMENT_STATUS.APPROVED,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => deletePackingList(Number(id)),
     onSuccess: () => {
@@ -463,6 +472,30 @@ export default function PackingListDetailPage() {
       navigate("/packing-lists");
     },
     onError: () => message.error("Could not delete this document."),
+  });
+
+  const uploadPlSignedCopyMutation = useMutation({
+    mutationFn: (file: File) => uploadPlSignedCopy(Number(id), file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["packing-list", id] });
+      message.success("PL signed copy uploaded.");
+    },
+    onError: (e: any) => {
+      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
+      message.error(detail);
+    },
+  });
+
+  const uploadCiSignedCopyMutation = useMutation({
+    mutationFn: (file: File) => uploadCiSignedCopy(pl?.ci_id as number, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl?.ci_id] });
+      message.success("CI signed copy uploaded.");
+    },
+    onError: (e: any) => {
+      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
+      message.error(detail);
+    },
   });
 
   if (isLoading || !pl) {
@@ -599,6 +632,53 @@ export default function PackingListDetailPage() {
       {activeTab === "Containers & Items" && <ContainersTab pl={pl} />}
       {activeTab === "Final Rates" && <FinalRatesTab pl={pl} ciId={pl.ci_id} />}
       {activeTab === "Bank & Payment" && <BankTab pl={pl} />}
+
+      {/* Signed copy upload (FR-08.4) — visible only when Approved */}
+      {isApproved && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 4 }}>
+          {/* PL signed copy */}
+          <div style={CARD}>
+            <h2 style={SECTION_TITLE}>Packing List — Signed Copy</h2>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
+              Upload a scanned signed copy of the approved Packing List (PDF, JPG, or PNG — max 3 MB).
+            </p>
+            {pl.signed_copy_url && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--pastel-green)", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+                <Paperclip size={14} strokeWidth={1.5} color="var(--pastel-green-text)" />
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-green-text)", flex: 1 }}>Signed copy uploaded</span>
+                <a href={pl.signed_copy_url} target="_blank" rel="noreferrer" style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--pastel-green-text)", fontWeight: 600 }}>View / Download</a>
+              </div>
+            )}
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--bg-input)", border: "1px dashed var(--border-medium)", borderRadius: 8, padding: "8px 16px", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", cursor: uploadPlSignedCopyMutation.isPending ? "not-allowed" : "pointer", opacity: uploadPlSignedCopyMutation.isPending ? 0.6 : 1 }}>
+              <Upload size={14} strokeWidth={1.5} />
+              {uploadPlSignedCopyMutation.isPending ? "Uploading…" : pl.signed_copy_url ? "Replace signed copy" : "Upload signed copy"}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} disabled={uploadPlSignedCopyMutation.isPending} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadPlSignedCopyMutation.mutate(file); e.target.value = ""; }} />
+            </label>
+          </div>
+
+          {/* CI signed copy */}
+          {pl.ci_id && (
+            <div style={CARD}>
+              <h2 style={SECTION_TITLE}>Commercial Invoice — Signed Copy</h2>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
+                Upload a scanned signed copy of the approved Commercial Invoice (PDF, JPG, or PNG — max 3 MB).
+              </p>
+              {pl.ci_status === DOCUMENT_STATUS.APPROVED && ciData?.signed_copy_url && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--pastel-green)", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+                  <Paperclip size={14} strokeWidth={1.5} color="var(--pastel-green-text)" />
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-green-text)", flex: 1 }}>Signed copy uploaded</span>
+                  <a href={ciData.signed_copy_url} target="_blank" rel="noreferrer" style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--pastel-green-text)", fontWeight: 600 }}>View / Download</a>
+                </div>
+              )}
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--bg-input)", border: "1px dashed var(--border-medium)", borderRadius: 8, padding: "8px 16px", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", cursor: uploadCiSignedCopyMutation.isPending ? "not-allowed" : "pointer", opacity: uploadCiSignedCopyMutation.isPending ? 0.6 : 1 }}>
+                <Upload size={14} strokeWidth={1.5} />
+                {uploadCiSignedCopyMutation.isPending ? "Uploading…" : ciData?.signed_copy_url ? "Replace signed copy" : "Upload signed copy"}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} disabled={uploadCiSignedCopyMutation.isPending} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadCiSignedCopyMutation.mutate(file); e.target.value = ""; }} />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Audit trail drawer */}
       <Drawer

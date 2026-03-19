@@ -76,6 +76,46 @@ class CommercialInvoiceViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only the document creator can edit this Commercial Invoice.")
         serializer.save()
 
+    # ---- Signed copy upload endpoint ----------------------------------------
+
+    @action(detail=True, methods=["post"], url_path="signed-copy", permission_classes=[IsAnyRole])
+    def signed_copy(self, request, pk=None):
+        """
+        POST /commercial-invoices/{id}/signed-copy/
+        Accepts multipart/form-data with a single field named 'file'.
+        Only allowed when the CI is in Approved status (FR-08.4).
+        File size is capped at SIGNED_COPY_MAX_BYTES (3 MB).
+        """
+        from django.conf import settings as django_settings
+        from apps.workflow.constants import APPROVED
+
+        ci = self.get_object()
+
+        if ci.status != APPROVED:
+            raise ValidationError(
+                {"detail": "Signed copy can only be uploaded for Approved documents."}
+            )
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            raise ValidationError({"file": "A file is required."})
+
+        max_bytes = getattr(django_settings, "SIGNED_COPY_MAX_BYTES", 3 * 1024 * 1024)
+        if uploaded_file.size > max_bytes:
+            raise ValidationError(
+                {"file": f"File size must not exceed {max_bytes // (1024 * 1024)} MB."}
+            )
+
+        # Replace any previously uploaded signed copy with the new one.
+        if ci.signed_copy:
+            ci.signed_copy.delete(save=False)
+
+        ci.signed_copy = uploaded_file
+        ci.save(update_fields=["signed_copy"])
+
+        serializer = self.get_serializer(ci)
+        return Response({"signed_copy_url": serializer.data["signed_copy_url"]})
+
 
 class CommercialInvoiceLineItemViewSet(viewsets.ModelViewSet):
     """

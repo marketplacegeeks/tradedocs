@@ -87,6 +87,8 @@ export interface PackingList {
   created_by_name: string;
   created_at: string;
   updated_at: string;
+  // Signed copy (FR-08.4)
+  signed_copy_url: string | null;
   containers: Container[];
 }
 
@@ -121,6 +123,8 @@ export interface CommercialInvoice {
   created_by: number;
   created_at: string;
   updated_at: string;
+  // Signed copy (FR-08.4)
+  signed_copy_url: string | null;
   line_items: CILineItem[];
 }
 
@@ -269,5 +273,27 @@ export function listCommercialInvoices(params?: Record<string, string>) {
 export function updateCILineItem(id: number, data: { rate_usd?: string; packages_kind?: string }) {
   return axiosInstance
     .patch<CILineItem>(`/api/v1/ci-line-items/${id}/`, data)
+    .then((r) => r.data);
+}
+
+// ---- Signed copy uploads (FR-08.4) ------------------------------------------
+
+export function uploadPlSignedCopy(plId: number, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return axiosInstance
+    .post<{ signed_copy_url: string }>(`/api/v1/packing-lists/${plId}/signed-copy/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+}
+
+export function uploadCiSignedCopy(ciId: number, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return axiosInstance
+    .post<{ signed_copy_url: string }>(`/api/v1/commercial-invoices/${ciId}/signed-copy/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
     .then((r) => r.data);
 }

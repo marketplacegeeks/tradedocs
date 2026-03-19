@@ -260,6 +260,46 @@ class PackingListViewSet(viewsets.ModelViewSet):
             content_type="application/pdf",
         )
 
+    # ---- Signed copy upload endpoint ----------------------------------------
+
+    @action(detail=True, methods=["post"], url_path="signed-copy", permission_classes=[IsAnyRole])
+    def signed_copy(self, request, pk=None):
+        """
+        POST /packing-lists/{id}/signed-copy/
+        Accepts multipart/form-data with a single field named 'file'.
+        Only allowed when the PL is in Approved status (FR-08.4).
+        File size is capped at SIGNED_COPY_MAX_BYTES (3 MB).
+        """
+        from django.conf import settings as django_settings
+        from apps.workflow.constants import APPROVED
+
+        pl = self.get_object()
+
+        if pl.status != APPROVED:
+            raise ValidationError(
+                {"detail": "Signed copy can only be uploaded for Approved documents."}
+            )
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            raise ValidationError({"file": "A file is required."})
+
+        max_bytes = getattr(django_settings, "SIGNED_COPY_MAX_BYTES", 3 * 1024 * 1024)
+        if uploaded_file.size > max_bytes:
+            raise ValidationError(
+                {"file": f"File size must not exceed {max_bytes // (1024 * 1024)} MB."}
+            )
+
+        # Replace any previously uploaded signed copy with the new one.
+        if pl.signed_copy:
+            pl.signed_copy.delete(save=False)
+
+        pl.signed_copy = uploaded_file
+        pl.save(update_fields=["signed_copy"])
+
+        serializer = self.get_serializer(pl)
+        return Response({"signed_copy_url": serializer.data["signed_copy_url"]})
+
     # ---- Audit log endpoint -------------------------------------------------
 
     @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAnyRole])

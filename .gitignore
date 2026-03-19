@@ -9,3 +9,6 @@ dist/
 build/
 node_modules/
 frontend/dist/
+
+# Ignore user-uploaded media files (signed copies, etc.)
+media/

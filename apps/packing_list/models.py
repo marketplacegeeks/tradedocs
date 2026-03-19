@@ -161,6 +161,14 @@ class PackingList(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Authorised users may upload a scanned signed copy once the PL is Approved (FR-08.4).
+    # Stored in MEDIA_ROOT/signed_copies/pl/; never auto-generated.
+    signed_copy = models.FileField(
+        upload_to="signed_copies/pl/",
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         db_table = "packing_list"
         ordering = ["-created_at"]

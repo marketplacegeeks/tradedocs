@@ -112,6 +112,7 @@ class PackingListSerializer(serializers.ModelSerializer):
     incoterms_display = serializers.SerializerMethodField()
     payment_terms_display = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    signed_copy_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PackingList
@@ -146,6 +147,8 @@ class PackingListSerializer(serializers.ModelSerializer):
             # Meta
             "created_by", "created_by_name",
             "created_at", "updated_at",
+            # Signed copy (FR-08.4)
+            "signed_copy_url",
             # Nested
             "containers",
         ]
@@ -229,6 +232,15 @@ class PackingListSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         return obj.created_by.full_name or obj.created_by.email
+
+    def get_signed_copy_url(self, obj):
+        """Return the absolute URL to the signed copy file, or None if not uploaded."""
+        if not obj.signed_copy:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.signed_copy.url)
+        return obj.signed_copy.url
 
 
 class PackingListWriteSerializer(serializers.ModelSerializer):
