@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     "apps.master_data",
     "apps.workflow",
     "apps.proforma_invoice",
+    "apps.packing_list",
+    "apps.commercial_invoice",
 ]
 
 MIDDLEWARE = [
