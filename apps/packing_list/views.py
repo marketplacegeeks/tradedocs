@@ -16,6 +16,7 @@ from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsAnyRole
 from apps.workflow.constants import DRAFT, EDITABLE_STATES
 from apps.workflow.models import AuditLog
+from apps.workflow.serializers import AuditLogSerializer
 from apps.workflow.services import WorkflowService
 
 from .models import Container, ContainerItem, PackingList
@@ -304,34 +305,14 @@ class PackingListViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAnyRole])
     def audit_log(self, request, pk=None):
+        """GET /packing-lists/{id}/audit-log/"""
         pl = self.get_object()
-        from apps.workflow.models import AuditLog
-        # Return audit entries for both PL and its CI.
-        ci_id = None
-        try:
-            ci_id = pl.commercial_invoice.pk
-        except Exception:
-            pass
-
-        entries = AuditLog.objects.filter(
-            document_type="packing_list", document_id=pl.pk
-        ).order_by("-created_at")
-
-        data = [
-            {
-                "id": e.pk,
-                "document_type": e.document_type,
-                "document_number": e.document_number,
-                "action": e.action,
-                "from_status": e.from_status,
-                "to_status": e.to_status,
-                "comment": e.comment,
-                "performed_by": e.performed_by.full_name or e.performed_by.email,
-                "created_at": e.created_at,
-            }
-            for e in entries
-        ]
-        return Response(data)
+        logs = AuditLog.objects.filter(
+            document_type="packing_list",
+            document_id=pl.pk,
+        ).select_related("performed_by").order_by("-performed_at")
+        serializer = AuditLogSerializer(logs, many=True)
+        return Response(serializer.data)
 
 
 # ---- Container viewset ------------------------------------------------------

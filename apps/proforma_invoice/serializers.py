@@ -334,15 +334,5 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
 
 
 # ---- Audit log serializer (read-only) -------------------------------------
-
-class AuditLogSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    action = serializers.CharField()
-    from_status = serializers.CharField()
-    to_status = serializers.CharField()
-    comment = serializers.CharField()
-    performed_by_name = serializers.SerializerMethodField()
-    performed_at = serializers.DateTimeField()
-
-    def get_performed_by_name(self, obj):
-        return obj.performed_by.full_name if obj.performed_by else None
+# Canonical definition lives in apps/workflow/serializers.py — imported here for backwards compat.
+from apps.workflow.serializers import AuditLogSerializer  # noqa: F401, E402

@@ -4,7 +4,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { message, Modal, Tooltip, Drawer } from "antd";
+import { message, Modal, Tooltip } from "antd";
+import AuditLogDrawer from "../../components/AuditLogDrawer";
 import { ArrowLeft, Download, FileText, Plus, Trash2, Edit2, Clock, Upload, Paperclip } from "lucide-react";
 
 import {
@@ -563,46 +564,6 @@ export default function ProformaInvoiceDetailPage() {
     );
   }
 
-  // ---- Audit log drawer ----------------------------------------------------
-
-  function renderAuditLog() {
-    return (
-      <Drawer
-        title="Audit Log"
-        open={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-        width={400}
-      >
-        {auditLogs.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontFamily: "var(--font-body)", fontSize: 13 }}>No activity yet.</p>
-        ) : (
-          auditLogs.map((log) => (
-            <div
-              key={log.id}
-              style={{
-                padding: "12px 0",
-                borderBottom: "1px solid var(--border-light)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span className={DOCUMENT_STATUS_CHIP[log.to_status] ?? "chip-blue"}>
-                  {DOCUMENT_STATUS_LABELS[log.action] ?? log.action}
-                </span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)" }}>
-                  {new Date(log.performed_at).toLocaleString()}
-                </span>
-              </div>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)", margin: "4px 0 0" }}>
-                by {log.performed_by_name}
-                {log.comment && <> · "{log.comment}"</>}
-              </p>
-            </div>
-          ))
-        )}
-      </Drawer>
-    );
-  }
-
   // ---- Render: Signed copy (FR-08.4) — visible only when Approved ----------
 
   function renderSignedCopy() {
@@ -802,7 +763,12 @@ export default function ProformaInvoiceDetailPage() {
         </div>
       )}
 
-      {renderAuditLog()}
+      <AuditLogDrawer
+        open={auditDrawerOpen}
+        onClose={() => setAuditDrawerOpen(false)}
+        entries={auditLogs}
+        title="Audit Log"
+      />
     </div>
   );
 }

@@ -169,3 +169,11 @@ export const DOCUMENT_STATUS_CHIP: Record<string, string> = {
   REWORK: "chip-orange",
   PERMANENTLY_REJECTED: "chip-pink",
 };
+
+// Human-readable labels for workflow action strings (as stored in AuditLog.action).
+export const WORKFLOW_ACTION_LABELS: Record<string, string> = {
+  SUBMIT: "Submitted",
+  APPROVE: "Approved",
+  REWORK: "Sent for Rework",
+  PERMANENTLY_REJECT: "Permanently Rejected",
+};
