@@ -243,7 +243,7 @@ class PackingListSerializer(serializers.ModelSerializer):
 
     def get_incoterms_display(self, obj):
         if obj.incoterms_id:
-            return f"{obj.incoterms.code} – {obj.incoterms.description}"
+            return f"{obj.incoterms.code} – {obj.incoterms.full_name}"
         return None
 
     def get_payment_terms_display(self, obj):
