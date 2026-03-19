@@ -1,0 +1,7 @@
+[   17481ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/:0
+[   19314ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/:0
+[   20322ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/:0
+[   22337ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/:0
+[   25940ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/?status=DRAFT:0
+[   26949ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/?status=DRAFT:0
+[   28966ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/api/v1/packing-lists/?status=DRAFT:0

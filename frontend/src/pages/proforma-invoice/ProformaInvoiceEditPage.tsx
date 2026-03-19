@@ -189,8 +189,20 @@ export default function ProformaInvoiceEditPage() {
       navigate(`/proforma-invoices/${piId}`);
     },
     onError: (err: any) => {
-      const detail = err?.response?.data?.detail || "Failed to update Proforma Invoice.";
-      message.error(detail);
+      const data = err?.response?.data;
+      let detail = "Failed to update Proforma Invoice.";
+      if (data) {
+        if (typeof data === "string") {
+          detail = data;
+        } else if (data.detail) {
+          detail = data.detail;
+        } else if (typeof data === "object") {
+          detail = Object.entries(data)
+            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+            .join(" | ");
+        }
+      }
+      message.error(detail, 8);
     },
   });
 

@@ -474,6 +474,8 @@ function Step1({
       final_destination: form.final_destination || null,
       country_of_origin: form.country_of_origin || null,
       country_of_final_destination: form.country_of_final_destination || null,
+      incoterms: form.incoterms || null,
+      payment_terms: form.payment_terms || null,
     };
     try {
       let result: PackingList;

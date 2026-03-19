@@ -194,20 +194,22 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         incoterm_code = incoterms_obj.code if incoterms_obj else None
         seller_fields = INCOTERM_SELLER_FIELDS.get(incoterm_code, set())
 
-        # FR-09.7.8: If a cost field is visible (seller-borne), it must not be blank.
-        # Applies only to the fields that are being submitted in this request.
-        cost_field_names = {
-            "freight": "Freight",
-            "insurance_amount": "Insurance Amount",
-            "import_duty": "Import Duty / Taxes",
-            "destination_charges": "Destination Charges",
-        }
-        for field_key, label in cost_field_names.items():
-            if field_key in seller_fields and field_key in attrs:
-                if attrs[field_key] is None:
-                    raise serializers.ValidationError(
-                        {field_key: f"{label} is required for {incoterm_code}. Enter 0 if not applicable."}
-                    )
+        # FR-09.7.8: Cost fields that are seller-borne for the chosen incoterm must not be
+        # blank — but only on UPDATE (detail page). On CREATE the cost section doesn't exist
+        # yet, so we skip this check and let the user fill it in on the next page.
+        if self.instance is not None:
+            cost_field_names = {
+                "freight": "Freight",
+                "insurance_amount": "Insurance Amount",
+                "import_duty": "Import Duty / Taxes",
+                "destination_charges": "Destination Charges",
+            }
+            for field_key, label in cost_field_names.items():
+                if field_key in seller_fields and field_key in attrs:
+                    if attrs[field_key] is None:
+                        raise serializers.ValidationError(
+                            {field_key: f"{label} is required for {incoterm_code}. Enter 0 if not applicable."}
+                        )
 
         return attrs
 

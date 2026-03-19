@@ -187,8 +187,21 @@ export default function ProformaInvoiceCreatePage() {
       navigate(`/proforma-invoices/${pi.id}`);
     },
     onError: (err: any) => {
-      const detail = err?.response?.data?.detail || "Failed to create Proforma Invoice.";
-      message.error(detail);
+      const data = err?.response?.data;
+      let msg = "Failed to create Proforma Invoice.";
+      if (data) {
+        if (typeof data === "string") {
+          msg = data;
+        } else if (data.detail) {
+          msg = data.detail;
+        } else if (typeof data === "object") {
+          // Field-level validation errors — join them into one readable string
+          msg = Object.entries(data)
+            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+            .join(" | ");
+        }
+      }
+      message.error(msg, 8);
     },
   });
 

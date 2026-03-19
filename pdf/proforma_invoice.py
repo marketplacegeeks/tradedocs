@@ -339,120 +339,12 @@ def generate_pi_pdf(pi) -> io.BytesIO:
     """
     Generate a Proforma Invoice PDF and return an in-memory BytesIO buffer.
     Constraint #20: never writes to disk.
+
+    Delegates to the pdf1/-layout generator in proforma_invoice_generator.py.
     """
-    from apps.workflow.constants import APPROVED
+    from pdf.proforma_invoice_generator import generate_proforma_invoice_pdf_bytes
 
-    is_draft = pi.status != APPROVED
-    buffer = io.BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=(PAGE_W, __import__('reportlab').lib.pagesizes.A4[1]),
-        leftMargin=MARGIN_H,
-        rightMargin=MARGIN_H,
-        topMargin=DOC_TOP_MARGIN,
-        bottomMargin=MARGIN_BOTTOM,
-    )
-
-    on_page = _make_page_callback(pi, is_draft)
-    story = []
-
-    # 1. Reference numbers grid -----------------------------------------------
-    story.append(section_label('Reference Numbers'))
-    story.append(Spacer(1, 2 * mm))
-    story.append(_build_reference_grid(pi))
-    story.append(Spacer(1, 3 * mm))
-
-    # 2. Parties ---------------------------------------------------------------
-    story.append(section_label('Parties'))
-    story.append(Spacer(1, 2 * mm))
-    story.append(_build_parties(pi))
-    story.append(Spacer(1, 3 * mm))
-
-    # 3. Shipping & logistics --------------------------------------------------
-    story.append(section_label('Shipping & Logistics'))
-    story.append(Spacer(1, 2 * mm))
-    story.append(_build_shipping_grid(pi))
-    story.append(Spacer(1, 3 * mm))
-
-    # 4. Goods description (line items) ----------------------------------------
-    story.append(section_label('Goods Description'))
-    story.append(Spacer(1, 2 * mm))
-    li_table, line_total = _build_line_items(pi)
-    story.append(li_table)
-    story.append(Spacer(1, 3 * mm))
-
-    # 5. Totals block ----------------------------------------------------------
-    totals_tbl, invoice_total = _build_totals(pi, line_total)
-    story.append(totals_tbl)
-    story.append(Spacer(1, 3 * mm))
-
-    # 6. Amount in words -------------------------------------------------------
-    story.append(_build_amount_words_box(invoice_total))
-    story.append(Spacer(1, 3 * mm))
-
-    # 7. Validity & terms grid -------------------------------------------------
-    story.append(section_label('Terms'))
-    story.append(Spacer(1, 2 * mm))
-    story.append(_build_validity_grid(pi))
-    story.append(Spacer(1, 3 * mm))
-
-    # 8. MT103 payment instruction + declaration -------------------------------
-    notice_style = ParagraphStyle(
-        'notice', fontName=FONT_BODY, fontSize=SIZE_TABLE - 0.5,
-        leading=11, textColor=COLOR_TEXT_MUTED,
-    )
-    story.append(_p(
-        'Request your bank to send MT 103 Message to our bank and send us a copy '
-        'of this message to trace &amp; claim the payment from our bank.',
-        notice_style,
-    ))
-    story.append(Spacer(1, 2 * mm))
-    story.append(_p(
-        'We declare that this invoice shows the actual price of the goods described '
-        'and that all particulars are true and correct.',
-        notice_style,
-    ))
-    story.append(Spacer(1, 3 * mm))
-
-    # 9. Banking details -------------------------------------------------------
-    if pi.bank:
-        bank = pi.bank
-        bank_lines = [
-            f"<b>BENEFICIARY NAME:</b> {bank.beneficiary_name}",
-            f"<b>BANK NAME:</b> {bank.bank_name}",
-            f"<b>BRANCH NAME:</b> {bank.branch_name}",
-            f"<b>BRANCH ADDRESS:</b> {bank.branch_address or '—'}",
-            f"<b>A/C NO.:</b> {bank.account_number}",
-        ]
-        if bank.routing_number:
-            bank_lines.append(f"<b>IFSC CODE:</b> {bank.routing_number}")
-        bank_lines.append(f"<b>SWIFT CODE:</b> {bank.swift_code or '—'}")
-        if bank.intermediary_bank_name:
-            bank_lines.extend([
-                f"<b>Intermediary Institution Routing for Currency</b> {bank.intermediary_currency.code if bank.intermediary_currency else ''}",
-                f"<b>A/C No.:</b> {bank.intermediary_account_number or '—'}",
-                bank.intermediary_bank_name,
-                f"<b>SWIFT Code:</b> {bank.intermediary_swift_code or '—'}",
-            ])
-        story.append(_p("<br/>".join(bank_lines), _BODY))
-        story.append(Spacer(1, 3 * mm))
-
-    # 10. Terms & Conditions (new page) ----------------------------------------
-    if pi.tc_content:
-        story.append(PageBreak())
-        story.append(section_label('Terms & Conditions'))
-        story.append(Spacer(1, 3 * mm))
-        tc_style = ParagraphStyle(
-            'tc', fontName=FONT_BODY, fontSize=SIZE_TABLE - 0.5,
-            leading=13, textColor='#3A3A5C',
-        )
-        # strip_html converts Tiptap HTML to plain paragraphs
-        for paragraph in strip_html(pi.tc_content).split('\n\n'):
-            if paragraph.strip():
-                story.append(_p(paragraph.strip(), tc_style))
-                story.append(Spacer(1, 2 * mm))
-
-    doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
+    pdf_bytes = generate_proforma_invoice_pdf_bytes(pi)
+    buffer = io.BytesIO(pdf_bytes)
     buffer.seek(0)
     return buffer
