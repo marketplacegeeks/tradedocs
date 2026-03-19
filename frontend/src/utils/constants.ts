@@ -14,9 +14,7 @@ export const DOCUMENT_STATUS = {
   PENDING_APPROVAL: "PENDING_APPROVAL",
   APPROVED: "APPROVED",
   REWORK: "REWORK",
-  REJECTED: "REJECTED",
   PERMANENTLY_REJECTED: "PERMANENTLY_REJECTED",
-  DISABLED: "DISABLED",
 } as const;
 
 export type DocumentStatus = (typeof DOCUMENT_STATUS)[keyof typeof DOCUMENT_STATUS];
@@ -106,9 +104,7 @@ export const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   PENDING_APPROVAL: "Pending Approval",
   APPROVED: "Approved",
   REWORK: "Rework",
-  REJECTED: "Rejected",
   PERMANENTLY_REJECTED: "Permanently Rejected",
-  DISABLED: "Disabled",
 };
 
 export const DOCUMENT_STATUS_CHIP: Record<string, string> = {
@@ -116,7 +112,5 @@ export const DOCUMENT_STATUS_CHIP: Record<string, string> = {
   PENDING_APPROVAL: "chip-yellow",
   APPROVED: "chip-green",
   REWORK: "chip-orange",
-  REJECTED: "chip-pink",
   PERMANENTLY_REJECTED: "chip-pink",
-  DISABLED: "chip-purple",
 };

@@ -225,6 +225,41 @@ class PackingListViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": new_status})
 
+    # ---- PDF endpoint -------------------------------------------------------
+
+    @action(detail=True, methods=["get"], url_path="pdf", permission_classes=[IsAnyRole])
+    def pdf(self, request, pk=None):
+        """
+        GET /packing-lists/{id}/pdf/
+        Streams the combined PL+CI PDF.
+
+        Access rules (FR-14M.13):
+          Maker / Checker — Approved state only
+          Company Admin   — any state
+        Constraint #20: PDF is generated in-memory and streamed; never written to disk.
+        """
+        from django.http import FileResponse
+        from pdf.packing_list import generate_pl_ci_pdf
+        from apps.workflow.constants import APPROVED
+
+        pl = self.get_object()
+
+        # Gate by role + status
+        if request.user.role != UserRole.COMPANY_ADMIN:
+            if pl.status != APPROVED:
+                raise PermissionDenied(
+                    "PDF download is only available for Approved documents."
+                )
+
+        buffer = generate_pl_ci_pdf(pl)
+        filename = f"{pl.pl_number}.pdf"
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
+        )
+
     # ---- Audit log endpoint -------------------------------------------------
 
     @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAnyRole])

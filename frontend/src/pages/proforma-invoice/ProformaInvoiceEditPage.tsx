@@ -37,6 +37,7 @@ const schema = z.object({
   country_of_final_destination: z.number().nullable().optional(),
   pre_carriage_by: z.number().nullable().optional(),
   place_of_receipt: z.number().nullable().optional(),
+  place_of_receipt_by_pre_carrier: z.number().nullable().optional(),
   vessel_flight_no: z.string().optional().default(""),
   port_of_loading: z.number().nullable().optional(),
   port_of_discharge: z.number().nullable().optional(),
@@ -153,6 +154,7 @@ export default function ProformaInvoiceEditPage() {
       country_of_final_destination: pi.country_of_final_destination ?? null,
       pre_carriage_by: pi.pre_carriage_by ?? null,
       place_of_receipt: pi.place_of_receipt ?? null,
+      place_of_receipt_by_pre_carrier: pi.place_of_receipt_by_pre_carrier ?? null,
       vessel_flight_no: pi.vessel_flight_no ?? "",
       port_of_loading: pi.port_of_loading ?? null,
       port_of_discharge: pi.port_of_discharge ?? null,
@@ -400,7 +402,7 @@ export default function ProformaInvoiceEditPage() {
               />
             </div>
             <div>
-              <label style={LABEL_STYLE}>Place of Receipt by Pre-Carrier</label>
+              <label style={LABEL_STYLE}>Place of Receipt</label>
               <Controller
                 name="place_of_receipt"
                 control={control}
@@ -418,12 +420,30 @@ export default function ProformaInvoiceEditPage() {
               />
             </div>
             <div>
-              <label style={LABEL_STYLE}>Vessel / Flight No</label>
-              <input {...register("vessel_flight_no")} style={INPUT_STYLE} placeholder="e.g. MV Pacific Star" />
+              <label style={LABEL_STYLE}>Place of Receipt by Pre-Carrier</label>
+              <Controller
+                name="place_of_receipt_by_pre_carrier"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    placeholder="Select location"
+                    style={{ width: "100%" }}
+                    showSearch
+                    optionFilterProp="label"
+                    options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+                  />
+                )}
+              />
             </div>
           </div>
 
           <div style={{ ...GRID3, marginBottom: 16 }}>
+            <div>
+              <label style={LABEL_STYLE}>Vessel / Flight No</label>
+              <input {...register("vessel_flight_no")} style={INPUT_STYLE} placeholder="e.g. MV Pacific Star" />
+            </div>
             <div>
               <label style={LABEL_STYLE}>Port of Loading</label>
               <Controller

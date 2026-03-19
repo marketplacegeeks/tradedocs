@@ -75,7 +75,7 @@ pbcopy < ~/.ssh/id_ed25519.pub
 ```
 
 3. Go to GitHub → Settings → SSH and GPG Keys → New SSH Key. Paste and save.
-4. Test: `ssh -T ``````````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
+4. Test: `ssh -T ``````````````````````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
 
 ---
 
@@ -440,7 +440,7 @@ These come from technical_architecture.md Section 9. Never violate them:
 4. Organisation records are never hard-deleted — set `is_active=False`.
 5. ALL document status transitions go through `WorkflowService` in `apps/workflow/services.py`. Never update `status` anywhere else.
 6. `WorkflowService` must write an `AuditLog` entry in the same `transaction.atomic()` as the status update.
-7. REJECT, REWORK, PERMANENTLY_REJECT, and DISABLE actions must block if comment is empty.
+7. REWORK and PERMANENTLY_REJECT actions must block if comment is empty.
 8. Document numbers (PI/PL/CI) are generated with `select_for_update()` to prevent duplicates.
 9. PDF generation always happens in memory and is streamed. Never write a PDF to disk.
 10. Every DRF view must explicitly declare `permission_classes`.
@@ -1069,12 +1069,12 @@ All Layer 2 items are merged to `main`. No further work needed here.
 
 > **v1.3 change:** The old standalone FR-14 (Packing List) and FR-15 (5-step CI wizard) are replaced by **FR-14M** — a single combined creation flow. PL and CI are created together, share a joint approval workflow, and download as one PDF file. See `requirements.md` Section 5.11 for the full spec.
 >
-> **v1.4 change (wireframe alignment):** Drawee field removed entirely. UOM is now mandatory on every container item (aggregation key). Incoterms, Payment Terms, FOB Rate, Freight, Insurance, and L/C Details all moved to **Page 5 — Final Rates** (not Page 2). Additional Description added as a field on the Order References page (Page 3). PI Preview Card added to the entry point. Disable action now applies from **any** state (not Approved only). Document detail page has a defined 4-tab layout (FR-14M.14).
+> **v1.4 change (wireframe alignment):** Drawee field removed entirely. UOM is now mandatory on every container item (aggregation key). Incoterms, Payment Terms, FOB Rate, Freight, Insurance, and L/C Details all moved to **Page 5 — Final Rates** (not Page 2). Additional Description added as a field on the Order References page (Page 3). PI Preview Card added to the entry point. Document detail page has a defined 4-tab layout (FR-14M.14).
 
 | # | Feature | FR | Branch name |
 | --- | --- | --- | --- |
 | 14 | Combined PL+CI model: header (incl. incoterms, payment_terms, fob_rate, freight, insurance, lc_details, additional_description on PL), containers, container items (item_code + uom mandatory, item-level weights), Final Rates | FR-14M.1–FR-14M.9, FR-14M.11 | `feature/fr-14m-model` |
-| 15 | WorkflowService extended for joint PL+CI states — Disable valid from any state | FR-08, FR-14M.12 | `feature/fr-14m-workflow` |
+| 15 | WorkflowService extended for joint PL+CI states (Submit, Approve, Rework, Permanently Reject) | FR-08, FR-14M.12 | `feature/fr-14m-workflow` |
 | 16 | Combined PL+CI API endpoints (PI Preview Card, create, Final Rates, summary, copy-container) | FR-14M.1–FR-14M.10 | `feature/fr-14m-api` |
 | 17 | Combined PDF generation (PL/Weight Note section + page break + CI section, single file, dynamic rate header) | FR-14M.13 | `feature/fr-14m-pdf` |
 | 18 | Combined PL+CI React pages (5-page wizard + summary/review + 4-tab detail page) | FR-14M, FR-14M.14 | `feature/fr-14m-pages` |
@@ -1093,15 +1093,14 @@ All Layer 2 items are merged to `main`. No further work needed here.
 - The PDF is a **single file**: PL/Weight Note section first, then a page break, then the CI section.
 - Rate and Amount (USD) are **not printed on the PL section** — they appear only on the CI section.
 - FOB Rate, Freight, Insurance print as `0.00` if not entered (they always appear on the CI PDF).
-- **Disable** is available from **any** state (not just Approved) — Checker/Admin only, comment mandatory, terminal for both PL and CI.
 
 **How to break Layer 3 into sessions:**
 - **Session 1 — Model:** `PackingList` header (fields: proforma_invoice FK, exporter, consignee, buyer, notify_party, pl_date, ci_date, vessel, port_of_loading, port_of_discharge, final_destination, pre_carriage_by, place_of_receipt, place_of_receipt_by_precarrier, country_of_origin, country_of_final_destination, incoterms, payment_terms, bank, fob_rate, freight, insurance, lc_details, additional_description, weight_unit, status), `PackingListContainer` (tare weight only — no net/gross at container level), `ContainerItem` (item_code required, uom required, net_weight_per_unit, inner_packing_weight; item_gross_weight is a property), `CommercialInvoice` header (linked 1:1 to PackingList), `CommercialInvoiceLineItem` (aggregated by item_code + UOM; stores rate_usd). Run migration. Write model tests (field defaults, auto-number format, item_gross_weight calculation, container_gross_weight calculation, UOM required, Item Code required). Verify all tables in DB via postgres MCP.
-- **Session 2 — Workflow:** Extend WorkflowService for joint PL+CI states. The key rule: every status transition (Submit, Approve, Reject/Rework, Permanently Reject, Disable) must update **both** the PL and CI records in the same `transaction.atomic()`. Disable is valid from **any** state. Write tests for every valid and invalid transition. Confirm reject/disable without a comment raises an error. Confirm `pytest` passes before moving on.
+- **Session 2 — Workflow:** Extend WorkflowService for joint PL+CI states. The key rule: every status transition (Submit, Approve, Reject/Rework, Permanently Reject) must update **both** the PL and CI records in the same `transaction.atomic()`. Write tests for every valid and invalid transition. Confirm rework/permanently-reject without a comment raises an error. Confirm `pytest` passes before moving on.
 - **Session 3 — API:** Create combined document endpoint (includes PI Preview Card data — returns PI line items for display on entry point; auto-populates header from selected Approved PI), add/remove containers, add/remove items, Final Rates update endpoint (writes rates + incoterms/payment_terms/fob_rate/freight/insurance/lc_details to the PL record), summary/review page endpoint, copy-container action. Write permission tests and validation tests (missing Item Code, missing UOM, missing Rate, at-least-one-container rule).
 - **Session 4 — PDF:** Single PDF file with two sections. PL section: exporter header (3-address layout), references + Additional Description in right info panel, shipping block, per-container item rows with weight columns, container subtotal rows (SUM item gross + tare), bottom summary (total net/gross + per-container tare table). CI section: same header block (no Drawee), aggregated line items (by Item Code + UOM) with dynamic rate header "Rate (USD per [UOM])" and Amount columns, FOB/Freight/Insurance break-up, L/C Details, bank details, Amount in Words, Declaration. Page break between sections. DRAFT watermark on both sections when not Approved. PDF download: Maker/Checker = Approved only; Admin = any state.
 - **Session 5 — React creation form:** 5-page wizard: (1) **Entry** — Consignee dropdown + Approved PI dropdown + PI Preview Card showing PI line items; (2) **Page 2 Header & Details** — document numbers (read-only), dates, Parties (Exporter, Consignee, Buyer, Notify Party — no Drawee), Shipping & Logistics (7 fields), Countries (2 fields), Bank dropdown + preview card; (3) **Page 3 Order References** — 5 reference pairs + Additional Description textarea; (4) **Page 4 Containers & Items** — weight unit selector, inline container add/edit, inline item add/edit within each container (Item Code required, UOM required), copy-container action; (5) **Page 5 Final Rates** — auto-generated rates table (Maker enters Rate per row, column header shows "Rate (USD per [UOM])"), Payment & Terms section (Incoterms + Payment Terms, editable), Break-up in USD section (FOB Rate, Freight, Insurance, L/C Details). Save → Summary/Review page showing aggregated line items, weight summary, Payment & Terms read-only, Break-up in USD read-only.
-- **Session 6 — React detail/edit page:** Tabbed read-only view with 4 tabs — **Document Header** (parties, shipping, countries, payment & terms) | **Containers & Items** (all containers with items, weight totals) | **Final Rates** (rates table + Break-up in USD) | **Bank & Payment** (bank details). Context-sensitive action buttons by role and status: Edit/Submit/Delete (Maker, Draft/Rework); Approve/Reject/Permanently Reject (Checker, from appropriate states); Disable (Checker/Admin, any state); PDF download (Maker/Checker = Approved only, Admin = any state). Rejection comments displayed on page for Maker to see.
+- **Session 6 — React detail/edit page:** Tabbed read-only view with 4 tabs — **Document Header** (parties, shipping, countries, payment & terms) | **Containers & Items** (all containers with items, weight totals) | **Final Rates** (rates table + Break-up in USD) | **Bank & Payment** (bank details). Context-sensitive action buttons by role and status: Edit/Submit/Delete (Maker, Draft/Rework); Approve/Reject/Permanently Reject (Checker, from appropriate states); PDF download (Maker/Checker = Approved only, Admin = any state). Rejection comments displayed on page for Maker to see.
 
 ---
 

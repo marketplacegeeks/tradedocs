@@ -38,6 +38,7 @@ const schema = z.object({
   // Shipping
   pre_carriage_by: z.number().nullable().optional(),
   place_of_receipt: z.number().nullable().optional(),
+  place_of_receipt_by_pre_carrier: z.number().nullable().optional(),
   vessel_flight_no: z.string().optional().default(""),
   port_of_loading: z.number().nullable().optional(),
   port_of_discharge: z.number().nullable().optional(),
@@ -387,7 +388,7 @@ export default function ProformaInvoiceCreatePage() {
               />
             </div>
             <div>
-              <label style={LABEL_STYLE}>Place of Receipt by Pre-Carrier</label>
+              <label style={LABEL_STYLE}>Place of Receipt</label>
               <Controller
                 name="place_of_receipt"
                 control={control}
@@ -405,12 +406,30 @@ export default function ProformaInvoiceCreatePage() {
               />
             </div>
             <div>
-              <label style={LABEL_STYLE}>Vessel / Flight No</label>
-              <input {...register("vessel_flight_no")} style={INPUT_STYLE} placeholder="e.g. MV Pacific Star" />
+              <label style={LABEL_STYLE}>Place of Receipt by Pre-Carrier</label>
+              <Controller
+                name="place_of_receipt_by_pre_carrier"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    placeholder="Select location"
+                    style={{ width: "100%" }}
+                    showSearch
+                    optionFilterProp="label"
+                    options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+                  />
+                )}
+              />
             </div>
           </div>
 
           <div style={{ ...GRID3, marginBottom: 16 }}>
+            <div>
+              <label style={LABEL_STYLE}>Vessel / Flight No</label>
+              <input {...register("vessel_flight_no")} style={INPUT_STYLE} placeholder="e.g. MV Pacific Star" />
+            </div>
             <div>
               <label style={LABEL_STYLE}>Port of Loading</label>
               <Controller

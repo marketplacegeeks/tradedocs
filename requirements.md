@@ -4,7 +4,7 @@
 **Status:** Active
 **Last Updated:** 2026-03-19
 
-> **v1.5 Change:** Discrepancy resolution pass. Additional Description removed from FR-14M.2 (not required). HSN Code made mandatory in FR-14M.8A and FR-14M validation rules. US-08 updated: HSN Code and UOM confirmed mandatory, Batch Details optional. US-13 corrected: Disable action available from Any state (not just Approved). AD Code (Authorised Dealer Code) added to FR-05 Bank master.
+> **v1.5 Change:** Discrepancy resolution pass. Additional Description removed from FR-14M.2 (not required). HSN Code made mandatory in FR-14M.8A and FR-14M validation rules. US-08 updated: HSN Code and UOM confirmed mandatory, Batch Details optional. US-13 removed: Disable action removed — DISABLED state is not part of FR-08.1 common workflow states. AD Code (Authorised Dealer Code) added to FR-05 Bank master.
 
 > **v1.4 Change:** FR-14M wireframe alignment pass. 12 discrepancies resolved against validated wireframes_plci.html: PI Preview Card added to FR-14M.1; Incoterms/Payment Terms and FOB/Freight/Insurance/L/C Details relocated to Page 5 (FR-14M.8B); Drawee field removed entirely; Additional Description added to FR-14M.2 (subsequently removed in v1.5); UOM made mandatory in FR-14M.8A with dynamic Rate label rule; FR-14M.8B and FR-14M.10 extended with Payment & Terms and Break-up in USD sections; FR-14M.14 Document Detail tab layout added; Disable action updated to Any state.
 
@@ -863,12 +863,9 @@ Draft → Pending Approval → Approved
                          → Rework → (Maker edits & resubmits) → Pending Approval
 
 Any state → Permanently Rejected  (terminal — both PL and CI)
-Any state → Disabled              (terminal — both PL and CI)
 ```
 
 > **Note on Permanently Rejected:** When the combined document is Permanently Rejected, both the PL and CI records move to Permanently Rejected simultaneously. No further edits, submissions, or downloads are possible on either document.
-
-> **Note on Disabled:** The Disable action can be triggered by a Checker or Admin from any state. Both the PL and CI records are disabled simultaneously. Comment is mandatory. This is a terminal state — no further actions are possible after disabling.
 
 **Role-based actions:**
 
@@ -879,7 +876,6 @@ Any state → Disabled              (terminal — both PL and CI)
 | Approve | Checker / Admin | Pending Approval state; approves both PL and CI |
 | Reject (→ Rework) | Checker / Admin | Pending Approval state; rejection comments are mandatory; both documents return to Rework |
 | Permanently Reject | Checker / Admin | Any state; comments are mandatory; both PL and CI permanently rejected |
-| Disable | Checker / Admin | Any state; terminal action; comment mandatory; both PL and CI are disabled |
 | Download PDF | See FR-14M.13 |  |
 
 ---
@@ -905,7 +901,6 @@ After first save, the saved document is accessible as a read-only view for all r
 | Approve | Checker / Admin | Pending Approval state |
 | Reject → Rework | Checker / Admin | Pending Approval state |
 | Permanently Reject | Checker / Admin | Any state |
-| Disable | Checker / Admin | Any state |
 | Download PDF | Maker, Checker | Approved state only |
 | Download PDF | Admin | Any state |
 
@@ -1349,16 +1344,6 @@ All weight fields use a single unit of measure (kg or lbs) selected at the shipm
 - [ ] Weights are formatted to 3 decimal places; monetary amounts to 2 decimal places
 - [ ] The PDF filename is derived from the PL and CI numbers
 
-### US-13: Disable an Approved Combined PL + CI Document
-**As a** Checker, **I want to** disable an Approved combined PL + CI document, **so that** it can be voided after it has been finalised if required.
-
-**Acceptance Criteria:**
-- [ ] "Disable" action is available to Checker and Company Admin only when the document status is Approved
-- [ ] A mandatory comment is required when disabling; the system must block the action if the comment is empty
-- [ ] On confirmation, status changes to Disabled — a terminal state; no further actions (submit, approve, reject, or download) are possible for either PL or CI
-- [ ] The disable event is recorded in the audit trail with actor name, timestamp, and the mandatory comment
-- [ ] A Maker cannot disable a combined document
-
 ---
 
 ## 8. Data Requirements
@@ -1694,4 +1679,4 @@ All weight fields use a single unit of measure (kg or lbs) selected at the shipm
 | # | Question | Owner | Status |
 | --- | --- | --- | --- |
 | 31 | Should a Proforma Invoice be submittable for approval with zero line items (header only)? Or must at least one line item exist before submission is permitted? | Business | Resolved — At least one line item must exist before a PI can be submitted for approval. |
-| 32 | If a Packing List is moved to Permanently Rejected or Disabled after a Commercial Invoice has been created from it, what should happen to the Commercial Invoice? Should it be automatically invalidated, or should it continue through its own workflow independently? | Business / Product | Open |
+| 32 | If a Packing List is moved to Permanently Rejected after a Commercial Invoice has been created from it, what should happen to the Commercial Invoice? Should it be automatically invalidated, or should it continue through its own workflow independently? | Business / Product | Open |

@@ -10,6 +10,8 @@ Constraint #14: REWORK and PERMANENTLY_REJECT require a non-empty comment.
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.accounts.models import UserRole
+
 from .constants import (
     APPROVE,
     COMMENT_REQUIRED_ACTIONS,
@@ -67,8 +69,11 @@ class WorkflowService:
             )
 
         # FR-08.2 / US-04: the user who created the document cannot approve it,
-        # even if they hold a Checker or Company Admin role.
-        if action == APPROVE and hasattr(document, "created_by") and document.created_by == performed_by:
+        # unless they are a Company Admin (Admins are trusted to self-approve).
+        if (action == APPROVE
+                and hasattr(document, "created_by")
+                and document.created_by == performed_by
+                and performed_by.role != UserRole.COMPANY_ADMIN):
             raise PermissionDenied(
                 "You cannot approve a document you created."
             )
@@ -147,8 +152,10 @@ class WorkflowService:
                 f"Your role ({performed_by.role}) is not allowed to perform '{action}'."
             )
 
-        # FR-08.2: creator cannot approve their own document.
-        if action == APPROVE and packing_list.created_by == performed_by:
+        # FR-08.2: creator cannot approve their own document, unless they are a Company Admin.
+        if (action == APPROVE
+                and packing_list.created_by == performed_by
+                and performed_by.role != UserRole.COMPANY_ADMIN):
             raise PermissionDenied("You cannot approve a document you created.")
 
         if action in COMMENT_REQUIRED_ACTIONS and not comment.strip():

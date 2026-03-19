@@ -242,14 +242,6 @@ class TestProformaInvoiceWorkflow:
         )
         assert resp.status_code == 400
 
-    def test_disable_action_blocked_for_pi(self):
-        pi = ProformaInvoiceFactory(status=APPROVED)
-        resp = auth_client(CheckerFactory()).post(
-            pi_workflow_url(pi.pk), {"action": "DISABLE", "comment": "Disabling"}, format="json"
-        )
-        assert resp.status_code == 400
-
-
 # ---- Audit log --------------------------------------------------------------
 
 @pytest.mark.django_db
@@ -369,12 +361,27 @@ class TestSerializerTotals:
 @pytest.mark.django_db
 class TestSelfApprovalBlock:
 
-    def test_creator_cannot_approve_own_document(self):
-        """A user who created the PI (as Maker) cannot approve it even as Company Admin."""
+    def test_maker_cannot_approve_own_document(self):
+        """A Maker who created a PI cannot approve it."""
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
+        resp = auth_client(maker).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_cannot_approve_own_document(self):
+        """A Checker who created a PI cannot approve it."""
+        checker = CheckerFactory()
+        pi = ProformaInvoiceFactory(created_by=checker, status=PENDING_APPROVAL)
+        resp = auth_client(checker).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
+        assert resp.status_code == 403
+
+    def test_admin_can_approve_own_document(self):
+        """A Company Admin who created a PI is allowed to approve it."""
         admin = CompanyAdminFactory()
         pi = ProformaInvoiceFactory(created_by=admin, status=PENDING_APPROVAL)
         resp = auth_client(admin).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
-        assert resp.status_code == 403
+        assert resp.status_code == 200
+        assert resp.data["status"] == APPROVED
 
     def test_different_checker_can_approve(self):
         """A Checker who did NOT create the PI can approve it normally."""

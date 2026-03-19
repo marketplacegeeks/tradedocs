@@ -76,6 +76,14 @@ class ProformaInvoice(models.Model):
         null=True,
         blank=True,
     )
+    # Separate field for the place where the pre-carrier hands over goods (FR-09.2 / FR-14M.3)
+    place_of_receipt_by_pre_carrier = models.ForeignKey(
+        "master_data.Location",
+        on_delete=models.PROTECT,
+        related_name="pi_place_of_receipt_by_pre_carrier",
+        null=True,
+        blank=True,
+    )
     vessel_flight_no = models.CharField(max_length=100, blank=True, default="")
     port_of_loading = models.ForeignKey(
         "master_data.Port",

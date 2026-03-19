@@ -169,7 +169,7 @@ CommercialInvoice
   ├── bank → Bank
   ├── ci_number: CharField (auto-generated, overridable by Maker)
   ├── fob_rate (2dp), freight (2dp), insurance (2dp), lc_details
-  ├── status: DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | DISABLED
+  ├── status: DRAFT | PENDING_APPROVAL | APPROVED | REWORK | PERMANENTLY_REJECTED
   ├── created_by → User
   └── → CommercialInvoiceLineItem (aggregated from PL at creation, stored as snapshot)
 
@@ -308,7 +308,7 @@ Document write permissions follow the rule: **only the Maker can create/edit, an
 All state transitions use a single POST to `/{document}/{id}/workflow/` with a JSON body:
 
 ```json
-{ "action": "SUBMIT" | "APPROVE" | "REJECT" | "PERMANENTLY_REJECT" | "DISABLE", "comment": "optional or required" }
+{ "action": "SUBMIT" | "APPROVE" | "REWORK" | "PERMANENTLY_REJECT", "comment": "optional or required" }
 ```
 
 This single endpoint routes to `WorkflowService`, which validates the action, enforces role rules, transitions the status, writes the audit log, and triggers notifications. No status field is ever updated directly in any other view.
@@ -515,9 +515,7 @@ VITE_API_BASE_URL          ← The Django API URL; used by Vite at build time
 
 13. **Permanently Rejected cascading is implemented only in \****`WorkflowService.permanently_reject()`**\*\*.** Never use a Django signal for cascade logic — signals are invisible and hard to debug.
 
-14. **`Disabled`**** state is valid only for \****`CommercialInvoice`**\*\*.** `WorkflowService` must raise a `ValueError` if `DISABLE` action is attempted on a ProformaInvoice or PackingList.
-
-15. **Mandatory comment enforcement:** `WorkflowService` must block any `REJECT`, `REWORK`, `PERMANENTLY_REJECT`, or `DISABLE` action if the `comment` field is empty. Raise a `ValidationError` with a clear message.
+14. **Mandatory comment enforcement:** `WorkflowService` must block any `REWORK` or `PERMANENTLY_REJECT` action if the `comment` field is empty. Raise a `ValidationError` with a clear message.
 
 ### Auto-Generated Numbers
 
@@ -576,11 +574,11 @@ PackingList:
   Any state → PERMANENTLY_REJECTED (terminal; cascades to linked CIs)
 
 CommercialInvoice:
-  DRAFT → PENDING_APPROVAL → APPROVED → DISABLED (terminal)
-                           → REJECTED → DRAFT (Maker edits) → PENDING_APPROVAL
+  DRAFT → PENDING_APPROVAL → APPROVED
+                           → REWORK → DRAFT (Maker edits) → PENDING_APPROVAL
   Any state → PERMANENTLY_REJECTED (terminal)
 ```
 
 **PDF watermark rule:** DRAFT watermark on all states except APPROVED. APPROVED = clean final PDF.
 **PDF access rule for Packing List:** Maker and Checker can only download PDF when status is APPROVED. Company Admin can download at any state.
-**PDF access rule for Commercial Invoice:** Maker can download Draft PDF when DRAFT or REJECTED. Final PDF (all roles) only when APPROVED.
+**PDF access rule for Commercial Invoice:** Maker can download Draft PDF when DRAFT or REWORK. Final PDF (all roles) only when APPROVED.

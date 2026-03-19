@@ -149,6 +149,7 @@ def _build_shipping_grid(pi):
         ('Country of Destination',    _name(pi.country_of_final_destination)),
         ('Pre-Carriage By',           _name(pi.pre_carriage_by)),
         ('Place of Receipt',          safe_str(pi.place_of_receipt)),
+        ('Place of Receipt by Pre-Carrier', safe_str(pi.place_of_receipt_by_pre_carrier)),
         ('Port of Loading',           safe_str(pi.port_of_loading)),
         ('Port of Discharge',         safe_str(pi.port_of_discharge)),
         ('Incoterms',                 incoterms_str),

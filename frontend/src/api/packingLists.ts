@@ -193,6 +193,21 @@ export function getPlAuditLog(id: number) {
     .then((r) => r.data);
 }
 
+// Downloads the combined PL+CI PDF and triggers a browser save-as dialog.
+export async function downloadPackingListPDF(id: number, filename: string) {
+  const response = await axiosInstance.get(`/api/v1/packing-lists/${id}/pdf/`, {
+    responseType: "blob",
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 // ---- Container endpoints ----------------------------------------------------
 
 export function listContainers(packingListId: number) {

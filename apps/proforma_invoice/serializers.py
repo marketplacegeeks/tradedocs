@@ -111,6 +111,8 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     payment_terms_name = serializers.SerializerMethodField()
     port_of_loading_name = serializers.SerializerMethodField()
     port_of_discharge_name = serializers.SerializerMethodField()
+    place_of_receipt_name = serializers.SerializerMethodField()
+    place_of_receipt_by_pre_carrier_name = serializers.SerializerMethodField()
 
     # Returns the full URL to the signed copy file, or null if none uploaded.
     signed_copy_url = serializers.SerializerMethodField()
@@ -130,12 +132,13 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "buyer_order_no", "buyer_order_date", "other_references",
             "country_of_origin", "country_of_final_destination",
             # Shipping
-            "pre_carriage_by", "place_of_receipt", "vessel_flight_no",
+            "pre_carriage_by", "place_of_receipt", "place_of_receipt_by_pre_carrier", "vessel_flight_no",
             "port_of_loading", "port_of_loading_name",
             "port_of_discharge", "port_of_discharge_name",
             "final_destination",
             # Payment & Terms
             "payment_terms", "payment_terms_name",
+            "place_of_receipt_name", "place_of_receipt_by_pre_carrier_name",
             "incoterms", "incoterms_code", "bank",
             "validity_for_acceptance", "validity_for_shipment",
             "partial_shipment", "transshipment",
@@ -160,6 +163,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "incoterms_code",
             "exporter_name", "consignee_name", "buyer_name",
             "payment_terms_name", "port_of_loading_name", "port_of_discharge_name",
+            "place_of_receipt_name", "place_of_receipt_by_pre_carrier_name",
             "signed_copy_url",
         ]
 
@@ -172,7 +176,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
                 "pi_date", "exporter", "consignee", "buyer",
                 "buyer_order_no", "buyer_order_date", "other_references",
                 "country_of_origin", "country_of_final_destination",
-                "pre_carriage_by", "place_of_receipt", "vessel_flight_no",
+                "pre_carriage_by", "place_of_receipt", "place_of_receipt_by_pre_carrier", "vessel_flight_no",
                 "port_of_loading", "port_of_discharge", "final_destination",
                 "payment_terms", "incoterms", "bank",
                 "validity_for_acceptance", "validity_for_shipment",
@@ -319,6 +323,12 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
 
     def get_port_of_discharge_name(self, obj):
         return obj.port_of_discharge.name if obj.port_of_discharge else None
+
+    def get_place_of_receipt_name(self, obj):
+        return obj.place_of_receipt.name if obj.place_of_receipt else None
+
+    def get_place_of_receipt_by_pre_carrier_name(self, obj):
+        return obj.place_of_receipt_by_pre_carrier.name if obj.place_of_receipt_by_pre_carrier else None
 
 
 # ---- Audit log serializer (read-only) -------------------------------------

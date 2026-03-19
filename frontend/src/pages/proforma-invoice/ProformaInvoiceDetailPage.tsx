@@ -712,6 +712,8 @@ export default function ProformaInvoiceDetailPage() {
           <LabelValue label="Payment Terms" value={pi.payment_terms_name ?? undefined} />
           <LabelValue label="Port of Loading" value={pi.port_of_loading_name ?? undefined} />
           <LabelValue label="Port of Discharge" value={pi.port_of_discharge_name ?? undefined} />
+          <LabelValue label="Place of Receipt" value={pi.place_of_receipt_name ?? undefined} />
+          <LabelValue label="Place of Receipt by Pre-Carrier" value={pi.place_of_receipt_by_pre_carrier_name ?? undefined} />
         </div>
         {pi.other_references && (
           <div style={{ marginTop: 16 }}>

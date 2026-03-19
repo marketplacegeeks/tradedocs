@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal, Drawer, Input } from "antd";
-import { ArrowLeft, Edit2, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit2, Clock, Trash2, FileDown } from "lucide-react";
 
 import {
   getPackingList,
@@ -15,6 +15,7 @@ import {
   getPlAuditLog,
   getCommercialInvoice,
   updateCILineItem,
+  downloadPackingListPDF,
 } from "../../api/packingLists";
 import type { PackingList, CILineItem } from "../../api/packingLists";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
@@ -478,6 +479,9 @@ export default function PackingListDetailPage() {
   const isAdmin = user?.role === ROLES.COMPANY_ADMIN;
   const canEdit = isEditable && (isCreator || isAdmin);
   const canDelete = isDraft && (isCreator || isAdmin);
+  // FR-14M.13: Maker/Checker can download only when Approved; Admin can download any state.
+  const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;
+  const canDownloadPDF = isApproved || isAdmin;
 
   return (
     <div style={{ padding: 32, background: "var(--bg-base)", minHeight: "100vh" }}>
@@ -526,6 +530,19 @@ export default function PackingListDetailPage() {
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-pink)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-pink-text)" }}
             >
               <Trash2 size={14} /> Delete
+            </button>
+          )}
+
+          {canDownloadPDF && (
+            <button
+              onClick={() =>
+                downloadPackingListPDF(pl.id, `${pl.pl_number}.pdf`).catch(() =>
+                  message.error("Could not download PDF.")
+                )
+              }
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "#fff" }}
+            >
+              <FileDown size={14} /> Download PDF
             </button>
           )}
 
