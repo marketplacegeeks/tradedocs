@@ -10,6 +10,8 @@ urlpatterns = [
     path("api/v1/users/", include(user_urlpatterns)),
     path("api/v1/master-data/", include("apps.master_data.urls")),
     path("api/v1/proforma-invoices/", include("apps.proforma_invoice.urls")),
+    path("api/v1/", include("apps.packing_list.urls")),
+    path("api/v1/", include("apps.commercial_invoice.urls")),
 ]
 
 # Serve uploaded files in development (Django handles this; in production use nginx/CDN).

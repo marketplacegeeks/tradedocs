@@ -16,6 +16,11 @@ import ProformaInvoiceCreatePage from "./pages/proforma-invoice/ProformaInvoiceC
 import ProformaInvoiceDetailPage from "./pages/proforma-invoice/ProformaInvoiceDetailPage";
 import ProformaInvoiceEditPage from "./pages/proforma-invoice/ProformaInvoiceEditPage";
 
+import PackingListListPage from "./pages/packing-list/PackingListListPage";
+import PackingListCreatePage from "./pages/packing-list/PackingListCreatePage";
+import PackingListDetailPage from "./pages/packing-list/PackingListDetailPage";
+import PackingListEditPage from "./pages/packing-list/PackingListEditPage";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import { ROLES } from "./utils/constants";
@@ -127,6 +132,26 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
               <ProformaInvoiceEditPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Packing List — all roles can read; Maker/Admin can create/edit */}
+        <Route path="/packing-lists" element={<PackingListListPage />} />
+        <Route
+          path="/packing-lists/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+              <PackingListCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/packing-lists/:id" element={<PackingListDetailPage />} />
+        <Route
+          path="/packing-lists/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+              <PackingListEditPage />
             </ProtectedRoute>
           }
         />

@@ -75,8 +75,8 @@ function getAllowedActions(status: string, role: string, docType: string): Actio
     });
   }
 
-  // Permanently Reject is available for Checker/Admin from any non-terminal state
-  const terminalStates = [DOCUMENT_STATUS.APPROVED, DOCUMENT_STATUS.PERMANENTLY_REJECTED, DOCUMENT_STATUS.DISABLED];
+  // FR-08.1: Permanently Reject is available from ANY state except Permanently Rejected.
+  const terminalStates = [DOCUMENT_STATUS.PERMANENTLY_REJECTED];
   if (!terminalStates.includes(status as DocumentStatus) && isCheckerOrAdmin) {
     actions.push({
       key: "PERMANENTLY_REJECT",
@@ -85,18 +85,6 @@ function getAllowedActions(status: string, role: string, docType: string): Actio
       variant: "danger",
       needsComment: true,
       commentLabel: "Reason for permanent rejection (required)",
-    });
-  }
-
-  // DISABLE — CommercialInvoice only, from APPROVED
-  if (docType === "commercial_invoice" && status === DOCUMENT_STATUS.APPROVED && isCheckerOrAdmin) {
-    actions.push({
-      key: "DISABLE",
-      label: "Disable",
-      icon: <XCircle size={14} strokeWidth={1.5} />,
-      variant: "danger",
-      needsComment: true,
-      commentLabel: "Reason for disabling (required)",
     });
   }
 
