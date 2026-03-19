@@ -114,6 +114,16 @@ class PackingListSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     signed_copy_url = serializers.SerializerMethodField()
 
+    # Display names for shipping / geography FK fields (avoids raw IDs on the detail page)
+    pre_carriage_by_name = serializers.SerializerMethodField()
+    place_of_receipt_name = serializers.SerializerMethodField()
+    place_of_receipt_by_pre_carrier_name = serializers.SerializerMethodField()
+    port_of_loading_name = serializers.SerializerMethodField()
+    port_of_discharge_name = serializers.SerializerMethodField()
+    final_destination_name = serializers.SerializerMethodField()
+    country_of_origin_name = serializers.SerializerMethodField()
+    country_of_final_destination_name = serializers.SerializerMethodField()
+
     class Meta:
         model = PackingList
         fields = [
@@ -144,6 +154,15 @@ class PackingListSerializer(serializers.ModelSerializer):
             "ci_id", "ci_number", "ci_status", "ci_date",
             "bank_id", "bank_display",
             "fob_rate", "freight", "insurance", "lc_details",
+            # Shipping display names
+            "pre_carriage_by_name",
+            "place_of_receipt_name",
+            "place_of_receipt_by_pre_carrier_name",
+            "port_of_loading_name",
+            "port_of_discharge_name",
+            "final_destination_name",
+            "country_of_origin_name",
+            "country_of_final_destination_name",
             # Meta
             "created_by", "created_by_name",
             "created_at", "updated_at",
@@ -241,6 +260,32 @@ class PackingListSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.signed_copy.url)
         return obj.signed_copy.url
+
+    # --- Shipping / geography display names ----------------------------------
+
+    def get_pre_carriage_by_name(self, obj):
+        return obj.pre_carriage_by.name if obj.pre_carriage_by_id else None
+
+    def get_place_of_receipt_name(self, obj):
+        return obj.place_of_receipt.name if obj.place_of_receipt_id else None
+
+    def get_place_of_receipt_by_pre_carrier_name(self, obj):
+        return obj.place_of_receipt_by_pre_carrier.name if obj.place_of_receipt_by_pre_carrier_id else None
+
+    def get_port_of_loading_name(self, obj):
+        return obj.port_of_loading.name if obj.port_of_loading_id else None
+
+    def get_port_of_discharge_name(self, obj):
+        return obj.port_of_discharge.name if obj.port_of_discharge_id else None
+
+    def get_final_destination_name(self, obj):
+        return obj.final_destination.name if obj.final_destination_id else None
+
+    def get_country_of_origin_name(self, obj):
+        return obj.country_of_origin.name if obj.country_of_origin_id else None
+
+    def get_country_of_final_destination_name(self, obj):
+        return obj.country_of_final_destination.name if obj.country_of_final_destination_id else None
 
 
 class PackingListWriteSerializer(serializers.ModelSerializer):

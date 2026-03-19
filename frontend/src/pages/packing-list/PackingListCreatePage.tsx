@@ -24,9 +24,10 @@ import {
 import type { PackingList, Container, ContainerItem } from "../../api/packingLists";
 import { listOrganisations } from "../../api/organisations";
 import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy } from "../../api/referenceData";
+import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { listProformaInvoices } from "../../api/proformaInvoices";
-import { DOCUMENT_STATUS } from "../../utils/constants";
+import { DOCUMENT_STATUS, INCOTERM_PL_FIELDS } from "../../utils/constants";
 
 // ---- Styles -----------------------------------------------------------------
 
@@ -492,6 +493,7 @@ function Step3({
   const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: listPorts });
   const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
   const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
+  const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
 
   async function handleSave() {
     setSaving(true);
@@ -563,6 +565,20 @@ function Step3({
           <Select allowClear showSearch style={{ width: "100%" }} value={form.final_destination}
             onChange={(v) => setForm({ ...form, final_destination: v })}
             options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+        </div>
+        <div>
+          <label style={LABEL}>Country of Origin of Goods</label>
+          <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_origin}
+            onChange={(v) => setForm({ ...form, country_of_origin: v })}
+            options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+        </div>
+        <div>
+          <label style={LABEL}>Country of Final Destination</label>
+          <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_final_destination}
+            onChange={(v) => setForm({ ...form, country_of_final_destination: v })}
+            options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
             filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
         </div>
       </div>
@@ -865,6 +881,25 @@ function Step5({
     payment_terms: String(pl.payment_terms ?? ""),
   });
 
+  // Derive which cost fields are visible based on the selected Incoterm code (FR-14M.8B).
+  const selectedIncotermCode = incoterms.find((t: any) => t.id === Number(financials.incoterms))?.code ?? null;
+  const visibleCostFields: Set<string> = selectedIncotermCode
+    ? (INCOTERM_PL_FIELDS[selectedIncotermCode] ?? new Set(["fob_rate", "freight", "insurance"]))
+    : new Set(["fob_rate", "freight", "insurance"]); // show all when no incoterm selected
+
+  // When the incoterm changes, clear now-hidden fields from local state.
+  function handleIncotermChange(incotermId: number | undefined) {
+    const code = incoterms.find((t: any) => t.id === incotermId)?.code ?? null;
+    const newVisible = code ? (INCOTERM_PL_FIELDS[code] ?? new Set(["fob_rate", "freight", "insurance"])) : new Set(["fob_rate", "freight", "insurance"]);
+    setFinancials((prev) => ({
+      ...prev,
+      incoterms: incotermId ? String(incotermId) : "",
+      fob_rate: newVisible.has("fob_rate") ? prev.fob_rate : "",
+      freight: newVisible.has("freight") ? prev.freight : "",
+      insurance: newVisible.has("insurance") ? prev.insurance : "",
+    }));
+  }
+
   async function handleSave() {
     if (!ci) return;
     setSaving(true);
@@ -945,7 +980,7 @@ function Step5({
         <div>
           <label style={LABEL}>Incoterms</label>
           <Select allowClear style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
-            onChange={(v) => setFinancials({ ...financials, incoterms: v ? String(v) : "" })}
+            onChange={(v) => handleIncotermChange(v)}
             options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
         </div>
         <div>
@@ -958,16 +993,24 @@ function Step5({
 
       <p style={{ ...SECTION_TITLE, marginTop: 24 }}>Break-up in USD</p>
       <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
-        {[
-          ["fob_rate", "FOB Rate (USD)"],
-          ["freight", "Freight (USD)"],
-          ["insurance", "Insurance (USD)"],
-        ].map(([field, label]) => (
-          <div key={field}>
-            <label style={LABEL}>{label}</label>
-            <input type="number" style={INPUT} value={financials[field] || ""} onChange={(e) => setFinancials({ ...financials, [field]: e.target.value })} />
+        {visibleCostFields.has("fob_rate") && (
+          <div>
+            <label style={LABEL}>FOB Rate (USD per UOM)</label>
+            <input type="number" style={INPUT} value={financials.fob_rate || ""} onChange={(e) => setFinancials({ ...financials, fob_rate: e.target.value })} />
           </div>
-        ))}
+        )}
+        {visibleCostFields.has("freight") && (
+          <div>
+            <label style={LABEL}>Freight (USD)</label>
+            <input type="number" style={INPUT} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} />
+          </div>
+        )}
+        {visibleCostFields.has("insurance") && (
+          <div>
+            <label style={LABEL}>Insurance (USD)</label>
+            <input type="number" style={INPUT} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} />
+          </div>
+        )}
       </div>
       <div>
         <label style={LABEL}>L/C Details</label>

@@ -25,9 +25,10 @@ import {
 import type { PackingList } from "../../api/packingLists";
 import { listOrganisations } from "../../api/organisations";
 import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy } from "../../api/referenceData";
+import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { useAuth } from "../../store/AuthContext";
-import { DOCUMENT_STATUS, ROLES } from "../../utils/constants";
+import { DOCUMENT_STATUS, INCOTERM_PL_FIELDS, ROLES } from "../../utils/constants";
 
 // ---- Styles (reuse the same tokens as Create page) --------------------------
 
@@ -141,6 +142,7 @@ export default function PackingListEditPage() {
   const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: listPorts });
   const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
   const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
+  const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
 
   const { data: ci } = useQuery({
@@ -175,6 +177,7 @@ export default function PackingListEditPage() {
       so_number: pl.so_number,
       so_date: pl.so_date,
       other_references: pl.other_references,
+      other_references_date: pl.other_references_date,
       additional_description: pl.additional_description,
       pre_carriage_by: pl.pre_carriage_by,
       place_of_receipt: pl.place_of_receipt,
@@ -187,6 +190,8 @@ export default function PackingListEditPage() {
       country_of_final_destination: pl.country_of_final_destination,
       incoterms: pl.incoterms,
       payment_terms: pl.payment_terms,
+      // Incoterm-driven cost fields — clear hidden ones on save via handleSaveAll
+
       fob_rate: pl.fob_rate || "",
       freight: pl.freight || "",
       insurance: pl.insurance || "",
@@ -198,7 +203,14 @@ export default function PackingListEditPage() {
     if (!pl) return;
     setSaving(true);
     try {
-      // Save all header + shipping + financial fields in one PATCH
+      // Determine which cost fields are visible based on selected incoterm.
+      const selectedCode = incoterms.find((t: any) => t.id === headerForm.incoterms)?.code ?? null;
+      const visibleCost: Set<string> = selectedCode
+        ? (INCOTERM_PL_FIELDS[selectedCode] ?? new Set(["fob_rate", "freight", "insurance"]))
+        : new Set(["fob_rate", "freight", "insurance"]);
+
+      // Save all header + shipping + financial fields in one PATCH.
+      // Hidden cost fields are sent as null (FR-14M.8B — "cleared").
       await updatePackingList(pl.id, {
         exporter: headerForm.exporter,
         consignee: headerForm.consignee,
@@ -216,6 +228,7 @@ export default function PackingListEditPage() {
         so_number: headerForm.so_number || "",
         so_date: headerForm.so_date || null,
         other_references: headerForm.other_references || "",
+        other_references_date: headerForm.other_references_date || null,
         additional_description: headerForm.additional_description || "",
         pre_carriage_by: headerForm.pre_carriage_by || null,
         place_of_receipt: headerForm.place_of_receipt || null,
@@ -228,9 +241,9 @@ export default function PackingListEditPage() {
         country_of_final_destination: headerForm.country_of_final_destination || null,
         incoterms: headerForm.incoterms || null,
         payment_terms: headerForm.payment_terms || null,
-        fob_rate: headerForm.fob_rate || null,
-        freight: headerForm.freight || null,
-        insurance: headerForm.insurance || null,
+        fob_rate: visibleCost.has("fob_rate") ? (headerForm.fob_rate || null) : null,
+        freight: visibleCost.has("freight") ? (headerForm.freight || null) : null,
+        insurance: visibleCost.has("insurance") ? (headerForm.insurance || null) : null,
         lc_details: headerForm.lc_details || "",
       });
 
@@ -346,10 +359,92 @@ export default function PackingListEditPage() {
         </div>
       </div>
 
+      {/* Order References */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Order References (all optional)</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={LABEL}>PO Number</label>
+            <input style={INPUT} value={headerForm.po_number || ""} onChange={(e) => setHeaderForm({ ...headerForm, po_number: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>PO Date</label>
+            <DatePicker style={{ width: "100%" }} value={headerForm.po_date ? dayjs(headerForm.po_date) : null}
+              onChange={(d) => setHeaderForm({ ...headerForm, po_date: d?.format("YYYY-MM-DD") ?? null })} />
+          </div>
+          <div />
+          <div>
+            <label style={LABEL}>LC Number</label>
+            <input style={INPUT} value={headerForm.lc_number || ""} onChange={(e) => setHeaderForm({ ...headerForm, lc_number: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>LC Date</label>
+            <DatePicker style={{ width: "100%" }} value={headerForm.lc_date ? dayjs(headerForm.lc_date) : null}
+              onChange={(d) => setHeaderForm({ ...headerForm, lc_date: d?.format("YYYY-MM-DD") ?? null })} />
+          </div>
+          <div />
+          <div>
+            <label style={LABEL}>BL Number</label>
+            <input style={INPUT} value={headerForm.bl_number || ""} onChange={(e) => setHeaderForm({ ...headerForm, bl_number: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>BL Date</label>
+            <DatePicker style={{ width: "100%" }} value={headerForm.bl_date ? dayjs(headerForm.bl_date) : null}
+              onChange={(d) => setHeaderForm({ ...headerForm, bl_date: d?.format("YYYY-MM-DD") ?? null })} />
+          </div>
+          <div />
+          <div>
+            <label style={LABEL}>SO Number</label>
+            <input style={INPUT} value={headerForm.so_number || ""} onChange={(e) => setHeaderForm({ ...headerForm, so_number: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>SO Date</label>
+            <DatePicker style={{ width: "100%" }} value={headerForm.so_date ? dayjs(headerForm.so_date) : null}
+              onChange={(d) => setHeaderForm({ ...headerForm, so_date: d?.format("YYYY-MM-DD") ?? null })} />
+          </div>
+          <div />
+          <div>
+            <label style={LABEL}>Other References</label>
+            <input style={INPUT} value={headerForm.other_references || ""} onChange={(e) => setHeaderForm({ ...headerForm, other_references: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>Other References Date</label>
+            <DatePicker style={{ width: "100%" }} value={headerForm.other_references_date ? dayjs(headerForm.other_references_date) : null}
+              onChange={(d) => setHeaderForm({ ...headerForm, other_references_date: d?.format("YYYY-MM-DD") ?? null })} />
+          </div>
+          <div />
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <label style={LABEL}>Additional Description</label>
+          <textarea style={{ ...INPUT, minHeight: 72, resize: "vertical" }} value={headerForm.additional_description || ""}
+            onChange={(e) => setHeaderForm({ ...headerForm, additional_description: e.target.value })} />
+        </div>
+      </div>
+
       {/* Shipping & Logistics */}
       <div style={CARD}>
         <p style={SECTION_TITLE}>Shipping & Logistics</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={LABEL}>Pre-Carriage By</label>
+            <Select allowClear style={{ width: "100%" }} value={headerForm.pre_carriage_by}
+              onChange={(v) => setHeaderForm({ ...headerForm, pre_carriage_by: v })}
+              options={preCarriage.map((p: any) => ({ value: p.id, label: p.name }))} />
+          </div>
+          <div>
+            <label style={LABEL}>Place of Receipt</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.place_of_receipt}
+              onChange={(v) => setHeaderForm({ ...headerForm, place_of_receipt: v })}
+              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Place of Receipt by Pre-Carrier</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.place_of_receipt_by_pre_carrier}
+              onChange={(v) => setHeaderForm({ ...headerForm, place_of_receipt_by_pre_carrier: v })}
+              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
           <div>
             <label style={LABEL}>Vessel / Flight No</label>
             <input style={INPUT} value={headerForm.vessel_flight_no || ""} onChange={(e) => setHeaderForm({ ...headerForm, vessel_flight_no: e.target.value })} />
@@ -378,14 +473,35 @@ export default function PackingListEditPage() {
           <div>
             <label style={LABEL}>Incoterms</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.incoterms}
-              onChange={(v) => setHeaderForm({ ...headerForm, incoterms: v })}
+              onChange={(v) => setHeaderForm({ ...headerForm, incoterms: v ?? null })}
               options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
           </div>
           <div>
             <label style={LABEL}>Payment Terms</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.payment_terms}
-              onChange={(v) => setHeaderForm({ ...headerForm, payment_terms: v })}
+              onChange={(v) => setHeaderForm({ ...headerForm, payment_terms: v ?? null })}
               options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
+          </div>
+        </div>
+      </div>
+
+      {/* Countries */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Countries</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={LABEL}>Country of Origin of Goods</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.country_of_origin}
+              onChange={(v) => setHeaderForm({ ...headerForm, country_of_origin: v ?? null })}
+              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+          </div>
+          <div>
+            <label style={LABEL}>Country of Final Destination</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.country_of_final_destination}
+              onChange={(v) => setHeaderForm({ ...headerForm, country_of_final_destination: v ?? null })}
+              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
           </div>
         </div>
       </div>
@@ -503,15 +619,38 @@ export default function PackingListEditPage() {
               })}
             </tbody>
           </table>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-            {[["fob_rate", "FOB Rate (USD)"], ["freight", "Freight (USD)"], ["insurance", "Insurance (USD)"]].map(([field, label]) => (
-              <div key={field}>
-                <label style={LABEL}>{label}</label>
-                <input type="number" style={INPUT} value={headerForm[field] || ""}
-                  onChange={(e) => setHeaderForm({ ...headerForm, [field]: e.target.value })} />
+          {(() => {
+            // Derive visible cost fields from the currently selected Incoterm.
+            const code = incoterms.find((t: any) => t.id === headerForm.incoterms)?.code ?? null;
+            const visible: Set<string> = code
+              ? (INCOTERM_PL_FIELDS[code] ?? new Set(["fob_rate", "freight", "insurance"]))
+              : new Set(["fob_rate", "freight", "insurance"]);
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                {visible.has("fob_rate") && (
+                  <div>
+                    <label style={LABEL}>FOB Rate (USD per UOM)</label>
+                    <input type="number" style={INPUT} value={headerForm.fob_rate || ""}
+                      onChange={(e) => setHeaderForm({ ...headerForm, fob_rate: e.target.value })} />
+                  </div>
+                )}
+                {visible.has("freight") && (
+                  <div>
+                    <label style={LABEL}>Freight (USD)</label>
+                    <input type="number" style={INPUT} value={headerForm.freight || ""}
+                      onChange={(e) => setHeaderForm({ ...headerForm, freight: e.target.value })} />
+                  </div>
+                )}
+                {visible.has("insurance") && (
+                  <div>
+                    <label style={LABEL}>Insurance (USD)</label>
+                    <input type="number" style={INPUT} value={headerForm.insurance || ""}
+                      onChange={(e) => setHeaderForm({ ...headerForm, insurance: e.target.value })} />
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })()}
           <div style={{ marginTop: 12 }}>
             <label style={LABEL}>L/C Details</label>
             <textarea style={{ ...INPUT, minHeight: 80, resize: "vertical" }} value={headerForm.lc_details || ""}

@@ -163,12 +163,15 @@ function HeaderTab({ pl }: { pl: PackingList }) {
       <div style={CARD}>
         <p style={SECTION_TITLE}>Shipping & Logistics</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          <Field label="Pre-Carriage By" value={pl.pre_carriage_by_name} />
+          <Field label="Place of Receipt" value={pl.place_of_receipt_name} />
+          <Field label="Place of Receipt by Pre-Carrier" value={pl.place_of_receipt_by_pre_carrier_name} />
           <Field label="Vessel / Flight No" value={pl.vessel_flight_no} />
-          <Field label="Port of Loading" value={String(pl.port_of_loading ?? "—")} />
-          <Field label="Port of Discharge" value={String(pl.port_of_discharge ?? "—")} />
-          <Field label="Final Destination" value={String(pl.final_destination ?? "—")} />
-          <Field label="Country of Origin" value={String(pl.country_of_origin ?? "—")} />
-          <Field label="Country of Final Destination" value={String(pl.country_of_final_destination ?? "—")} />
+          <Field label="Port of Loading" value={pl.port_of_loading_name} />
+          <Field label="Port of Discharge" value={pl.port_of_discharge_name} />
+          <Field label="Final Destination" value={pl.final_destination_name} />
+          <Field label="Country of Origin" value={pl.country_of_origin_name} />
+          <Field label="Country of Final Destination" value={pl.country_of_final_destination_name} />
           <Field label="Incoterms" value={pl.incoterms_display} />
           <Field label="Payment Terms" value={pl.payment_terms_display} />
         </div>

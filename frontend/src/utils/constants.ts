@@ -90,6 +90,22 @@ export const INCOTERM_SELLER_FIELDS: Record<string, Set<string>> = {
   DDP: new Set(["freight", "insurance_amount", "import_duty", "destination_charges"]),
 };
 
+// Maps incoterm code → which of the PL/CI cost fields the seller must fill in.
+// Used by the PL creation wizard (Step 5) and Edit page to show/hide FOB Rate, Freight, Insurance.
+// FR-14M.8B: L/C Details is always shown and is NOT in these sets.
+export const INCOTERM_PL_FIELDS: Record<string, Set<string>> = {
+  EXW: new Set(),
+  FCA: new Set(["fob_rate"]),
+  FOB: new Set(["fob_rate"]),
+  CFR: new Set(["fob_rate", "freight"]),
+  CIF: new Set(["fob_rate", "freight", "insurance"]),
+  CPT: new Set(["fob_rate", "freight"]),
+  CIP: new Set(["fob_rate", "freight", "insurance"]),
+  DAP: new Set(["fob_rate", "freight", "insurance"]),
+  DPU: new Set(["fob_rate", "freight", "insurance"]),
+  DDP: new Set(["fob_rate", "freight", "insurance"]),
+};
+
 // Human-readable labels for PI cost breakdown fields
 export const COST_FIELD_LABELS: Record<string, string> = {
   freight: "Freight",
