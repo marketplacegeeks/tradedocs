@@ -42,6 +42,7 @@ const bankSchema = z
       })
       .default(""),
     routing_number: z.string().optional().default(""),
+    ad_code: z.string().optional().default(""),
     // Intermediary institution — optional, but all-or-nothing
     intermediary_bank_name: z.string().optional().default(""),
     intermediary_account_number: z.string().optional().default(""),
@@ -204,7 +205,7 @@ export default function BankFormPage() {
       organisation: undefined,
       nickname: "", beneficiary_name: "", bank_name: "",
       branch_name: "", branch_address: "", account_number: "",
-      account_type: undefined, swift_code: "", iban: "", routing_number: "",
+      account_type: undefined, swift_code: "", iban: "", routing_number: "", ad_code: "",
       intermediary_bank_name: "", intermediary_account_number: "",
       intermediary_swift_code: "", intermediary_currency: null,
     },
@@ -238,6 +239,7 @@ export default function BankFormPage() {
         swift_code: existingBank.swift_code,
         iban: existingBank.iban,
         routing_number: existingBank.routing_number,
+        ad_code: existingBank.ad_code,
         intermediary_bank_name: existingBank.intermediary_bank_name,
         intermediary_account_number: existingBank.intermediary_account_number,
         intermediary_swift_code: existingBank.intermediary_swift_code,
@@ -387,6 +389,13 @@ export default function BankFormPage() {
               } />
             </Field>
           </Row3>
+          <Row2>
+            <Field label="AD Code" error={errors.ad_code?.message} hint="Optional. Authorised Dealer Code issued by the bank for customs/DGFT use.">
+              <Controller name="ad_code" control={control} render={({ field }) =>
+                <input {...field} style={inputStyle(!!errors.ad_code)} placeholder="e.g. 12345678901234" />
+              } />
+            </Field>
+          </Row2>
         </Section>
 
         <Section

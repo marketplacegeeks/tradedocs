@@ -416,9 +416,25 @@ def generate_pi_pdf(pi) -> io.BytesIO:
 
     # 9. Banking details -------------------------------------------------------
     if pi.bank:
-        story.append(section_label('Beneficiary Bank Details'))
-        story.append(Spacer(1, 2 * mm))
-        story.append(build_banking_box(pi.bank))
+        bank = pi.bank
+        bank_lines = [
+            f"<b>BENEFICIARY NAME:</b> {bank.beneficiary_name}",
+            f"<b>BANK NAME:</b> {bank.bank_name}",
+            f"<b>BRANCH NAME:</b> {bank.branch_name}",
+            f"<b>BRANCH ADDRESS:</b> {bank.branch_address or '—'}",
+            f"<b>A/C NO.:</b> {bank.account_number}",
+        ]
+        if bank.routing_number:
+            bank_lines.append(f"<b>IFSC CODE:</b> {bank.routing_number}")
+        bank_lines.append(f"<b>SWIFT CODE:</b> {bank.swift_code or '—'}")
+        if bank.intermediary_bank_name:
+            bank_lines.extend([
+                f"<b>Intermediary Institution Routing for Currency</b> {bank.intermediary_currency.code if bank.intermediary_currency else ''}",
+                f"<b>A/C No.:</b> {bank.intermediary_account_number or '—'}",
+                bank.intermediary_bank_name,
+                f"<b>SWIFT Code:</b> {bank.intermediary_swift_code or '—'}",
+            ])
+        story.append(_p("<br/>".join(bank_lines), STYLE_NORMAL))
         story.append(Spacer(1, 3 * mm))
 
     # 10. Terms & Conditions (new page) ----------------------------------------

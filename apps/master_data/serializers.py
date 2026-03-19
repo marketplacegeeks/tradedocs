@@ -85,7 +85,7 @@ class BankSerializer(serializers.ModelSerializer):
             "branch_name", "branch_address",
             "account_number", "account_type",
             "currency", "currency_code", "currency_name",
-            "swift_code", "iban", "routing_number",
+            "swift_code", "iban", "routing_number", "ad_code",
             "intermediary_bank_name", "intermediary_account_number",
             "intermediary_swift_code",
             "intermediary_currency", "intermediary_currency_code",

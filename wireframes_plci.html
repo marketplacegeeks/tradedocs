@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PL+CI Wireframes — Combined Packing List + Commercial Invoice</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: monospace; background: #f0f0f0; margin: 0; padding: 20px; color: #222; }
+
+    h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { font-size: 14px; color: #555; margin: 0 0 6px; font-weight: normal; }
+
+    /* ---- Screen container ---- */
+    .screen { background: white; border: 2px solid #444; margin: 48px 0; width: 960px; }
+    .screen-label { background: #333; color: white; padding: 8px 14px; font-size: 13px; font-weight: bold; letter-spacing: 0.5px; }
+    .screen-meta { background: #eee; border-bottom: 1px solid #ccc; padding: 10px 14px; font-size: 11px; line-height: 1.7; }
+    .screen-meta strong { font-size: 11px; }
+    .screen-body { padding: 14px; }
+
+    /* ---- App shell ---- */
+    .app-shell { display: flex; min-height: 480px; border: 1px solid #bbb; }
+    .sidebar { width: 170px; background: #ddd; border-right: 1px solid #bbb; padding: 10px; flex-shrink: 0; }
+    .sidebar-logo { background: #aaa; height: 32px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .nav-item { padding: 6px 8px; font-size: 11px; border-bottom: 1px solid #bbb; }
+    .nav-item.active { background: #bbb; font-weight: bold; }
+    .nav-group { font-size: 10px; text-transform: uppercase; color: #666; padding: 8px 8px 2px; margin-top: 6px; }
+    .main-area { flex: 1; padding: 14px; }
+
+    /* ---- Top bar ---- */
+    .top-bar { background: #ccc; border-bottom: 1px solid #bbb; padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+
+    /* ---- Page header ---- */
+    .page-title { font-size: 17px; font-weight: bold; margin-bottom: 4px; }
+    .breadcrumb { font-size: 10px; color: #888; margin-bottom: 12px; }
+    .page-actions { display: flex; gap: 6px; margin-bottom: 14px; }
+
+    /* ---- Wizard steps ---- */
+    .wizard-bar { display: flex; gap: 0; margin-bottom: 18px; border: 1px solid #bbb; }
+    .wstep { flex: 1; padding: 8px 6px; font-size: 10px; text-align: center; border-right: 1px solid #bbb; background: #eee; }
+    .wstep:last-child { border-right: none; }
+    .wstep.done { background: #ccc; }
+    .wstep.active { background: #888; color: white; font-weight: bold; }
+
+    /* ---- Buttons ---- */
+    .btn { border: 1px solid #555; background: #ddd; padding: 5px 12px; font-size: 11px; margin: 3px; display: inline-block; cursor: pointer; }
+    .btn-primary { background: #555; color: white; border-color: #333; }
+    .btn-danger { background: #888; color: white; border-color: #555; }
+    .btn-sm { padding: 3px 8px; font-size: 10px; }
+    .btn-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    /* ---- Form elements ---- */
+    .form-group { margin-bottom: 10px; }
+    .form-label { font-size: 10px; font-weight: bold; margin-bottom: 3px; display: block; }
+    .form-label .req { color: #666; font-weight: normal; }
+    .input-box { border: 1px solid #999; background: #f9f9f9; padding: 5px 8px; font-size: 11px; width: 100%; font-family: monospace; }
+    .input-box.readonly { background: #e8e8e8; color: #666; }
+    .select-box { border: 1px solid #999; background: #f9f9f9; padding: 5px 8px; font-size: 11px; width: 100%; font-family: monospace; }
+    .textarea-box { border: 1px solid #999; background: #f9f9f9; padding: 5px 8px; font-size: 11px; width: 100%; font-family: monospace; height: 52px; resize: none; }
+
+    /* ---- Grid helpers ---- */
+    .row { display: flex; gap: 10px; margin-bottom: 4px; }
+    .col { flex: 1; }
+    .col-2 { flex: 2; }
+    .col-3 { flex: 3; }
+
+    /* ---- Section title ---- */
+    .section-title { font-size: 12px; font-weight: bold; border-bottom: 1px solid #bbb; padding-bottom: 4px; margin: 14px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ---- Tables ---- */
+    table.wt { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 11px; }
+    table.wt th { background: #ccc; border: 1px solid #999; padding: 5px 6px; text-align: left; font-size: 10px; }
+    table.wt td { border: 1px solid #bbb; padding: 5px 6px; vertical-align: top; }
+    table.wt tr.subtotal td { background: #e8e8e8; font-weight: bold; }
+    table.wt tr.total-row td { background: #ccc; font-weight: bold; }
+
+    /* ---- Status badge ---- */
+    .badge { border: 1px solid #888; background: #e0e0e0; padding: 2px 8px; font-size: 10px; font-family: monospace; }
+
+    /* ---- Card / panel ---- */
+    .card { border: 1px solid #bbb; background: #fafafa; padding: 10px; margin-bottom: 10px; }
+    .card-header { font-size: 11px; font-weight: bold; background: #e8e8e8; margin: -10px -10px 10px; padding: 6px 10px; border-bottom: 1px solid #bbb; }
+
+    /* ---- Container block ---- */
+    .container-block { border: 1px solid #bbb; margin-bottom: 12px; }
+    .container-header { background: #ddd; padding: 6px 10px; font-size: 11px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+    .container-body { padding: 10px; }
+
+    /* ---- Modal ---- */
+    .modal-wrapper { background: #aaa; padding: 30px; }
+    .modal { background: white; border: 2px solid #444; width: 540px; margin: 0 auto; }
+    .modal-title { background: #ccc; padding: 10px 14px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #aaa; }
+    .modal-body { padding: 16px; }
+    .modal-footer { padding: 10px 14px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; gap: 6px; }
+
+    /* ---- Empty state ---- */
+    .empty-state { text-align: center; padding: 60px 20px; border: 2px dashed #bbb; margin: 20px 0; }
+    .empty-icon { width: 60px; height: 60px; background: #ddd; border: 1px solid #bbb; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .empty-text { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+    .empty-sub { font-size: 11px; color: #888; margin-bottom: 14px; }
+
+    /* ---- Divider ---- */
+    hr { border: none; border-top: 1px solid #ccc; margin: 14px 0; }
+
+    /* ---- Review summary ---- */
+    .summary-stat { border: 1px solid #bbb; padding: 8px 12px; font-size: 11px; background: #f5f5f5; }
+    .summary-stat .stat-label { font-size: 10px; color: #666; }
+    .summary-stat .stat-value { font-size: 14px; font-weight: bold; }
+
+    /* ---- Alert ---- */
+    .alert { border: 1px solid #bbb; background: #e8e8e8; padding: 8px 12px; font-size: 11px; margin-bottom: 10px; }
+
+    /* ---- Pagination ---- */
+    .pagination { font-size: 11px; display: flex; gap: 4px; align-items: center; }
+
+    /* ---- Annotation note ---- */
+    .note { font-size: 10px; color: #666; font-style: italic; margin-top: 3px; }
+
+    /* ---- TOC ---- */
+    .toc { background: white; border: 1px solid #bbb; padding: 14px 20px; margin-bottom: 30px; width: 960px; }
+    .toc h2 { font-size: 14px; font-weight: bold; color: #222; margin-bottom: 8px; }
+    .toc ol { margin: 0; padding-left: 20px; font-size: 12px; line-height: 2; }
+    .toc a { color: #444; }
+  </style>
+</head>
+<body>
+
+<h1>Low-Fidelity Wireframes — Combined Packing List + Commercial Invoice</h1>
+<p style="font-size:12px;color:#666;">FR-14M — modifiedrequirement.md v1.1 &nbsp;|&nbsp; 19 screens &nbsp;|&nbsp; Grey-box layout only — no colour, no icons</p>
+
+<!-- ===================== TABLE OF CONTENTS ===================== -->
+<div class="toc">
+  <h2>Screen Inventory</h2>
+  <ol>
+    <li><a href="#S01">PL+CI Document List</a></li>
+    <li><a href="#S02">Empty State (no documents)</a></li>
+    <li><a href="#S03">Create — Entry Point (select Consignee + PI)</a></li>
+    <li><a href="#S04">Create — Page 2: Header, Shipping, Terms, Countries &amp; Bank</a></li>
+    <li><a href="#S05">Create — Page 3: Order References &amp; Additional Info</a></li>
+    <li><a href="#S06">ℹ MERGED — Shipping content is now on Page 2 (S04)</a></li>
+    <li><a href="#S07">Create — Page 4: Containers &amp; Items</a></li>
+    <li><a href="#S08">ℹ REMOVED — Add / Edit Container is inline on S07</a></li>
+    <li><a href="#S09">ℹ REMOVED — Add / Edit Item is inline on S07</a></li>
+    <li><a href="#S10">Create — Page 5: Final Rates</a></li>
+    <li><a href="#S11">ℹ MERGED — Bank &amp; Payment content is now on Page 2 (S04)</a></li>
+    <li><a href="#S12">Summary / Review Page (post-first-save)</a></li>
+    <li><a href="#S13">Document Detail / View Page</a></li>
+    <li><a href="#S14">Modal — Submit for Approval Confirmation</a></li>
+    <li><a href="#S15">Modal — Approve Confirmation</a></li>
+    <li><a href="#S16">Modal — Reject → Rework (with mandatory comment)</a></li>
+    <li><a href="#S17">Modal — Permanently Reject (with mandatory comment)</a></li>
+    <li><a href="#S18">Modal — Delete (Deactivate) Confirmation</a></li>
+    <li><a href="#S19">Modal — Copy Container Confirmation</a></li>
+  </ol>
+</div>
+
+
+<!-- ===================== S01: LIST ===================== -->
+<div class="screen" id="S01">
+  <div class="screen-label">S01 — PL+CI Document List</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Shows all combined PL+CI documents with status, document numbers, and primary actions.<br/>
+    <strong>Key elements:</strong> Search/filter bar, status filter dropdown, documents table (PL No, CI No, PI No, Exporter, Date, Status), action buttons (View, Download PDF), Create New button, pagination.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-group">Documents</div>
+        <div class="nav-item">Proforma Invoice</div>
+        <div class="nav-item active">PL + CI</div>
+        <div class="nav-group">Master Data</div>
+        <div class="nav-item">Organisations</div>
+        <div class="nav-item">Banks</div>
+        <div class="nav-item">Reference Data</div>
+        <div class="nav-group">Admin</div>
+        <div class="nav-item">Users</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / Packing List &amp; Commercial Invoice</div>
+        <div class="page-title">Packing List + Commercial Invoice</div>
+        <div class="btn-row" style="justify-content:space-between;margin-bottom:12px;">
+          <div class="btn-row">
+            <input class="input-box" style="width:220px;" placeholder="Search PL No, CI No, PI No..." />
+            <select class="select-box" style="width:140px;"><option>All Statuses</option><option>Draft</option><option>Pending Approval</option><option>Approved</option><option>Rework</option></select>
+            <span class="btn">Filter</span>
+          </div>
+          <span class="btn btn-primary">+ Create PL + CI</span>
+        </div>
+
+        <table class="wt">
+          <thead>
+            <tr>
+              <th>PL Number</th><th>CI Number</th><th>Proforma Invoice</th><th>Exporter</th><th>PL Date</th><th>Status</th><th style="width:140px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PL-2026-0003</td><td>CI-2026-0003</td><td>PI-2026-0007</td><td>Org Name A</td><td>18 Mar 2026</td><td><span class="badge">APPROVED</span></td>
+              <td><span class="btn btn-sm">View</span><span class="btn btn-sm">PDF</span></td>
+            </tr>
+            <tr>
+              <td>PL-2026-0002</td><td>CI-2026-0002</td><td>PI-2026-0005</td><td>Org Name A</td><td>15 Mar 2026</td><td><span class="badge">PENDING APPROVAL</span></td>
+              <td><span class="btn btn-sm">View</span></td>
+            </tr>
+            <tr>
+              <td>PL-2026-0001</td><td>CI-2026-0001</td><td>PI-2026-0003</td><td>Org Name A</td><td>10 Mar 2026</td><td><span class="badge">REWORK</span></td>
+              <td><span class="btn btn-sm">Edit</span><span class="btn btn-sm">View</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="btn-row" style="justify-content:space-between;margin-top:8px;">
+          <span style="font-size:11px;">Showing 3 of 3 documents</span>
+          <div class="pagination"><span class="btn btn-sm">‹</span><span class="btn btn-sm active" style="background:#888;color:white;">1</span><span class="btn btn-sm">›</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S02: EMPTY STATE ===================== -->
+<div class="screen" id="S02">
+  <div class="screen-label">S02 — Empty State (No Documents Yet)</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Shown when the user lands on the PL+CI list and no documents exist yet.<br/>
+    <strong>Key elements:</strong> Placeholder icon box, descriptive text, single CTA button to create the first document.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-group">Documents</div>
+        <div class="nav-item">Proforma Invoice</div>
+        <div class="nav-item active">PL + CI</div>
+        <div class="nav-group">Master Data</div>
+        <div class="nav-item">Organisations</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / Packing List &amp; Commercial Invoice</div>
+        <div class="page-title">Packing List + Commercial Invoice</div>
+        <div class="empty-state">
+          <div class="empty-icon">[DOC]</div>
+          <div class="empty-text">No PL+CI documents yet</div>
+          <div class="empty-sub">Create your first combined Packing List and Commercial Invoice by selecting an Approved Proforma Invoice.</div>
+          <span class="btn btn-primary">+ Create PL + CI</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S03: ENTRY POINT ===================== -->
+<div class="screen" id="S03">
+  <div class="screen-label">S03 — Create: Entry Point (Select Consignee + Proforma Invoice)</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> First step of the creation flow — Maker selects the Consignee and then an Approved PI belonging to that Consignee. All downstream fields auto-populate from the PI (including Exporter).<br/>
+    <strong>Key elements:</strong> Consignee dropdown, PI dropdown (filtered to Approved PIs for selected Consignee; searchable; most recently approved PI shown first), PI summary preview card (read-only showing Exporter + key shipping fields), Continue button.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-group">Documents</div>
+        <div class="nav-item">Proforma Invoice</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / New</div>
+        <div class="page-title">Create Packing List + Commercial Invoice</div>
+        <div class="alert">Select a Consignee, then select an Approved Proforma Invoice. All matching fields will be auto-populated from the PI.</div>
+
+        <div style="max-width:720px;">
+          <div class="form-group">
+            <label class="form-label">Consignee <span class="req">*required</span></label>
+            <select class="select-box"><option>— Select Consignee —</option><option selected>Consignee Org B</option></select>
+            <div class="note">Organisations tagged as Consignee</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Proforma Invoice <span class="req">*required</span></label>
+            <select class="select-box"><option>— Select Proforma Invoice —</option><option selected>PI-2026-0007 (18 Mar 2026) ← most recent</option><option>PI-2026-0004 (02 Mar 2026)</option></select>
+            <div class="note">Shows only Approved PIs for the selected Consignee. Searchable. Most recently approved PI appears first.</div>
+          </div>
+
+          <div class="card" style="margin-top:14px;max-width:700px;">
+            <div class="card-header">PI Preview (read-only — auto-populated from selected PI)</div>
+            <div class="row" style="margin-bottom:10px;">
+              <div class="col">
+                <div class="form-label">Exporter</div>
+                <div style="font-size:11px;background:#e8e8e8;padding:5px 8px;border:1px solid #bbb;">Org Name A</div>
+              </div>
+              <div class="col">
+                <div class="form-label">Consignee</div>
+                <div style="font-size:11px;background:#e8e8e8;padding:5px 8px;border:1px solid #bbb;">Consignee Org B</div>
+              </div>
+            </div>
+            <div class="form-label" style="margin-bottom:4px;">Line Items (from original PI)</div>
+            <table class="wt">
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Description</th>
+                  <th>HSN</th>
+                  <th>No &amp; Kind of Pkgs</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="background:#e8e8e8;">ITEM-001</td>
+                  <td style="background:#e8e8e8;">Castor Oil BP Grade</td>
+                  <td style="background:#e8e8e8;">151550</td>
+                  <td style="background:#e8e8e8;">10 Drums</td>
+                  <td style="background:#e8e8e8;">200.000 MT</td>
+                </tr>
+                <tr>
+                  <td style="background:#e8e8e8;">ITEM-002</td>
+                  <td style="background:#e8e8e8;">Castor Oil USP Grade</td>
+                  <td style="background:#e8e8e8;">151550</td>
+                  <td style="background:#e8e8e8;">5 Drums</td>
+                  <td style="background:#e8e8e8;">100.000 MT</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="btn-row" style="margin-top:18px;">
+            <span class="btn">Cancel</span>
+            <span class="btn btn-primary">Continue →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S04: PAGE 2 - HEADER, SHIPPING, TERMS, COUNTRIES & BANK ===================== -->
+<div class="screen" id="S04">
+  <div class="screen-label">S04 — Create: Page 2 — Header, Shipping, Terms, Countries &amp; Bank</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Single scrollable page combining all PI-derived data fields and bank details. All sections auto-populated from the selected PI and remain editable. Bank is selected here (required for CI PDF).<br/>
+    <strong>Key elements:</strong> 4-step wizard bar; Document Numbers (read-only until save) + Dates; Parties (Exporter, Consignee, Buyer, Notify Party, Drawee); Shipping &amp; Logistics (7 fields); Payment &amp; Terms (Incoterms, Payment Terms); Countries (origin, destination); Bank dropdown + preview card + FOB/Freight/Insurance/L-C Details; Next / Back buttons.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / New / Page 2</div>
+        <div class="page-title">Create PL + CI — Header &amp; Details</div>
+        <div class="wizard-bar">
+          <div class="wstep done">Entry</div>
+          <div class="wstep active">1. Header &amp; Details</div>
+          <div class="wstep">2. References</div>
+          <div class="wstep">3. Containers</div>
+          <div class="wstep">4. Final Rates</div>
+        </div>
+        <div class="alert">All fields are auto-populated from the selected PI. Review and edit as needed.</div>
+
+        <!-- ── Document Numbers & Dates ── -->
+        <div class="section-title">Document Numbers &amp; Dates</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Packing List No</label>
+              <input class="input-box readonly" value="— generated on save —" readonly />
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Commercial Invoice No</label>
+              <input class="input-box readonly" value="— generated on save —" readonly />
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">PL Date</label>
+              <input class="input-box" value="18/03/2026" />
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">CI Date</label>
+              <input class="input-box" value="18/03/2026" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Parties ── -->
+        <div class="section-title">Parties</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Exporter <span class="req">*</span></label>
+              <select class="select-box"><option>Org Name A (auto-populated)</option></select>
+              <div class="note">Auto-populated from PI; editable. Organisations tagged as Exporter.</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Consignee <span class="req">*</span></label>
+              <select class="select-box"><option>Consignee Org B (auto-populated)</option></select>
+              <div class="note">Auto-populated from PI; editable. PDF label: "Advising Bank/Consignee" (PL) / "Advising Bank/Consignee1" (CI)</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Drawee</label>
+              <input class="input-box" placeholder="e.g. BIS-CMBCCNBS261" />
+              <div class="note">Printed below Consignee block on both PDFs</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Buyer (if different from Consignee)</label>
+              <select class="select-box"><option>— Optional —</option><option>Buyer Org C</option></select>
+              <div class="note">Auto-populated from PI if set; editable</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-2">
+            <div class="form-group">
+              <label class="form-label">Notify Party</label>
+              <select class="select-box"><option>— Optional —</option><option>Notify Party Org D</option></select>
+              <div class="note">PDF label: "Consignee2/Importer/Notify Party" on both docs</div>
+            </div>
+          </div>
+          <div class="col"></div>
+        </div>
+
+        <!-- ── Shipping & Logistics ── -->
+        <div class="section-title">Shipping &amp; Logistics</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Pre-Carriage By</label>
+              <select class="select-box"><option>By Road</option></select>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Place of Receipt</label>
+              <select class="select-box"><option>Ahmedabad, India</option></select>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Place of Receipt by Pre-Carrier</label>
+              <select class="select-box"><option>Mundra ICD</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Vessel / Flight No</label>
+              <input class="input-box" value="MV OCEAN STAR 201W" />
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Port of Loading</label>
+              <select class="select-box"><option>Mundra Port, India</option></select>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Port of Discharge</label>
+              <select class="select-box"><option>Shanghai Port, China</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Final Destination</label>
+              <select class="select-box"><option>Shanghai, China</option></select>
+            </div>
+          </div>
+          <div class="col"></div><div class="col"></div>
+        </div>
+
+        <!-- ── Countries ── -->
+        <div class="section-title">Countries</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Country of Origin of Goods</label>
+              <select class="select-box"><option>India</option></select>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Country of Final Destination</label>
+              <select class="select-box"><option>China</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Bank Details ── -->
+        <div class="section-title">Bank Details (for Commercial Invoice)</div>
+        <div class="row">
+          <div class="col-2">
+            <div class="form-group">
+              <label class="form-label">Bank <span class="req">*required</span></label>
+              <select class="select-box"><option>— Select Bank (Beneficiary Name – Bank Name) —</option><option selected>ABC Exports – State Bank of India, Mumbai</option></select>
+              <div class="note">Full bank details (branch, account, IFSC, SWIFT) print on the CI PDF</div>
+            </div>
+          </div>
+          <div class="col"></div>
+        </div>
+        <div class="card" style="max-width:500px;">
+          <div class="card-header">Bank Details Preview (read-only — from Bank master)</div>
+          <div style="font-size:11px;line-height:2.0;">
+            <div><strong>Beneficiary Name:</strong> ABC Exports Pvt Ltd</div>
+            <div><strong>Bank Name:</strong> State Bank of India</div>
+            <div><strong>Branch:</strong> Fort Branch, Mumbai</div>
+            <div><strong>Branch Address:</strong> 123 Main Street, Fort, Mumbai – 400001</div>
+            <div><strong>A/C No:</strong> 123456789012 &nbsp;&nbsp; <strong>IFSC:</strong> SBIN0000001 &nbsp;&nbsp; <strong>SWIFT:</strong> SBININBB</div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:8px;">Payment terms and financial break-up (FOB Rate, Freight, Insurance, L/C Details) are entered on Page 5 — Final Rates.</div>
+
+        <hr/>
+        <div class="btn-row" style="justify-content:space-between;">
+          <span class="btn">‹ Back</span>
+          <div class="btn-row">
+            <span class="btn">Save Draft</span>
+            <span class="btn btn-primary">Next: References ›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S05: PAGE 3 - ORDER REFERENCES + ADDITIONAL INFO ===================== -->
+<div class="screen" id="S05">
+  <div class="screen-label">S05 — Create: Page 3 — Order References</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Maker enters optional order reference numbers/dates and a document-level Additional Description.<br/>
+    <strong>Key elements:</strong> 4-step wizard bar, 5 reference pairs (PO, LC, BL, SO, Other References — each with Number + Date fields), Additional Description textarea, Next / Back / Save Draft buttons.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / New / Page 3</div>
+        <div class="page-title">Create PL + CI — Order References &amp; Additional Info</div>
+        <div class="wizard-bar">
+          <div class="wstep done">Entry</div>
+          <div class="wstep done">1. Header &amp; Details</div>
+          <div class="wstep active">2. References</div>
+          <div class="wstep">3. Containers</div>
+          <div class="wstep">4. Final Rates</div>
+        </div>
+
+        <div class="section-title">Order References (all optional)</div>
+        <div class="note" style="margin-bottom:10px;">Only populated references are printed on the PL and CI PDFs. "Other References" prints as "Other Reference(s):" on both PL and CI PDFs.</div>
+
+        <table class="wt">
+          <thead><tr><th style="width:30%;">Reference</th><th>Number / Value</th><th>Date</th></tr></thead>
+          <tbody>
+            <tr><td><strong>PO Number</strong></td><td><input class="input-box" placeholder="Purchase Order number" /></td><td><input class="input-box" placeholder="DD/MM/YYYY" /></td></tr>
+            <tr><td><strong>LC Number</strong></td><td><input class="input-box" placeholder="Letter of Credit number" /></td><td><input class="input-box" placeholder="DD/MM/YYYY" /></td></tr>
+            <tr><td><strong>BL Number</strong></td><td><input class="input-box" placeholder="Bill of Lading number" /></td><td><input class="input-box" placeholder="DD/MM/YYYY" /></td></tr>
+            <tr><td><strong>Sales Order (SO) Number</strong></td><td><input class="input-box" placeholder="Internal Sales Order number" /></td><td><input class="input-box" placeholder="DD/MM/YYYY" /></td></tr>
+            <tr><td><strong>Other References</strong><br/><span class="note">Prints as "Other Reference(s):" on both PL and CI PDFs</span></td><td><input class="input-box" placeholder="Any additional reference" /></td><td><input class="input-box" placeholder="DD/MM/YYYY" /></td></tr>
+          </tbody>
+        </table>
+
+        <div class="form-group">
+          <label class="form-label">Additional Description</label>
+          <textarea class="textarea-box" style="height:70px;" placeholder="Free-text block for product specifications, quality parameters, or supplementary information (e.g. purity, moisture, appearance specs). Printed in right info panel on both PL and CI PDFs."></textarea>
+        </div>
+
+        <hr/>
+        <div class="btn-row" style="justify-content:space-between;">
+          <span class="btn">‹ Back</span>
+          <div class="btn-row">
+            <span class="btn">Save Draft</span>
+            <span class="btn btn-primary">Next: Containers ›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S06: MERGED — SEE S04 ===================== -->
+<div class="screen" id="S06">
+  <div class="screen-label">S06 — MERGED INTO S04 (was: Shipping, Terms &amp; Countries)</div>
+  <div class="screen-meta">
+    <strong>Note:</strong> Shipping &amp; Logistics, Payment &amp; Terms, and Countries sections have been moved to <strong>Page 2 (S04 — Header &amp; Details)</strong>. They are no longer a separate wizard step. See S04 for the current wireframe.
+  </div>
+  <div class="screen-body">
+    <div class="empty-state" style="margin:20px;">
+      <div class="empty-icon">[ℹ]</div>
+      <div class="empty-text">This screen has been merged into S04</div>
+      <div class="empty-sub">Shipping, Terms &amp; Countries now appear as sections within Page 2 (Header &amp; Details). Refer to S04 for the wireframe.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S07: PAGE 4 - CONTAINERS & ITEMS ===================== -->
+<div class="screen" id="S07">
+  <div class="screen-label">S07 — Create: Page 4 — Containers &amp; Items</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Maker adds containers and items inline — no modals. Each container card has: dark field-header bars above input rows, an items table, and inline forms for add/edit.<br/>
+    <strong>Key elements:</strong> Info banner; Weight Unit selector; Container cards (numbered badge, field-header rows, items table, "+ Add Item"); inline edit row within items table; inline Add Item form below table; full-width "+ Add New Container" button; Next / Back buttons.<br/>
+    <strong>Three states shown:</strong> (A) Container 1 — saved, items present, one item in inline edit mode. (B) Container 2 — saved, no items yet, Add Item form expanded. (C) New container card appended above full-width Add button.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / New / Page 4</div>
+        <div class="page-title">Containers &amp; Items</div>
+        <div class="wizard-bar">
+          <div class="wstep done">Entry</div>
+          <div class="wstep done">1. Header &amp; Details</div>
+          <div class="wstep done">2. References</div>
+          <div class="wstep active">3. Containers</div>
+          <div class="wstep">4. Final Rates</div>
+        </div>
+
+        <!-- Info banner -->
+        <div style="border:1px solid #bbb;background:#f0f0f0;padding:10px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:center;">
+          <div style="font-size:20px;flex-shrink:0;">[&#x1F4E6;]</div>
+          <div>
+            <div style="font-size:11px;font-weight:bold;">Structure: Packing List &#x2192; Containers &#x2192; Items</div>
+            <div style="font-size:10px;color:#555;">One packing list contains multiple containers. Each container contains multiple items.</div>
+          </div>
+        </div>
+
+        <!-- Weight Unit selector -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span class="form-label" style="margin:0;">Weight Unit</span>
+          <select class="select-box" style="width:100px;"><option selected>kg</option><option>lbs</option></select>
+          <span class="note" style="margin:0;">Applies to all weight fields on this document</span>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CONTAINER 1 — saved, 2 items, ITEM-001 in inline edit mode
+             ═══════════════════════════════════════════════════════════ -->
+        <div style="border:2px solid #bbb;margin-bottom:14px;">
+          <!-- Container card header -->
+          <div style="background:#444;color:white;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="background:white;color:#333;font-weight:bold;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">1</span>
+              <span style="font-size:12px;font-weight:bold;">Container</span>
+            </div>
+            <div>
+              <span class="btn btn-sm" style="background:#ddd;color:#333;border-color:#aaa;">Copy Container</span>
+              <span class="btn btn-sm btn-danger">Remove Container</span>
+            </div>
+          </div>
+          <!-- Field header bar: row 1 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Container Reference <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Marks and Numbers <span style="font-weight:normal;color:#ccc;">*</span></div>
+          </div>
+          <!-- Input row 1 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="CONT001" /></div>
+            <div style="padding:6px 10px;"><input class="input-box" value="MARK-001 / BATCH-A" /></div>
+          </div>
+          <!-- Field header bar: row 2 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Tare Weight (kg) <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Seal Number <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Net Weight (auto)</div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Gross Weight (auto)</div>
+          </div>
+          <!-- Input row 2 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="2.200" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="SEAL-9901" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box readonly" value="400.000" readonly /></div>
+            <div style="padding:6px 10px;"><input class="input-box readonly" value="402.200" readonly /></div>
+          </div>
+          <!-- Items section -->
+          <div style="padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:11px;font-weight:bold;">Items in this Container</div>
+              <span class="btn btn-sm btn-primary">+ Add Item</span>
+            </div>
+            <table class="wt">
+              <thead>
+                <tr>
+                  <th style="width:22px;">#</th>
+                  <th>HSN Code</th>
+                  <th>Item Code</th>
+                  <th>No &amp; Kind of Pkgs</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>UOM</th>
+                  <th>Net Wt/unit</th>
+                  <th>Inner Pkg Wt</th>
+                  <th>Item Gross Wt</th>
+                  <th style="width:60px;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Saved row -->
+                <tr>
+                  <td>1</td><td>151550</td><td>ITEM-001</td><td>10 Drums</td><td>Castor Oil BP Grade</td>
+                  <td>200.000</td><td>MT</td><td>200.000</td><td>2.000</td>
+                  <td style="background:#e8e8e8;">202.000</td>
+                  <td><span class="btn btn-sm">Edit</span></td>
+                </tr>
+                <!-- Inline edit row (shown when Edit clicked on ITEM-001) -->
+                <tr style="background:#f0f0f0;">
+                  <td style="font-size:9px;color:#888;text-align:center;">&#x270E;</td>
+                  <td><input class="input-box" value="151550" style="width:65px;" /></td>
+                  <td><input class="input-box" value="ITEM-001" style="width:75px;" /></td>
+                  <td><input class="input-box" value="10 Drums" /></td>
+                  <td><input class="input-box" value="Castor Oil BP Grade" /></td>
+                  <td><input class="input-box" value="200.000" style="width:65px;" /></td>
+                  <td><select class="select-box" style="width:55px;"><option>MT</option></select></td>
+                  <td><input class="input-box" value="200.000" style="width:65px;" /></td>
+                  <td><input class="input-box" value="2.000" style="width:65px;" /></td>
+                  <td style="background:#e8e8e8;font-size:10px;">202.000<br/><span style="color:#888;">(auto)</span></td>
+                  <td>
+                    <span class="btn btn-sm btn-primary">Save</span>
+                    <span class="btn btn-sm">&#x2715;</span>
+                  </td>
+                </tr>
+                <div class="note" style="display:none;">spacer</div>
+                <!-- Second saved row -->
+                <tr>
+                  <td>2</td><td>151550</td><td>ITEM-002</td><td>5 Drums</td><td>Castor Oil USP Grade</td>
+                  <td>100.000</td><td>MT</td><td>200.000</td><td>2.000</td>
+                  <td style="background:#e8e8e8;">202.000</td>
+                  <td><span class="btn btn-sm">Edit</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="note">&#x2191; Highlighted row = inline edit mode. Clicking Edit replaces the row with editable fields; Save / ✕ in the Action column confirm or discard.</div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CONTAINER 2 — saved, 0 items, Add Item form expanded
+             ═══════════════════════════════════════════════════════════ -->
+        <div style="border:2px solid #bbb;margin-bottom:14px;">
+          <div style="background:#444;color:white;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="background:white;color:#333;font-weight:bold;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">2</span>
+              <span style="font-size:12px;font-weight:bold;">Container</span>
+              <span style="font-size:10px;color:#ffcc00;">&#x26A0; needs at least 1 item</span>
+            </div>
+            <div>
+              <span class="btn btn-sm" style="background:#ddd;color:#333;border-color:#aaa;">Copy Container</span>
+              <span class="btn btn-sm btn-danger">Remove Container</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Container Reference <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Marks and Numbers <span style="font-weight:normal;color:#ccc;">*</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="CONT002" /></div>
+            <div style="padding:6px 10px;"><input class="input-box" value="MARK-002" /></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Tare Weight (kg) <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Seal Number <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Net Weight (auto)</div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Gross Weight (auto)</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="2.200" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" value="SEAL-9902" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box readonly" value="0.000" readonly /></div>
+            <div style="padding:6px 10px;"><input class="input-box readonly" value="2.200" readonly /></div>
+          </div>
+          <!-- Items section -->
+          <div style="padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:11px;font-weight:bold;">Items in this Container</div>
+              <span class="btn btn-sm btn-primary">+ Add Item</span>
+            </div>
+            <table class="wt">
+              <thead>
+                <tr>
+                  <th style="width:22px;">#</th>
+                  <th>HSN Code</th>
+                  <th>Item Code</th>
+                  <th>No &amp; Kind of Pkgs</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>UOM</th>
+                  <th>Net Wt/unit</th>
+                  <th>Inner Pkg Wt</th>
+                  <th>Item Gross Wt</th>
+                  <th style="width:60px;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="11" style="text-align:center;color:#888;padding:12px;font-style:italic;">No items yet — use "+ Add Item" to add the first item.</td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- Inline Add Item form (expands below table when "+ Add Item" clicked) -->
+            <div style="border:1px solid #999;background:#fafafa;padding:12px;margin-top:8px;">
+              <div style="font-size:11px;font-weight:bold;margin-bottom:10px;border-bottom:1px solid #ddd;padding-bottom:6px;">New Item — Container 2</div>
+              <div class="row">
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">Item Code <span class="req">*</span></label>
+                    <input class="input-box" placeholder="Internal product code" />
+                    <div class="note">Aggregation key for Final Rates</div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">HSN Code</label>
+                    <input class="input-box" placeholder="e.g. 151550" />
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">No &amp; Kind of Packages <span class="req">*</span></label>
+                    <input class="input-box" placeholder="e.g. 10 Drums" />
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description of Goods <span class="req">*</span></label>
+                <textarea class="textarea-box" style="height:40px;" placeholder="Full commodity description"></textarea>
+              </div>
+              <div class="row">
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">Quantity <span class="req">*</span></label>
+                    <input class="input-box" placeholder="0.000" />
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">UOM <span class="req">*</span></label>
+                    <select class="select-box"><option>— Select —</option><option>MT</option><option>KG</option><option>PCS</option></select>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">Net Weight/unit (kg) <span class="req">*</span></label>
+                    <input class="input-box" placeholder="0.000" />
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">Inner Packing Weight (kg) <span class="req">*</span></label>
+                    <input class="input-box" placeholder="0.000" />
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="form-group">
+                    <label class="form-label">Item Gross Wt (kg)</label>
+                    <input class="input-box readonly" value="0.000 (auto)" readonly />
+                    <div class="note">= Net Wt + Inner Pkg Wt</div>
+                  </div>
+                </div>
+              </div>
+              <div class="btn-row" style="margin-top:8px;">
+                <span class="btn btn-primary btn-sm">Save Item</span>
+                <span class="btn btn-sm">Cancel</span>
+              </div>
+            </div>
+            <div class="note" style="margin-top:4px;">&#x2191; Inline Add Item form — expands below the items table when "+ Add Item" is clicked. No popup.</div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CONTAINER 3 — new container card (state: just been added)
+             Shown to illustrate what clicking "+ Add New Container" creates
+             ═══════════════════════════════════════════════════════════ -->
+        <div style="border:2px dashed #999;margin-bottom:14px;">
+          <div style="background:#666;color:white;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="background:white;color:#333;font-weight:bold;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">3</span>
+              <span style="font-size:12px;font-weight:bold;">Container</span>
+              <span style="font-size:10px;color:#ccc;">(new — fill in fields below)</span>
+            </div>
+            <div>
+              <span class="btn btn-sm btn-danger">Remove Container</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Container Reference <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Marks and Numbers <span style="font-weight:normal;color:#ccc;">*</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" placeholder="e.g. CONT003" /></div>
+            <div style="padding:6px 10px;"><input class="input-box" placeholder="Shipping marks on packages" /></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:#555;color:white;">
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Tare Weight (kg) <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Seal Number <span style="font-weight:normal;color:#ccc;">*</span></div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;border-right:1px solid #777;">Net Weight (auto)</div>
+            <div style="padding:5px 10px;font-size:10px;font-weight:bold;">Gross Weight (auto)</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid #ddd;">
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" placeholder="0.000" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box" placeholder="e.g. SEAL-9903" /></div>
+            <div style="padding:6px 10px;border-right:1px solid #ddd;"><input class="input-box readonly" value="—" readonly /></div>
+            <div style="padding:6px 10px;"><input class="input-box readonly" value="—" readonly /></div>
+          </div>
+          <div style="padding:10px;">
+            <div style="font-size:10px;color:#888;font-style:italic;">Save container fields first, then use "+ Add Item" to add items.</div>
+          </div>
+        </div>
+        <div class="note" style="margin-bottom:10px;">&#x2191; Container 3 = a new card appended when Maker clicks "+ Add New Container". Dashed border indicates unsaved state.</div>
+
+        <!-- Full-width Add New Container button -->
+        <div style="border:2px solid #555;background:#444;color:white;padding:12px;text-align:center;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:16px;">
+          + Add New Container
+        </div>
+
+        <hr/>
+        <div class="btn-row" style="justify-content:space-between;">
+          <span class="btn">&#x2039; Back</span>
+          <div class="btn-row">
+            <span class="btn">Save Draft</span>
+            <span class="btn btn-primary">Next: Final Rates &#x203A;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S08: MODAL - ADD/EDIT CONTAINER ===================== -->
+<div class="screen" id="S08">
+  <div class="screen-label">S08 — REMOVED (was: Modal — Add / Edit Container)</div>
+  <div class="screen-meta">
+    <strong>Note:</strong> Add / Edit Container is now handled inline on <strong>Page 4 (S07 — Containers &amp; Items)</strong>. No modal. See S07 for the inline Add Container form wireframe.
+  </div>
+  <div class="screen-body">
+    <div class="empty-state" style="margin:20px;">
+      <div class="empty-icon">[ℹ]</div>
+      <div class="empty-text">This screen has been removed</div>
+      <div class="empty-sub">Container add/edit is handled inline on S07.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S09: MODAL - ADD/EDIT ITEM ===================== -->
+<div class="screen" id="S09">
+  <div class="screen-label">S09 — REMOVED (was: Modal — Add / Edit Item within Container)</div>
+  <div class="screen-meta">
+    <strong>Note:</strong> Add / Edit Item is now handled inline on <strong>Page 4 (S07 — Containers &amp; Items)</strong>. No modal. See S07 for the inline Add Item form wireframe within each container block.
+  </div>
+  <div class="screen-body">
+    <div class="empty-state" style="margin:20px;">
+      <div class="empty-icon">[ℹ]</div>
+      <div class="empty-text">This screen has been removed</div>
+      <div class="empty-sub">Item add/edit is handled inline on S07 within each container block.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S10: PAGE 5 - FINAL RATES ===================== -->
+<div class="screen" id="S10">
+  <div class="screen-label">S10 — Create: Page 5 — Final Rates</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Auto-generated table showing one row per unique Item Code + UOM combination across all containers. Maker enters a single rate (USD) per row. All other columns are read-only. This is the last data-entry page; saving redirects to the Summary / Review page.<br/>
+    <strong>Key elements:</strong> 4-step wizard bar, read-only aggregated table (Item Code, Description, HSN, Total Qty, UOM), editable Rate (USD) column, calculated Amount (USD) column, validation alert if any rate is empty, Save &amp; Review / Back buttons.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / New / Page 5</div>
+        <div class="page-title">Create PL + CI — Final Rates</div>
+        <div class="wizard-bar">
+          <div class="wstep done">Entry</div>
+          <div class="wstep done">1. Header &amp; Details</div>
+          <div class="wstep done">2. References</div>
+          <div class="wstep done">3. Containers</div>
+          <div class="wstep active">4. Final Rates</div>
+        </div>
+        <div class="alert">Rates are entered <strong>once per unique Item Code + UOM</strong> — not per container line. Enter a rate for every row before saving.</div>
+
+        <table class="wt">
+          <thead>
+            <tr>
+              <th>Item Code</th>
+              <th>Description of Goods</th>
+              <th>HSN Code</th>
+              <th>Total Qty (across all containers)</th>
+              <th>UOM</th>
+              <th>Rate (USD) <span class="req">*</span></th>
+              <th>Amount (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="background:#e8e8e8;">ITEM-001</td>
+              <td style="background:#e8e8e8;">Castor Oil BP Grade</td>
+              <td style="background:#e8e8e8;">151550</td>
+              <td style="background:#e8e8e8;">400.000</td>
+              <td style="background:#e8e8e8;">MT</td>
+              <td><input class="input-box" placeholder="0.00" style="width:90px;" value="1250.00" /></td>
+              <td style="background:#e8e8e8;">500,000.00</td>
+            </tr>
+            <tr>
+              <td style="background:#e8e8e8;">ITEM-002</td>
+              <td style="background:#e8e8e8;">Castor Oil USP Grade</td>
+              <td style="background:#e8e8e8;">151550</td>
+              <td style="background:#e8e8e8;">200.000</td>
+              <td style="background:#e8e8e8;">MT</td>
+              <td><input class="input-box" placeholder="Rate required" style="width:90px;border-color:#888;background:#fff3cd;" /></td>
+              <td style="background:#e8e8e8;color:#888;">—</td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="6" style="text-align:right;font-weight:bold;">Total Amount (USD)</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert" style="margin-top:8px;">⚠ Rate (USD) is required for all items before saving.</div>
+
+        <!-- ── Payment & Terms ── -->
+        <div class="section-title">Payment &amp; Terms</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Incoterms</label>
+              <select class="select-box"><option>CIF – Cost, Insurance, Freight</option></select>
+              <div class="note">Auto-populated from PI; editable</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Payment Terms</label>
+              <select class="select-box"><option>LC at Sight</option></select>
+              <div class="note">Auto-populated from PI; editable</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Break-up in USD ── -->
+        <div class="section-title">Break-up in USD (printed on CI PDF)</div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">FOB Rate (USD per UOM)</label>
+              <input class="input-box" placeholder="0.00" />
+              <div class="note">System computes total FOB = FOB Rate × total shipment qty. Prints as 0.00 if not entered.</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Freight (USD)</label>
+              <input class="input-box" placeholder="0.00" />
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label class="form-label">Insurance (USD)</label>
+              <input class="input-box" placeholder="0.00" />
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">L/C Details</label>
+          <textarea class="textarea-box" placeholder="Letter of Credit reference details (multi-line, optional)"></textarea>
+        </div>
+
+        <hr/>
+        <div class="btn-row" style="justify-content:space-between;">
+          <span class="btn">‹ Back</span>
+          <div class="btn-row">
+            <span class="btn">Save Draft</span>
+            <span class="btn btn-primary">Save &amp; Review →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S11: MERGED — SEE S04 ===================== -->
+<div class="screen" id="S11">
+  <div class="screen-label">S11 — MERGED INTO S04 (was: Bank &amp; Payment Details)</div>
+  <div class="screen-meta">
+    <strong>Note:</strong> Bank &amp; Payment Details (Bank dropdown, FOB Rate, Freight, Insurance, L/C Details) have been moved to <strong>Page 2 (S04 — Header &amp; Details)</strong>. They are no longer a separate final wizard step. See S04 for the current wireframe.
+  </div>
+  <div class="screen-body">
+    <div class="empty-state" style="margin:20px;">
+      <div class="empty-icon">[ℹ]</div>
+      <div class="empty-text">This screen has been merged into S04</div>
+      <div class="empty-sub">Bank &amp; Payment Details now appear as the last section within Page 2 (Header &amp; Details). Refer to S04 for the wireframe.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S12: SUMMARY / REVIEW PAGE ===================== -->
+<div class="screen" id="S12">
+  <div class="screen-label">S12 — Summary / Review Page (post-first-save)</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Shown after the Maker saves the combined document for the first time. Displays auto-generated document numbers, aggregated line items (by Item Code + UOM), weight totals, and amount totals so the Maker can verify before submitting.<br/>
+    <strong>Key elements:</strong> Success banner with PL No + CI No, aggregated items table (combined across all containers), weight summary, total amount, Submit for Approval button, Edit button (returns to form), Delete button.
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Maker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / PL-2026-0004</div>
+
+        <div class="alert" style="background:#d4edda;border-color:#aaa;">
+          ✓ Document saved successfully. PL No: <strong>PL-2026-0004</strong> &nbsp;|&nbsp; CI No: <strong>CI-2026-0004</strong>
+        </div>
+
+        <div class="btn-row" style="justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div class="page-title" style="margin-bottom:2px;">PL-2026-0004 / CI-2026-0004</div>
+            <div style="font-size:11px;">PI: PI-2026-0007 &nbsp;|&nbsp; Exporter: Org Name A &nbsp;|&nbsp; Status: <span class="badge">DRAFT</span></div>
+          </div>
+          <div class="btn-row">
+            <span class="btn">Edit</span>
+            <span class="btn btn-danger">Delete</span>
+            <span class="btn btn-primary">Submit for Approval</span>
+          </div>
+        </div>
+
+        <div class="section-title">Aggregated Line Items (grouped by Item Code + UOM)</div>
+        <table class="wt">
+          <thead>
+            <tr>
+              <th>Marks &amp; Nos / Container Nos.</th>
+              <th>HSN Code</th>
+              <th>No. &amp; Kind of Pkgs.</th>
+              <th>Description of Goods</th>
+              <th>Item Code</th>
+              <th>Qty</th>
+              <th>UOM</th>
+              <th>Rate (USD)</th>
+              <th>Amount (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>MARK-001 / CONT001, CONT002</td>
+              <td>151550</td>
+              <td>20 Drums</td>
+              <td>Castor Oil BP Grade</td>
+              <td>ITEM-001</td>
+              <td>400.000</td>
+              <td>MT</td>
+              <td>1,250.00</td>
+              <td>500,000.00</td>
+            </tr>
+            <tr>
+              <td>MARK-002 / CONT001, CONT002</td>
+              <td>151550</td>
+              <td>10 Drums</td>
+              <td>Castor Oil USP Grade</td>
+              <td>ITEM-002</td>
+              <td>200.000</td>
+              <td>MT</td>
+              <td>1,400.00</td>
+              <td>280,000.00</td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="8" style="text-align:right;">Total Amount (USD)</td>
+              <td>780,000.00</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="section-title">Weight Summary</div>
+        <div class="row">
+          <div class="col summary-stat"><div class="stat-label">Total Net Weight</div><div class="stat-value">600.000 kg</div></div>
+          <div class="col summary-stat"><div class="stat-label">Total Gross Weight</div><div class="stat-value">608.400 kg</div></div>
+          <div class="col summary-stat"><div class="stat-label">Total Amount (USD)</div><div class="stat-value">780,000.00</div></div>
+          <div class="col"></div>
+        </div>
+
+        <div class="section-title">Payment &amp; Terms</div>
+        <div class="row">
+          <div class="col summary-stat">
+            <div class="stat-label">Incoterms</div>
+            <div style="font-size:12px;font-weight:bold;">CIF – Cost, Insurance, Freight</div>
+          </div>
+          <div class="col summary-stat">
+            <div class="stat-label">Payment Terms</div>
+            <div style="font-size:12px;font-weight:bold;">LC at Sight</div>
+          </div>
+          <div class="col"></div><div class="col"></div>
+        </div>
+
+        <div class="section-title">Break-up in USD</div>
+        <div class="row">
+          <div class="col summary-stat"><div class="stat-label">FOB Rate (USD/UOM)</div><div class="stat-value">1,100.00</div></div>
+          <div class="col summary-stat"><div class="stat-label">Freight (USD)</div><div class="stat-value">12,000.00</div></div>
+          <div class="col summary-stat"><div class="stat-label">Insurance (USD)</div><div class="stat-value">1,500.00</div></div>
+          <div class="col summary-stat"><div class="stat-label">L/C Details</div><div style="font-size:11px;">LC/2026/SBI/00123</div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S13: DOCUMENT DETAIL / VIEW ===================== -->
+<div class="screen" id="S13">
+  <div class="screen-label">S13 — Document Detail / View Page</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Full read-only view of a saved PL+CI document showing all header fields, all containers with items, final rates, and bank details. Context-sensitive action buttons differ by role and status.<br/>
+    <strong>Key elements:</strong> Document header summary panel, status badge, tabbed or sectioned view (Header | Containers &amp; Items | Final Rates | Bank Details), Download PDF button (role/status gated), Submit / Approve / Reject / Permanently Reject / Edit / Delete actions (role/status gated), audit trail / rejection comments (if applicable).
+  </div>
+  <div class="screen-body">
+    <div class="top-bar"><span>TradeDocs</span><span>Checker Name &nbsp;|&nbsp; Logout</span></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">[Logo]</div>
+        <div class="nav-item active">PL + CI</div>
+      </div>
+      <div class="main-area">
+        <div class="breadcrumb">Documents / PL+CI / PL-2026-0004</div>
+
+        <div class="btn-row" style="justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <div class="page-title" style="margin-bottom:2px;">PL-2026-0004 / CI-2026-0004</div>
+            <div style="font-size:11px;">PI: PI-2026-0007 &nbsp;|&nbsp; Exporter: Org Name A &nbsp;|&nbsp; Status: <span class="badge">PENDING APPROVAL</span></div>
+          </div>
+          <div class="btn-row">
+            <span class="btn">Download PDF</span>
+            <span class="btn btn-danger">Permanently Reject</span>
+            <span class="btn">Reject → Rework</span>
+            <span class="btn btn-primary">Approve</span>
+          </div>
+        </div>
+        <div class="note" style="margin-bottom:10px;font-size:10px;">Checker view shown. Maker view would show: Edit (Draft/Rework), Submit for Approval (Draft/Rework), Delete (Draft only). PDF download: Maker &amp; Checker = Approved state only; Admin = any state.</div>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #bbb;margin-bottom:12px;">
+          <div style="padding:6px 14px;font-size:11px;background:#ddd;border:1px solid #bbb;border-bottom:none;font-weight:bold;">Document Header</div>
+          <div style="padding:6px 14px;font-size:11px;border:1px solid #bbb;border-bottom:none;">Containers &amp; Items</div>
+          <div style="padding:6px 14px;font-size:11px;border:1px solid #bbb;border-bottom:none;">Final Rates</div>
+          <div style="padding:6px 14px;font-size:11px;border:1px solid #bbb;border-bottom:none;">Bank &amp; Payment</div>
+        </div>
+
+        <!-- Header tab content (active) -->
+        <div class="card">
+          <div class="card-header">Parties</div>
+          <div class="row">
+            <div class="col"><span class="form-label">Exporter:</span><br/>Org Name A</div>
+            <div class="col"><span class="form-label">Consignee (Advising Bank/Consignee1):</span><br/>Consignee Org B<br/><span style="font-size:10px;color:#888;">Drawee: BIS- CMBCCNBS261</span></div>
+            <div class="col"><span class="form-label">Buyer:</span><br/>Buyer Org C</div>
+            <div class="col"><span class="form-label">Notify Party (Consignee2/Importer):</span><br/>Notify Org D</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:8px;">
+          <div class="card-header">Shipping, Terms &amp; References</div>
+          <div class="row">
+            <div class="col"><span class="form-label">PL No:</span> PL-2026-0004<br/><span class="form-label">PL Date:</span> 18/03/2026</div>
+            <div class="col"><span class="form-label">CI No:</span> CI-2026-0004<br/><span class="form-label">CI Date:</span> 18/03/2026</div>
+            <div class="col"><span class="form-label">Port of Loading:</span> Mundra Port<br/><span class="form-label">Port of Discharge:</span> Shanghai Port</div>
+            <div class="col"><span class="form-label">Incoterms:</span> CIF<br/><span class="form-label">Payment Terms:</span> LC at Sight</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S14: MODAL - SUBMIT FOR APPROVAL ===================== -->
+<div class="screen" id="S14">
+  <div class="screen-label">S14 — Modal: Submit for Approval Confirmation</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Maker confirms they are ready to submit both the PL and CI for approval. Reminds user this covers both documents jointly.<br/>
+    <strong>Key elements:</strong> Confirmation text, PL No + CI No summary, Cancel / Confirm Submit buttons.
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Submit for Approval</div>
+        <div class="modal-body">
+          <p style="font-size:12px;">You are about to submit the following documents for approval:</p>
+          <div class="card">
+            <div style="font-size:11px;line-height:2.0;">
+              <div><strong>Packing List:</strong> PL-2026-0004</div>
+              <div><strong>Commercial Invoice:</strong> CI-2026-0004</div>
+              <div><strong>Linked PI:</strong> PI-2026-0007</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#555;">Both documents will be submitted together and can only be approved or rejected as a unit.</p>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-primary">Confirm: Submit for Approval</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S15: MODAL - APPROVE ===================== -->
+<div class="screen" id="S15">
+  <div class="screen-label">S15 — Modal: Approve Confirmation</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Checker confirms approval of both PL and CI in a single action. Approval is final and moves both documents to Approved state.<br/>
+    <strong>Key elements:</strong> Document numbers summary, confirmation message, Cancel / Confirm Approve buttons.
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Approve Documents</div>
+        <div class="modal-body">
+          <p style="font-size:12px;">You are approving the following documents:</p>
+          <div class="card">
+            <div style="font-size:11px;line-height:2.0;">
+              <div><strong>Packing List:</strong> PL-2026-0004</div>
+              <div><strong>Commercial Invoice:</strong> CI-2026-0004</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#555;">Both documents will move to <strong>Approved</strong> status. This action cannot be undone. The clean PDF will become available for download.</p>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-primary">Confirm: Approve</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S16: MODAL - REJECT (REWORK) ===================== -->
+<div class="screen" id="S16">
+  <div class="screen-label">S16 — Modal: Reject → Rework (with mandatory comment)</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Checker rejects both documents and sends them back to the Maker for rework. Comment is mandatory — the form cannot be submitted without it.<br/>
+    <strong>Key elements:</strong> Document numbers, mandatory rejection comments textarea (inline validation if empty), Cancel / Confirm Reject buttons.
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Reject — Send for Rework</div>
+        <div class="modal-body">
+          <p style="font-size:12px;">Rejecting the following documents and returning them to the Maker for rework:</p>
+          <div class="card">
+            <div style="font-size:11px;">
+              <strong>PL-2026-0004</strong> &amp; <strong>CI-2026-0004</strong>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">Rejection Comments <span class="req">*required — cannot submit without a comment</span></label>
+            <textarea class="textarea-box" style="height:90px;border-color:#888;" placeholder="Explain what the Maker needs to fix (mandatory)..."></textarea>
+            <div class="note" style="color:#888;">These comments will be visible to the Maker on the document.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-danger">Confirm: Reject → Rework</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S17: MODAL - PERMANENTLY REJECT ===================== -->
+<div class="screen" id="S17">
+  <div class="screen-label">S17 — Modal: Permanently Reject (with mandatory comment)</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Checker/Admin permanently rejects both documents from any state. Terminal action — no further edits, submissions, or downloads possible on either document.<br/>
+    <strong>Key elements:</strong> Strong warning text (terminal/irreversible), document numbers, mandatory comments textarea, Cancel / Confirm Permanently Reject buttons (destructive style).
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Permanently Reject</div>
+        <div class="modal-body">
+          <div class="alert" style="border-color:#888;background:#f8d7da;">
+            ⚠ This is a <strong>terminal action</strong>. Both documents will be permanently rejected and cannot be edited, resubmitted, or downloaded. This cannot be undone.
+          </div>
+          <p style="font-size:12px;">Permanently rejecting:</p>
+          <div class="card">
+            <div style="font-size:11px;">
+              <strong>PL-2026-0004</strong> &amp; <strong>CI-2026-0004</strong>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">Reason for Permanent Rejection <span class="req">*required</span></label>
+            <textarea class="textarea-box" style="height:90px;border-color:#888;" placeholder="Provide a detailed reason (mandatory)..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-danger">Confirm: Permanently Reject</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S18: MODAL - DELETE / DEACTIVATE ===================== -->
+<div class="screen" id="S18">
+  <div class="screen-label">S18 — Modal: Delete (Deactivate) Confirmation</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Maker confirms deletion/deactivation of a Draft document. Only available in Draft state.<br/>
+    <strong>Key elements:</strong> Warning text, document numbers, Cancel / Confirm Delete buttons.
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Delete Document</div>
+        <div class="modal-body">
+          <div class="alert">
+            You are about to delete the following Draft documents. This action will deactivate them.
+          </div>
+          <div class="card">
+            <div style="font-size:11px;line-height:2.0;">
+              <div><strong>Packing List:</strong> PL-2026-0004</div>
+              <div><strong>Commercial Invoice:</strong> CI-2026-0004</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#555;">Only Draft documents can be deleted. Once deleted, these documents will no longer appear in the active list.</p>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-danger">Confirm: Delete</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== S19: MODAL - COPY CONTAINER ===================== -->
+<div class="screen" id="S19">
+  <div class="screen-label">S19 — Modal: Copy Container Confirmation</div>
+  <div class="screen-meta">
+    <strong>Purpose:</strong> Maker confirms copying a container. All items are copied; Container Reference, Marks &amp; Numbers, and Seal Number are left blank; Tare Weight is pre-filled. Maker must then fill in the blank fields on the copy.<br/>
+    <strong>Key elements:</strong> Source container summary, copy behaviour description (what is copied vs. left blank), Cancel / Confirm Copy buttons.
+  </div>
+  <div class="screen-body">
+    <div class="modal-wrapper">
+      <div class="modal">
+        <div class="modal-title">Copy Container</div>
+        <div class="modal-body">
+          <p style="font-size:12px;">Copying container:</p>
+          <div class="card">
+            <div style="font-size:11px;line-height:2.0;">
+              <div><strong>Container Reference:</strong> CONT001</div>
+              <div><strong>Items:</strong> 2 items (ITEM-001, ITEM-002)</div>
+              <div><strong>Tare Weight:</strong> 2.200 kg</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;">
+            <strong>What will be copied:</strong>
+            <ul style="margin:4px 0;padding-left:18px;line-height:1.8;">
+              <li>All items (Item Code, Description, HSN, Qty, Weights, etc.)</li>
+              <li>Container Tare Weight (pre-filled; you can adjust)</li>
+            </ul>
+            <strong>What will be left blank (you must fill in):</strong>
+            <ul style="margin:4px 0;padding-left:18px;line-height:1.8;">
+              <li>Container Reference</li>
+              <li>Marks and Numbers</li>
+              <li>Seal Number</li>
+            </ul>
+            <div class="note">Rates are not set per container — they apply at the Final Rates step.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="btn">Cancel</span>
+          <span class="btn btn-primary">Confirm: Copy Container</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== SCREEN INVENTORY ===================== -->
+<div style="background:white;border:2px solid #444;width:960px;margin:40px 0;padding:20px;">
+  <h2 style="font-size:16px;font-weight:bold;margin-bottom:12px;">Flat Screen Inventory — All 19 Screens</h2>
+  <table class="wt" style="font-size:11px;">
+    <thead><tr><th>#</th><th>Screen ID</th><th>Screen Name</th><th>Type</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>S01</td><td>PL+CI Document List</td><td>Full Page</td><td>All</td></tr>
+      <tr><td>2</td><td>S02</td><td>Empty State (No Documents)</td><td>Full Page</td><td>All</td></tr>
+      <tr><td>3</td><td>S03</td><td>Create — Entry Point (Exporter + PI selection)</td><td>Full Page</td><td>Maker</td></tr>
+      <tr><td>4</td><td>S04</td><td>Create — Step 1: Document Header</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>5</td><td>S05</td><td>Create — Step 2: Order References &amp; Additional Info</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>6</td><td>S06</td><td>Create — Step 3: Shipping, Terms &amp; Countries</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>7</td><td>S07</td><td>Create — Step 4: Weight Unit &amp; Containers</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>8</td><td>S08</td><td>Modal — Add / Edit Container</td><td>Modal</td><td>Maker</td></tr>
+      <tr><td>9</td><td>S09</td><td>Modal — Add / Edit Item (within Container)</td><td>Modal</td><td>Maker</td></tr>
+      <tr><td>10</td><td>S10</td><td>Create — Step 5: Final Rates</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>11</td><td>S11</td><td>Create — Step 6: Bank &amp; Payment Details</td><td>Wizard Step</td><td>Maker</td></tr>
+      <tr><td>12</td><td>S12</td><td>Summary / Review Page (post-first-save)</td><td>Full Page</td><td>Maker</td></tr>
+      <tr><td>13</td><td>S13</td><td>Document Detail / View Page</td><td>Full Page</td><td>All</td></tr>
+      <tr><td>14</td><td>S14</td><td>Modal — Submit for Approval Confirmation</td><td>Modal</td><td>Maker</td></tr>
+      <tr><td>15</td><td>S15</td><td>Modal — Approve Confirmation</td><td>Modal</td><td>Checker / Admin</td></tr>
+      <tr><td>16</td><td>S16</td><td>Modal — Reject → Rework (mandatory comment)</td><td>Modal</td><td>Checker / Admin</td></tr>
+      <tr><td>17</td><td>S17</td><td>Modal — Permanently Reject (mandatory comment)</td><td>Modal</td><td>Checker / Admin</td></tr>
+      <tr><td>18</td><td>S18</td><td>Modal — Delete (Deactivate) Confirmation</td><td>Modal</td><td>Maker</td></tr>
+      <tr><td>19</td><td>S19</td><td>Modal — Copy Container Confirmation</td><td>Modal</td><td>Maker</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

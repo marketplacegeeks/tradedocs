@@ -231,6 +231,8 @@ class Bank(models.Model):
     )
     # Stores IFSC (India), ACH routing number (USA), sort code (UK), etc.
     routing_number = models.CharField(max_length=50, blank=True)
+    # AD Code is a 14-digit number assigned by the bank to the exporter for DGFT/customs use.
+    ad_code = models.CharField(max_length=255, blank=True, help_text="Authorised Dealer Code issued by the bank for customs/DGFT use")
 
     # --- Intermediary Institution (optional; all-or-nothing) ---
     # Used when the receiving bank requires a correspondent bank for a specific currency.

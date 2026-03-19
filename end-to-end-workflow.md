@@ -3,7 +3,7 @@
 
 **Project:** TradeDocs — trade document platform for export trading houses
 **Stack:** Django 5.x + DRF (backend) · React 18 + TypeScript + Ant Design (frontend) · PostgreSQL (Railway)
-**Key reference files:** `requirements.md` (PRD v1.2) · `technical_architecture.md` (authoritative constraints)
+**Key reference files:** `requirements.md` (PRD v1.4) · `technical_architecture.md` (authoritative constraints)
 **Who this is for:** A product manager using Claude Code for the first time, learning AI-assisted development.
 
 ---
@@ -75,7 +75,7 @@ pbcopy < ~/.ssh/id_ed25519.pub
 ```
 
 3. Go to GitHub → Settings → SSH and GPG Keys → New SSH Key. Paste and save.
-4. Test: `ssh -T ``````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
+4. Test: `ssh -T ``````````````git@github.com` — you should see `Hi [username]! You've successfully authenticated.`
 
 ---
 
@@ -1013,93 +1013,103 @@ Each layer depends on the one before it. Do not start Layer 2 before Layer 1 is 
 
 ---
 
-## Layer 1 — Foundation (no dependencies; build these first)
+## ✅ Layer 1 — Foundation — COMPLETE
 
-These are the tables and pages everything else depends on. Build them before touching any document.
+All Layer 1 items are merged to `main`. No further work needed here.
 
-| # | Feature | FR | Branch name |
+| # | Feature | FR | Status |
 | --- | --- | --- | --- |
-| 1 | Project structure, settings, docker-compose, env | — | `feature/bootstrap` |
-| 2 | `accounts` app — User model, JWT login/logout, roles, permission classes | — | `feature/accounts-auth` |
-| 3 | `master_data` — lookup tables: Country, Port, Location, Incoterm, UOM, PaymentTerm, PreCarriageBy | FR-06 | `feature/fr-06-reference-data` |
-| 4 | `master_data` — Organisation model (addresses, tax codes, role tags) | FR-04 | `feature/fr-04-organisation` |
-| 5 | `master_data` — Bank model | FR-05 | `feature/fr-05-bank` |
-| 6 | `master_data` — T&C Templates (rich text) | FR-07 | `feature/fr-07-tc-templates` |
-| 7 | User Management page (Company Admin only) | FR-10 | `feature/fr-10-user-management` |
-| 8 | All Master Data pages in React (Organisation, Bank, Reference Data, T&C Templates) | FR-04–07 and FR-10 | `feature/master-data-pages` |
-
-**How to break Layer 1 into sessions:**
-- Session 1: accounts app (User model + JWT auth). Write tests: login returns a token, wrong password returns 401, Maker cannot access admin endpoints. Stop. Confirm `pytest` passes.
-- Session 2: Country, Port, Location, Incoterm, UOM, PaymentTerm, PreCarriageBy models + their API endpoints. Write tests: list endpoints return 200, unauthenticated gets 401. Confirm `pytest` passes.
-- Session 3: Organisation model with all four sub-sections (FR-04.1–04.4). Write tests: factory for Organisation + Address, permission tests for Maker vs Checker. This is the most complex master data model. Give it a full session.
-- Session 4: Bank model + API. Write tests. Confirm `pytest` passes.
-- Session 5: T&C Template model + API. Write tests. Confirm `pytest` passes.
-- Session 6: React pages for all master data (this is mostly CRUD forms — ask Claude to generate them one at a time).
+| 1 | Project structure, settings, docker-compose, env | — | ✅ Done |
+| 2 | `accounts` app — User model, JWT login/logout, roles, permission classes | — | ✅ Done |
+| 3 | `master_data` — lookup tables: Country, Port, Location, Incoterm, UOM, PaymentTerm, PreCarriageBy | FR-06 | ✅ Done |
+| 4 | `master_data` — Organisation model (addresses, tax codes, role tags) | FR-04 | ✅ Done |
+| 5 | `master_data` — Bank model | FR-05 | ✅ Done |
+| 6 | `master_data` — T&C Templates (rich text) | FR-07 | ✅ Done |
+| 7 | User Management page (Company Admin only) | FR-10 | ✅ Done |
+| 8 | All Master Data pages in React (Organisation, Bank, Reference Data, T&C Templates) | FR-04–07, FR-10 | ✅ Done |
 
 ---
 
-## Layer 2 — Proforma Invoice (depends on Layer 1)
+## ✅ Layer 2 — Proforma Invoice — COMPLETE
 
-| # | Feature | FR | Branch name |
+All Layer 2 items are merged to `main`. No further work needed here.
+
+| # | Feature | FR | Status |
 | --- | --- | --- | --- |
-| 9 | PI model: header (FR-09.1–09.3), line items (FR-09.5), dynamic charge rows, Incoterm cost breakdown (FR-09.7) | FR-09.1–09.5, FR-09.7 | `feature/fr-09-pi-model` |
-| 10 | `workflow` app — WorkflowService, AuditLog (PI states first) | FR-08 | `feature/fr-08-workflow-pi` |
-| 11 | PI create/edit API endpoints + state-aware serializers | FR-09 | `feature/fr-09-pi-api` |
-| 12 | PI PDF generation (ReportLab) — DRAFT watermark + clean Approved output; includes Incoterm cost breakdown block, MT103 instruction, Declaration, and Bank details block | FR-09.6 | `feature/fr-09-pi-pdf` |
-| 13 | Proforma Invoice list, create, and detail pages (React) | FR-09 | `feature/fr-09-pi-pages` |
-
-**Key PI rules to carry into every session:**
-- Document number format: `PI-YYYY-NNNN` (e.g., PI-2026-0001). Auto-generated on save; read-only field.
-- Submission is blocked if there are zero line items — at least one line item is required (FR-09.5).
-- Workflow states: `Draft → Pending Approval → Approved` or `→ Rework → Permanently Rejected`. The state is "Pending Approval" (not "Pending") and rejection returns to "Rework" (not "Draft").
-- Rate label on line items is dynamic: "Rate (USD/MT)", "Rate (USD/KG)", etc. — it follows the UOM selected on that line item.
-- Additional charges below the line items are free-text rows (Description + Amount USD). There is no fixed "Bank Charges" field — the Maker names each charge.
-- The Incoterm selection controls which cost fields appear in the Cost Breakdown section (FR-09.7). Fields the buyer bears are hidden entirely — never greyed out.
-- Invoice Total = Grand Total + seller-borne cost breakdown fields. "Amount in Words" reflects Invoice Total, not Grand Total.
-- For EXW: no cost breakdown fields appear at all; Invoice Total = Grand Total.
-
-**How to break Layer 2 into sessions:**
-- Session 1: PI model only — header fields, PILineItem (with UOM FK, dynamic rate label stored as-is), PICharge (free-text description + amount), and the Incoterm cost breakdown fields (freight, insurance, import duty, destination charges) on the PI header. Run migration. Write model tests (field defaults, PI-YYYY-NNNN format, line item amount calculation). Verify tables in DB via postgres MCP.
-- Session 2: WorkflowService for PI states (`Draft → Pending Approval → Approved → Rework → Permanently Rejected`). Write tests for every valid and invalid transition — e.g., Approved cannot go back to Draft, Rework without a comment must raise an error, submission with zero line items must raise an error. This is critical logic — spend a full session on it. Confirm `pytest` passes before moving on.
-- Session 3: PI API endpoints (create, update, list, detail). Enforce at-least-one-line-item on submit. Write permission tests (Maker cannot approve, unauthenticated gets 401). Verify with curl.
-- Session 4: PI PDF layout in ReportLab. Must include: main info table (8 rows), line items table, amount block with dynamic charge rows + cost breakdown (Incoterm-driven), MT103 static text, Declaration static text, Bank details block (BENEFICIARY NAME / BANK NAME / BRANCH NAME / BRANCH ADDRESS / A/C NO. / IFSC CODE / SWIFT CODE + intermediary block if configured), T&C on new page. Generate a test PDF and open it.
-- Session 5: React list and create pages.
-- Session 6: React detail page (line items, dynamic charge rows, Incoterm cost breakdown, workflow actions, PDF download).
+| 9 | PI model: header, line items, dynamic charge rows, Incoterm cost breakdown | FR-09.1–09.5, FR-09.7 | ✅ Done |
+| 10 | `workflow` app — WorkflowService, AuditLog (PI states) | FR-08 | ✅ Done |
+| 11 | PI create/edit API endpoints + state-aware serializers | FR-09 | ✅ Done |
+| 12 | PI PDF generation — DRAFT watermark + clean Approved output | FR-09.6 | ✅ Done |
+| 13 | Proforma Invoice list, create, and detail pages (React) | FR-09 | ✅ Done |
 
 ---
 
-## Layer 3 — Packing List (depends on Layer 2 — specifically on PI existing)
+## ⚠ Pre-Layer 3 Fix — PI Create/Edit: Dynamic Incoterm Field Visibility
 
-| # | Feature | FR | Branch name |
+> **Must be done before starting Layer 3.** The `INCOTERM_SELLER_FIELDS` map and visibility logic already exist in `constants.ts` and are correctly applied in `ProformaInvoiceDetailPage.tsx` (view). However, **`ProformaInvoiceCreatePage.tsx`**** and \****`ProformaInvoiceEditPage.tsx`**\*\* do not use this map** — the cost breakdown fields (Freight, Insurance, Import Duty, Destination Charges) are currently always visible on the form regardless of which Incoterm is selected. This contradicts FR-09.7.3.
+>
+> This fix is prerequisite because: (1) it closes the PI feature properly, and (2) the FR-14M Final Rates page uses the identical visibility pattern — building it first on PI means the pattern is proven before reuse.
+
+| # | Fix | FR | Branch name |
 | --- | --- | --- | --- |
-| 14 | PL model: header, containers, container items | FR-14.1–14.8 | `feature/fr-14-pl-model` |
-| 15 | WorkflowService extended for PL states + cascade rules | FR-08 | `feature/fr-14-workflow-pl` |
-| 16 | PL API endpoints (including copy-container) | FR-14 | `feature/fr-14-pl-api` |
-| 17 | PL PDF generation | FR-14.10 | `feature/fr-14-pl-pdf` |
-| 18 | Packing List form page in React (create + edit) | FR-14 | `feature/fr-14-pl-pages` |
+| — | `ProformaInvoiceCreatePage.tsx` — watch the `incoterms` field value; use `INCOTERM_SELLER_FIELDS` to conditionally render Freight, Insurance, Import Duty, Destination Charges. Clear hidden field values when Incoterm changes (FR-09.7.5). | FR-09.7.3, FR-09.7.5 | `fix/fr-09-incoterm-field-visibility` |
+| — | `ProformaInvoiceEditPage.tsx` — same fix, same pattern. Initialise visibility from the loaded PI's existing `incoterms_code`. | FR-09.7.3 | `fix/fr-09-incoterm-field-visibility` |
+
+**What to check after the fix:**
+- Select EXW → entire cost breakdown section disappears
+- Select FOB → only FOB Value (read-only) visible; Freight and Insurance hidden
+- Select CFR → FOB Value + Freight visible; Insurance hidden
+- Select CIF → all three visible; Insurance shows CIP/CIF tooltip (FR-09.7.3)
+- Change Incoterm mid-form → previously entered values in now-hidden fields are cleared
+- Run `pytest apps/proforma_invoice/tests/ -v` and confirm 0 failures before merging
 
 ---
 
-## Layer 4 — Commercial Invoice (depends on Layer 3 — requires Approved Packing Lists)
+## ▶ Layer 3 — Combined Packing List + Commercial Invoice — START HERE (after fix above)
+
+> **v1.3 change:** The old standalone FR-14 (Packing List) and FR-15 (5-step CI wizard) are replaced by **FR-14M** — a single combined creation flow. PL and CI are created together, share a joint approval workflow, and download as one PDF file. See `requirements.md` Section 5.11 for the full spec.
+>
+> **v1.4 change (wireframe alignment):** Drawee field removed entirely. UOM is now mandatory on every container item (aggregation key). Incoterms, Payment Terms, FOB Rate, Freight, Insurance, and L/C Details all moved to **Page 5 — Final Rates** (not Page 2). Additional Description added as a field on the Order References page (Page 3). PI Preview Card added to the entry point. Disable action now applies from **any** state (not Approved only). Document detail page has a defined 4-tab layout (FR-14M.14).
 
 | # | Feature | FR | Branch name |
 | --- | --- | --- | --- |
-| 19 | CI model: CommercialInvoice + CommercialInvoiceLineItem | FR-15 | `feature/fr-15-ci-model` |
-| 20 | `CommercialInvoiceService.aggregate_line_items()` | FR-15.4 | `feature/fr-15-ci-aggregation` |
-| 21 | WorkflowService extended for CI states (DISABLED terminal state) | FR-08 | `feature/fr-15-workflow-ci` |
-| 22 | CI wizard API endpoints (eligible-consignees, approved-packing-lists, aggregate-line-items) | FR-15.1–15.6 | `feature/fr-15-ci-wizard-api` |
-| 23 | CI PDF generation (Draft + Final modes) | FR-15.8 | `feature/fr-15-ci-pdf` |
-| 24 | Commercial Invoice wizard page + detail page (React) | FR-15 | `feature/fr-15-ci-pages` |
+| 14 | Combined PL+CI model: header (incl. incoterms, payment_terms, fob_rate, freight, insurance, lc_details, additional_description on PL), containers, container items (item_code + uom mandatory, item-level weights), Final Rates | FR-14M.1–FR-14M.9, FR-14M.11 | `feature/fr-14m-model` |
+| 15 | WorkflowService extended for joint PL+CI states — Disable valid from any state | FR-08, FR-14M.12 | `feature/fr-14m-workflow` |
+| 16 | Combined PL+CI API endpoints (PI Preview Card, create, Final Rates, summary, copy-container) | FR-14M.1–FR-14M.10 | `feature/fr-14m-api` |
+| 17 | Combined PDF generation (PL/Weight Note section + page break + CI section, single file, dynamic rate header) | FR-14M.13 | `feature/fr-14m-pdf` |
+| 18 | Combined PL+CI React pages (5-page wizard + summary/review + 4-tab detail page) | FR-14M, FR-14M.14 | `feature/fr-14m-pages` |
+
+**Key FR-14M rules to carry into every session:**
+- Both PL number (`PL-YYYY-NNNN`) and CI number (`CI-YYYY-NNNN`) are auto-generated on first save; neither is editable by the Maker.
+- **Item Code is mandatory** on every container item — it is the aggregation key for the Final Rates section and the CI line items.
+- **UOM is mandatory** on every container item — it is the other half of the aggregation key. The Rate column label is dynamic: "Rate (USD per [UOM])" e.g. "Rate (USD per KG)". Items with no UOM cannot be aggregated.
+- **Weight model:** there is no container-level Net Weight. `Item Gross Weight = Net Weight per unit + Inner Packing Weight` (item level); `Container Gross Weight = SUM(Item Gross Weight) + Container Tare Weight` (container level).
+- Rates are entered **once per unique Item Code + UOM** in the Final Rates section — never per container row.
+- **Incoterms, Payment Terms, FOB Rate, Freight, Insurance, and L/C Details are all on Page 5 (Final Rates)** — not on the header page. Bank is the only financial field on Page 2. FOB Rate / Freight / Insurance visibility is Incoterm-driven using the same `INCOTERM_SELLER_FIELDS` map from `constants.ts` (FR-09.7.3 rules — same pattern as the PI fix above). L/C Details is always visible. When Incoterm changes, hidden field values are cleared.
+- **Drawee field does not exist** — it has been removed from the data model entirely.
+- **Additional Description** is a free-text field on the Order References page (Page 3); it prints in the right info panel on both PDFs.
+- **PI Preview Card** is shown on the entry point after the Maker selects a PI — displays the PI's line items (Item Code, Description, HSN, No & Kind of Pkgs, Qty) for confirmation.
+- One Submit, one Approve, one Reject covers **both PL and CI simultaneously**. They cannot be acted on independently.
+- The PDF is a **single file**: PL/Weight Note section first, then a page break, then the CI section.
+- Rate and Amount (USD) are **not printed on the PL section** — they appear only on the CI section.
+- FOB Rate, Freight, Insurance print as `0.00` if not entered (they always appear on the CI PDF).
+- **Disable** is available from **any** state (not just Approved) — Checker/Admin only, comment mandatory, terminal for both PL and CI.
+
+**How to break Layer 3 into sessions:**
+- **Session 1 — Model:** `PackingList` header (fields: proforma_invoice FK, exporter, consignee, buyer, notify_party, pl_date, ci_date, vessel, port_of_loading, port_of_discharge, final_destination, pre_carriage_by, place_of_receipt, place_of_receipt_by_precarrier, country_of_origin, country_of_final_destination, incoterms, payment_terms, bank, fob_rate, freight, insurance, lc_details, additional_description, weight_unit, status), `PackingListContainer` (tare weight only — no net/gross at container level), `ContainerItem` (item_code required, uom required, net_weight_per_unit, inner_packing_weight; item_gross_weight is a property), `CommercialInvoice` header (linked 1:1 to PackingList), `CommercialInvoiceLineItem` (aggregated by item_code + UOM; stores rate_usd). Run migration. Write model tests (field defaults, auto-number format, item_gross_weight calculation, container_gross_weight calculation, UOM required, Item Code required). Verify all tables in DB via postgres MCP.
+- **Session 2 — Workflow:** Extend WorkflowService for joint PL+CI states. The key rule: every status transition (Submit, Approve, Reject/Rework, Permanently Reject, Disable) must update **both** the PL and CI records in the same `transaction.atomic()`. Disable is valid from **any** state. Write tests for every valid and invalid transition. Confirm reject/disable without a comment raises an error. Confirm `pytest` passes before moving on.
+- **Session 3 — API:** Create combined document endpoint (includes PI Preview Card data — returns PI line items for display on entry point; auto-populates header from selected Approved PI), add/remove containers, add/remove items, Final Rates update endpoint (writes rates + incoterms/payment_terms/fob_rate/freight/insurance/lc_details to the PL record), summary/review page endpoint, copy-container action. Write permission tests and validation tests (missing Item Code, missing UOM, missing Rate, at-least-one-container rule).
+- **Session 4 — PDF:** Single PDF file with two sections. PL section: exporter header (3-address layout), references + Additional Description in right info panel, shipping block, per-container item rows with weight columns, container subtotal rows (SUM item gross + tare), bottom summary (total net/gross + per-container tare table). CI section: same header block (no Drawee), aggregated line items (by Item Code + UOM) with dynamic rate header "Rate (USD per [UOM])" and Amount columns, FOB/Freight/Insurance break-up, L/C Details, bank details, Amount in Words, Declaration. Page break between sections. DRAFT watermark on both sections when not Approved. PDF download: Maker/Checker = Approved only; Admin = any state.
+- **Session 5 — React creation form:** 5-page wizard: (1) **Entry** — Consignee dropdown + Approved PI dropdown + PI Preview Card showing PI line items; (2) **Page 2 Header & Details** — document numbers (read-only), dates, Parties (Exporter, Consignee, Buyer, Notify Party — no Drawee), Shipping & Logistics (7 fields), Countries (2 fields), Bank dropdown + preview card; (3) **Page 3 Order References** — 5 reference pairs + Additional Description textarea; (4) **Page 4 Containers & Items** — weight unit selector, inline container add/edit, inline item add/edit within each container (Item Code required, UOM required), copy-container action; (5) **Page 5 Final Rates** — auto-generated rates table (Maker enters Rate per row, column header shows "Rate (USD per [UOM])"), Payment & Terms section (Incoterms + Payment Terms, editable), Break-up in USD section (FOB Rate, Freight, Insurance, L/C Details). Save → Summary/Review page showing aggregated line items, weight summary, Payment & Terms read-only, Break-up in USD read-only.
+- **Session 6 — React detail/edit page:** Tabbed read-only view with 4 tabs — **Document Header** (parties, shipping, countries, payment & terms) | **Containers & Items** (all containers with items, weight totals) | **Final Rates** (rates table + Break-up in USD) | **Bank & Payment** (bank details). Context-sensitive action buttons by role and status: Edit/Submit/Delete (Maker, Draft/Rework); Approve/Reject/Permanently Reject (Checker, from appropriate states); Disable (Checker/Admin, any state); PDF download (Maker/Checker = Approved only, Admin = any state). Rejection comments displayed on page for Maker to see.
 
 ---
 
-## Layer 5 — Supporting Features (add after Layer 4)
-
 | # | Feature | FR | Branch name |
 | --- | --- | --- | --- |
-| 25 | `SignedCopyUpload` model + upload/download endpoints | FR-08.4 | `feature/signed-copy-upload` |
-| 26 | Audit log drawer (React, reusable across all three document types) | FR-08 | `feature/audit-log-drawer` |
-| 27 | `reports` app — placeholder page | FR (OQ#4) | `feature/reports-placeholder` |
+| 19 | `SignedCopyUpload` model + upload/download endpoints | FR-08.4 | `feature/signed-copy-upload` |
+| 20 | Audit log drawer (React, reusable across all three document types) | FR-08 | `feature/audit-log-drawer` |
+| 21 | `reports` app — placeholder page | — | `feature/reports-placeholder` |
 
 ---
 
@@ -1280,4 +1290,4 @@ Use anchored corrections — point to the specific document and rule:
 |  | 32 | Commit and push |
 |  | 33 | Run `/session-end` — update MEMORY.md |
 |  | 34 | Merge to main when feature is complete |
-| **Feature Build Order** | — | Layer 1 (Foundation) → Layer 2 (PI) → Layer 3 (PL) → Layer 4 (CI) → Layer 5 (Supporting) |
+| **Feature Build Order** | — | ✅ Layer 1 (Foundation) → ✅ Layer 2 (PI) → **▶ Layer 3 (Combined PL+CI, FR-14M v1.4)** → Layer 4 (Supporting) |
