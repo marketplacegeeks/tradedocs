@@ -53,24 +53,22 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 3 — MAIN INFO TABLE (bottom half)
-# Total width = 180mm  |  5 equal columns: [36mm | 36mm | 36mm | 36mm | 36mm]
-# ─────────────────────────────────────────────────────────────────────────────
+# Two separate tables:
 #
-#   ┌──────────────────┬──────────────────────────┬──────────────────┬──────────────────┬──────────────────┐
-#   │ Pre-Carriaged By:│ Place of Receipt by       │ Vessel/Flight No:│ Incoterms:       │ Payment Terms:   │ Row 0
-#   │ pre_carriage     │ Pre-Carrier:              │ invoice.vessel_  │ incoterm_disp    │ payment_term_    │
-#   │ (pre_carriage_by │ por_pre                   │ flight_no        │ (incoterms.code) │ name             │
-#   │  .name)          │ (place_of_receipt_by_     │                  │                  │ (payment_terms   │
-#   │                  │  pre_carrier.name)        │                  │                  │  .name)          │
-#   ├──────────────────┼──────────────────────────┼──────────────────┼──────────────────┼──────────────────┤
-#   │ Port of Loading: │ Port of Discharge:        │ Final            │ Marks & Nos /    │ No & Kind of     │ Row 1
-#   │ port_loading     │ port_discharge            │ Destination:     │ Container No     │ Packages         │
-#   │ (port_of_loading │ (port_of_discharge        │ final_dest       │ (blank — no      │ (blank — no      │
-#   │  .name)          │  .name)                   │ (final_          │  model field)    │  model field)    │
-#   │                  │                           │ destination.name)│                  │                  │
-#   └──────────────────┴──────────────────────────┴──────────────────┴──────────────────┴──────────────────┘
-#        36mm                   36mm                    36mm               36mm               36mm
-#                                                                                     Total = 180mm
+# Table A — 4 equal columns [45mm | 45mm | 45mm | 45mm] = 180mm
+#   ┌─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┐
+#   │ Port of Loading:    │ Port of Discharge:  │ Final Destination:  │ Incoterms:          │
+#   │ port_loading        │ port_discharge      │ final_dest          │ incoterm_disp       │
+#   └─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┘
+#
+# Table B — 3 equal columns [60mm | 60mm | 60mm] = 180mm
+#   ┌────────────────────────┬────────────────────────────────┬──────────────────────┐
+#   │ Pre-Carriaged By:      │ Place of Receipt by            │ Vessel/Flight No:    │ Row 0
+#   │ pre_carriage           │ Pre-Carrier: por_pre           │ vessel_flight_no     │
+#   ├────────────────────────┼────────────────────────────────┼──────────────────────┤
+#   │ No & Kind of Packages  │ Marks & Nos/Container No       │ Payment Terms:       │ Row 1
+#   │ (blank)                │ (blank)                        │ payment_term_name    │
+#   └────────────────────────┴────────────────────────────────┴──────────────────────┘
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 4 — LINE ITEMS TABLE
@@ -112,20 +110,17 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 7 — VALIDITY & SHIPMENT TABLE
-# Total width = 180mm  |  1 column: [180mm]  |  4 rows
+# Total width = 180mm  |  2 equal columns: [90mm | 90mm]  |  2 rows
 # ─────────────────────────────────────────────────────────────────────────────
 #
-#   ┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
-#   │ Validity for Acceptance: invoice.validity_for_acceptance                                           │ Row 0
-#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
-#   │ Validity for Shipment:   invoice.validity_for_shipment                                             │ Row 1
-#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
-#   │ Partial Shipment:        bool_yn(invoice.partial_shipment)  → "Yes" / "No"                        │ Row 2
-#   │                          (CharField: "ALLOWED" → "Yes", "NOT_ALLOWED" → "No")                     │
-#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
-#   │ Transshipment:           bool_yn(invoice.transshipment)     → "Yes" / "No"                        │ Row 3
-#   └────────────────────────────────────────────────────────────────────────────────────────────────────┘
-#                                            180mm                                       Total = 180mm
+#   ┌──────────────────────────────────────────┬──────────────────────────────────────────┐
+#   │ Validity for Acceptance:                 │ Validity for Shipment:                   │ Row 0
+#   │ invoice.validity_for_acceptance          │ invoice.validity_for_shipment            │
+#   ├──────────────────────────────────────────┼──────────────────────────────────────────┤
+#   │ Partial Shipment:                        │ Transshipment:                           │ Row 1
+#   │ bool_yn(invoice.partial_shipment)        │ bool_yn(invoice.transshipment)           │
+#   └──────────────────────────────────────────┴──────────────────────────────────────────┘
+#                  90mm                                        90mm              Total = 180mm
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 8 — MT103 ADVISORY + DECLARATION  (plain Paragraphs, full width)
@@ -228,6 +223,7 @@ from typing import Any
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
@@ -385,26 +381,48 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     from apps.workflow.constants import APPROVED
     is_draft = getattr(invoice, "status", None) != APPROVED
 
-    def add_footer(canvas, _doc):
-        # Draw faint diagonal DRAFT watermark on non-approved documents (FR-08.3).
-        # alpha=0.07 produces the '/ca .07' ExtGState entry that tests check for.
-        if is_draft:
-            from reportlab.lib.colors import HexColor
-            canvas.saveState()
-            canvas.setFont("Helvetica-Bold", 80)
-            # alpha=0.07 produces the '/ca .07' ExtGState entry the test checks for.
-            canvas.setFillColor(HexColor('#CC1A1A'), alpha=0.07)
-            canvas.translate(A4[0] / 2, A4[1] / 2)
-            canvas.rotate(45)
-            canvas.drawCentredString(0, 0, "DRAFT")
-            canvas.restoreState()
-        canvas.saveState()
-        canvas.setFont("Helvetica", 8)
-        canvas.drawCentredString(
-            A4[0] / 2, 10 * mm,
-            "This is a computer-generated document. Signature is not required.",
-        )
-        canvas.restoreState()
+    # NumberedCanvas enables "Page X of Y" in the footer (two-pass rendering).
+    # On showPage() we snapshot the canvas state; on save() we replay each page,
+    # draw the footer with the known total, then flush.
+    class NumberedCanvas(canvas.Canvas):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved_page_states = []
+
+        def showPage(self):
+            self._saved_page_states.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total_pages = len(self._saved_page_states)
+            for page_num, state in enumerate(self._saved_page_states, start=1):
+                self.__dict__.update(state)
+                self._draw_footer(page_num, total_pages)
+                super().showPage()
+            super().save()
+
+        def _draw_footer(self, page_num, total_pages):
+            if is_draft:
+                from reportlab.lib.colors import HexColor as _HexColor
+                self.saveState()
+                self.setFont("Helvetica-Bold", 80)
+                self.setFillColor(_HexColor('#CC1A1A'), alpha=0.07)
+                self.translate(A4[0] / 2, A4[1] / 2)
+                self.rotate(45)
+                self.drawCentredString(0, 0, "DRAFT")
+                self.restoreState()
+
+            self.saveState()
+            self.setFont("Helvetica", 8)
+            self.drawCentredString(
+                A4[0] / 2, 18 * mm,
+                "This is a computer generated document & does not need signature",
+            )
+            self.drawCentredString(
+                A4[0] / 2, 10 * mm,
+                f"Page {page_num} of {total_pages}",
+            )
+            self.restoreState()
 
     story = []
 
@@ -552,7 +570,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
 
     main_info_table_top = Table(
         main_info_data,
-        colWidths=[36 * mm, 36 * mm, 54 * mm, 54 * mm],
+        colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm],
     )
     main_info_table_top.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
@@ -573,31 +591,45 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("SPAN",         (3, 2), (3, 3)),
     ]))
 
-    # Second table (rows 6-7 in reference): Pre-carriage / Vessel / Ports
-    #   Row 0: Pre-Carriage | Place of Receipt | Vessel/Flight | Incoterms | Payment Terms
-    #   Row 1: Port of Loading | Port of Discharge | Final Destination | Marks | Packages
-    # The model has no marks_and_nos or kind_of_packages fields, so those cells are blank.
-    main_info_data_bottom = [
-        [
-            Paragraph(f"<b>Pre-Carriaged By:</b><br/>{pre_carriage}", style_text),
-            Paragraph(f"<b>Place of Receipt by Pre-Carrier:</b><br/>{por_pre}", style_text),
-            Paragraph(f"<b>Vessel/Flight No:</b><br/>{safe(invoice.vessel_flight_no)}", style_text),
-            Paragraph(f"<b>Incoterms:</b><br/>{incoterm_disp}", style_text),
-            Paragraph(f"<b>Payment Terms:</b><br/>{payment_term_name}", style_text),
-        ],
-        [
+    # Row A (4 equal columns, 45mm each = 180mm):
+    #   Port of Loading | Port of Discharge | Final Destination | Incoterms
+    info_row_a = Table(
+        [[
             Paragraph(f"<b>Port of Loading:</b><br/>{port_loading}", style_text),
             Paragraph(f"<b>Port of Discharge:</b><br/>{port_discharge}", style_text),
             Paragraph(f"<b>Final Destination:</b><br/>{final_dest}", style_text),
-            Paragraph("<b>Marks &amp; Nos/Container No</b><br/>", style_text),
-            Paragraph("<b>No &amp; Kind of Packages</b><br/>", style_text),
-        ],
-    ]
-    main_info_table_bottom = Table(
-        main_info_data_bottom,
-        colWidths=[36 * mm, 36 * mm, 36 * mm, 36 * mm, 36 * mm],
+            Paragraph(f"<b>Incoterms:</b><br/>{incoterm_disp}", style_text),
+        ]],
+        colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm],
     )
-    main_info_table_bottom.setStyle(TableStyle([
+    info_row_a.setStyle(TableStyle([
+        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING",   (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+    ]))
+
+    # Rows B (3 equal columns, 60mm each = 180mm):
+    #   Row 0: Pre-Carriaged By | Place of Receipt by Pre-Carrier | Vessel/Flight No
+    #   Row 1: No & Kind of Packages | Marks & Nos/Container No | Payment Terms
+    info_rows_b = Table(
+        [
+            [
+                Paragraph(f"<b>Pre-Carriaged By:</b><br/>{pre_carriage}", style_text),
+                Paragraph(f"<b>Place of Receipt by Pre-Carrier:</b><br/>{por_pre}", style_text),
+                Paragraph(f"<b>Vessel/Flight No:</b><br/>{safe(invoice.vessel_flight_no)}", style_text),
+            ],
+            [
+                Paragraph("<b>No &amp; Kind of Packages</b><br/>", style_text),
+                Paragraph("<b>Marks &amp; Nos/Container No</b><br/>", style_text),
+                Paragraph(f"<b>Payment Terms:</b><br/>{payment_term_name}", style_text),
+            ],
+        ],
+        colWidths=[60 * mm, 60 * mm, 60 * mm],
+    )
+    info_rows_b.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",       (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",  (0, 0), (-1, -1), 4),
@@ -607,7 +639,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     ]))
 
     story.append(main_info_table_top)
-    story.append(main_info_table_bottom)
+    story.append(info_rows_b)
+    story.append(info_row_a)
     story.append(Spacer(1, 10))
 
     # ---- Line items table -----------------------------------------------------
@@ -783,24 +816,16 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # ---- Validity and terms table ---------------------------------------------
     # partial_shipment / transshipment are CharFields: "ALLOWED" / "NOT_ALLOWED"
     validity_data = [
-        [Paragraph(
-            f"<b>Validity for Acceptance:</b> {safe(invoice.validity_for_acceptance)}",
-            style_text,
-        )],
-        [Paragraph(
-            f"<b>Validity for Shipment:</b> {safe(invoice.validity_for_shipment)}",
-            style_text,
-        )],
-        [Paragraph(
-            f"<b>Partial Shipment:</b> {bool_yn(invoice.partial_shipment)}",
-            style_text,
-        )],
-        [Paragraph(
-            f"<b>Transshipment:</b> {bool_yn(invoice.transshipment)}",
-            style_text,
-        )],
+        [
+            Paragraph(f"<b>Validity for Acceptance:</b> {safe(invoice.validity_for_acceptance)}", style_text),
+            Paragraph(f"<b>Validity for Shipment:</b> {safe(invoice.validity_for_shipment)}", style_text),
+        ],
+        [
+            Paragraph(f"<b>Partial Shipment:</b> {bool_yn(invoice.partial_shipment)}", style_text),
+            Paragraph(f"<b>Transshipment:</b> {bool_yn(invoice.transshipment)}", style_text),
+        ],
     ]
-    validity_table = Table(validity_data, colWidths=[180 * mm])
+    validity_table = Table(validity_data, colWidths=[90 * mm, 90 * mm])
     validity_table.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",       (0, 0), (-1, -1), "TOP"),
@@ -812,13 +837,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(validity_table)
     story.append(Spacer(1, 10))
 
-    # ---- MT103 advisory + declaration -----------------------------------------
-    story.append(Paragraph(
-        "Request your bank to send MT 103 Message to our bank and send us copy of this "
-        "message to trace &amp; claim the payment from our bank.",
-        style_text,
-    ))
-    story.append(Spacer(1, 8))
+    # ---- Declaration -----------------------------------------------------------
     story.append(Paragraph(
         "<b>Declaration:</b> We declare that this invoice shows the actual price of the "
         "goods described and that all particulars are true and correct.",
@@ -827,98 +846,52 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(Spacer(1, 10))
 
     # ---- Bank details ---------------------------------------------------------
-    # Printed in three sections matching the Bank model structure:
-    #   1. Beneficiary Details  — always shown
-    #   2. Routing & Identifiers — optional fields shown only when non-empty
-    #   3. Intermediary Bank    — shown only when intermediary_bank_name is set
-    # Layout: 2 columns [label 60mm | value 120mm] = 180mm total.
+    # Flat single-box layout: each field on its own line, bold label + value.
+    # Intermediary bank (if set) shown as a single sentence at the bottom.
     if bank:
-        bank_style = TableStyle([
-            ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING",   (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
-        ])
-
-        def _bank_row(label, value):
-            return [
-                Paragraph(f"<b>{label}</b>", style_label),
-                Paragraph(safe(value), style_text),
-            ]
-
-        # Section 1: Beneficiary Details (all fields always present on the model)
-        bank_country_name = safe(getattr(bank.bank_country, "name", "")) if getattr(bank, "bank_country", None) else ""
-        currency_code = safe(getattr(bank.currency, "code", "")) if getattr(bank, "currency", None) else ""
-        account_type_display = safe(bank.account_type).title() if bank.account_type else ""
-
-        beneficiary_data = [
-            [Paragraph("<b>BENEFICIARY DETAILS</b>", style_label), Paragraph("", style_text)],
-            _bank_row("Beneficiary Name",  bank.beneficiary_name),
-            _bank_row("Bank Name",         bank.bank_name),
-            _bank_row("Bank Country",      bank_country_name),
-            _bank_row("Branch Name",       bank.branch_name),
-            _bank_row("Branch Address",    bank.branch_address),
-            _bank_row("Account No.",       bank.account_number),
-            _bank_row("Account Type",      account_type_display),
-            _bank_row("Currency",          currency_code),
-        ]
-        beneficiary_table = Table(beneficiary_data, colWidths=[60 * mm, 120 * mm])
-        beneficiary_table.setStyle(TableStyle([
-            *bank_style._cmds,
-            # Section header spans both columns
-            ("SPAN",       (0, 0), (1, 0)),
-            ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
-        ]))
-        story.append(beneficiary_table)
-        story.append(Spacer(1, 4))
-
-        # Section 2: Routing & Identifiers — only rows with a saved value
-        routing_rows = [
-            [Paragraph("<b>ROUTING &amp; IDENTIFIERS</b>", style_label), Paragraph("", style_text)],
-        ]
-        if bank.swift_code:
-            routing_rows.append(_bank_row("SWIFT / BIC Code", bank.swift_code))
-        if bank.iban:
-            routing_rows.append(_bank_row("IBAN", bank.iban))
+        bank_lines = []
+        bank_lines.append(f"<b>BENEFICIARY NAME:</b> {safe(bank.beneficiary_name)}")
+        bank_lines.append(f"<b>BANK NAME:</b> {safe(bank.bank_name)}")
+        bank_lines.append(f"<b>BRANCH NAME:</b> {safe(bank.branch_name)}")
+        bank_lines.append(f"<b>BRANCH ADDRESS:</b> {safe(bank.branch_address)}")
+        bank_lines.append(f"<b>A/C NO.:</b> {safe(bank.account_number)}")
         if bank.routing_number:
-            routing_rows.append(_bank_row("Routing No. / IFSC", bank.routing_number))
-        if bank.ad_code:
-            routing_rows.append(_bank_row("AD Code", bank.ad_code))
+            bank_lines.append(f"<b>IFSC CODE:</b> {safe(bank.routing_number)}")
+        if bank.swift_code:
+            bank_lines.append(f"<b>SWIFT CODE:</b> {safe(bank.swift_code)}")
+        if bank.iban:
+            bank_lines.append(f"<b>IBAN:</b> {safe(bank.iban)}")
 
-        if len(routing_rows) > 1:  # at least one identifier field is set
-            routing_table = Table(routing_rows, colWidths=[60 * mm, 120 * mm])
-            routing_table.setStyle(TableStyle([
-                *bank_style._cmds,
-                ("SPAN",       (0, 0), (1, 0)),
-                ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
-            ]))
-            story.append(routing_table)
-            story.append(Spacer(1, 4))
-
-        # Section 3: Intermediary Bank — only when all four fields are saved
+        # Intermediary bank as a single sentence
         if safe(bank.intermediary_bank_name):
             intermediary_currency_code = (
                 safe(getattr(bank.intermediary_currency, "code", ""))
                 if getattr(bank, "intermediary_currency", None) else ""
             )
-            intermediary_data = [
-                [Paragraph("<b>INTERMEDIARY BANK</b>", style_label), Paragraph("", style_text)],
-                _bank_row("Bank Name",       bank.intermediary_bank_name),
-                _bank_row("Account No.",     bank.intermediary_account_number),
-                _bank_row("SWIFT / BIC Code", bank.intermediary_swift_code),
-                _bank_row("Currency",        intermediary_currency_code),
-            ]
-            intermediary_table = Table(intermediary_data, colWidths=[60 * mm, 120 * mm])
-            intermediary_table.setStyle(TableStyle([
-                *bank_style._cmds,
-                ("SPAN",       (0, 0), (1, 0)),
-                ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
-            ]))
-            story.append(intermediary_table)
-            story.append(Spacer(1, 4))
+            bank_lines.append(
+                f"<b>Intermediary Institution Routing for Currency</b> {intermediary_currency_code} "
+                f"<b>A/C No.:</b> {safe(bank.intermediary_account_number)} "
+                f"The Bank of {safe(bank.intermediary_bank_name)} "
+                f"<b>SWIFT Code:</b> {safe(bank.intermediary_swift_code)}"
+            )
 
+        bank_lines.append(
+            "Request your bank to send MT 103 Message to our bank and send us copy of this "
+            "message to trace &amp; claim the payment from our bank."
+        )
+
+        # One Paragraph per line so <b> tags render reliably; outer BOX border only.
+        bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
+        bank_box = Table(bank_rows, colWidths=[180 * mm])
+        bank_box.setStyle(TableStyle([
+            ("BOX",          (0, 0), (-1, -1), 0.5, colors.black),
+            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING",   (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 1),
+        ]))
+        story.append(bank_box)
         story.append(Spacer(1, 6))
 
     # ---- Terms & Conditions (new page) ----------------------------------------
@@ -941,7 +914,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 story.append(Spacer(1, 4))
 
     # ---- Build the PDF --------------------------------------------------------
-    doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
+    doc.build(story, canvasmaker=NumberedCanvas)
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
