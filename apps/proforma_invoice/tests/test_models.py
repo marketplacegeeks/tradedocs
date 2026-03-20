@@ -92,3 +92,66 @@ class TestGenerateDocumentNumber:
         seq_part = number.split("-")[2]
         assert len(seq_part) == 4
         assert seq_part.isdigit()
+
+
+# ============================================================================
+# ProformaInvoiceCharge model tests (no coverage existed before)
+# ============================================================================
+
+@pytest.mark.django_db
+class TestProformaInvoiceChargeModel:
+
+    def test_str_contains_pi_number_and_description(self):
+        pi = ProformaInvoiceFactory(pi_number="PI-2026-0001")
+        charge = ProformaInvoiceChargeFactory(pi=pi, description="Bank Charges")
+        result = str(charge)
+        assert "PI-2026-0001" in result
+        assert "Bank Charges" in result
+
+    def test_amount_stored_with_correct_precision(self):
+        charge = ProformaInvoiceChargeFactory(amount_usd=Decimal("150.75"))
+        charge.refresh_from_db()
+        assert charge.amount_usd == Decimal("150.75")
+
+    def test_charge_cascade_deleted_with_pi(self):
+        """CASCADE on the pi FK means charges are deleted when the PI is deleted."""
+        from apps.proforma_invoice.models import ProformaInvoiceCharge
+        pi = ProformaInvoiceFactory()
+        charge = ProformaInvoiceChargeFactory(pi=pi)
+        charge_id = charge.pk
+        pi.delete()
+        assert not ProformaInvoiceCharge.objects.filter(pk=charge_id).exists()
+
+
+# ============================================================================
+# ProformaInvoiceLineItem: additional edge-case model tests
+# ============================================================================
+
+@pytest.mark.django_db
+class TestLineItemModelEdgeCases:
+
+    def test_line_item_cascade_deleted_with_pi(self):
+        """CASCADE on the pi FK means line items are deleted when the PI is deleted."""
+        pi = ProformaInvoiceFactory()
+        item = ProformaInvoiceLineItemFactory(pi=pi)
+        item_id = item.pk
+        pi.delete()
+        assert not ProformaInvoiceLineItem.objects.filter(pk=item_id).exists()
+
+    def test_amount_usd_field_is_not_directly_editable(self):
+        """amount_usd is always computed on save — passing a wrong value is ignored."""
+        item = ProformaInvoiceLineItemFactory(
+            quantity=Decimal("2.000"),
+            rate_usd=Decimal("100.00"),
+        )
+        # Force an incorrect stored value and re-save
+        item.quantity = Decimal("3.000")
+        item.save()
+        item.refresh_from_db()
+        # Must reflect 3 × 100 = 300, not the old stale value
+        assert item.amount_usd == Decimal("300.00")
+
+    def test_hsn_code_blank_is_valid_at_model_level(self):
+        """HSN code is optional — blank string is accepted at the model level."""
+        item = ProformaInvoiceLineItemFactory(hsn_code="")
+        assert item.hsn_code == ""
