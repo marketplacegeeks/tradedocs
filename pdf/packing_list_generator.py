@@ -494,10 +494,11 @@ def build_pl_story(packing_list, styles):
             ("BACKGROUND",   (0, 0), (-1, -1), colors.whitesmoke),
         ]))
 
-        # Items table
+        # Items table — HSN Code and Item Code are separate columns.
         item_header = [
             Paragraph("<b>Sr.</b>", style_label),
-            Paragraph("<b>HSN/Item</b>", style_label),
+            Paragraph("<b>HSN Code</b>", style_label),
+            Paragraph("<b>Item Code</b>", style_label),
             Paragraph("<b>No &amp; Kind of Packages</b>", style_label),
             Paragraph("<b>Description of Goods</b>", style_label),
             Paragraph("<b>Qty</b>", style_label),
@@ -510,9 +511,6 @@ def build_pl_story(packing_list, styles):
             sr += 1
             hsn_part = safe(getattr(it, "hsn_code", ""))
             item_code_part = safe(getattr(it, "item_code", ""))
-            hsn_item = " ".join(
-                x for x in [hsn_part, f"({item_code_part})" if item_code_part else ""] if x
-            ).strip()
             qty_display = _fmt_decimal(getattr(it, "quantity", None))
             uom_obj = getattr(it, "uom", None)
             uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
@@ -522,7 +520,8 @@ def build_pl_story(packing_list, styles):
 
             item_rows.append([
                 Paragraph(str(sr), style_text),
-                Paragraph(hsn_item or "-", style_text),
+                Paragraph(hsn_part or "-", style_text),
+                Paragraph(item_code_part or "-", style_text),
                 Paragraph(packages_kind or "-", style_text),
                 Paragraph(description or "-", style_text),
                 Paragraph(qty_display or "-", style_text),
@@ -530,9 +529,10 @@ def build_pl_story(packing_list, styles):
                 Paragraph(batch_details or "-", style_text),
             ])
 
+        # Col widths: Sr(10) + HSN(20) + ItemCode(20) + Packages(28) + Desc(52) + Qty(16) + UOM(10) + Batch(24) = 180mm
         items_table = Table(
             item_rows,
-            colWidths=[12 * mm, 20 * mm, 32 * mm, 60 * mm, 18 * mm, 12 * mm, 26 * mm],
+            colWidths=[10 * mm, 20 * mm, 20 * mm, 28 * mm, 52 * mm, 16 * mm, 10 * mm, 24 * mm],
             repeatRows=1,
         )
         items_table.hAlign = "LEFT"
@@ -540,7 +540,7 @@ def build_pl_story(packing_list, styles):
             ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
             ("VALIGN",       (0, 0), (-1, -1), "TOP"),
             ("ALIGN",        (0, 0), (0, -1),  "CENTER"),
-            ("ALIGN",        (4, 1), (4, -1),  "RIGHT"),
+            ("ALIGN",        (5, 1), (5, -1),  "RIGHT"),  # Qty is now col 5
             ("LEFTPADDING",  (0, 0), (-1, -1), 2),
             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
             ("TOPPADDING",   (0, 0), (-1, -1), 2),

@@ -18,6 +18,7 @@ from .constants import (
     PI_TRANSITIONS,
     PLCI_TRANSITIONS,
     PERMANENTLY_REJECTED,
+    SUBMIT,
 )
 from .models import AuditLog
 
@@ -161,6 +162,12 @@ class WorkflowService:
         if action in COMMENT_REQUIRED_ACTIONS and not comment.strip():
             raise ValidationError(
                 {"comment": f"A comment is required when performing '{action}'."}
+            )
+
+        # Incoterms is mandatory before a PL+CI can be submitted.
+        if action == SUBMIT and not packing_list.incoterms_id:
+            raise ValidationError(
+                {"incoterms": "Incoterms must be set before submitting for approval."}
             )
 
         # Load the linked CI (required — PL and CI always exist together).

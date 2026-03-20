@@ -40,6 +40,24 @@ from reportlab.platypus import (
 )
 
 
+# Mirrors INCOTERM_PL_FIELDS in frontend/src/utils/constants.ts.
+# Keys are Incoterm codes; values are the set of CI cost fields that should be printed.
+# L/C Details is always shown and is NOT in these sets (FR-14M.8B).
+_INCOTERM_VISIBLE_FIELDS: dict = {
+    "EXW": set(),
+    "FCA": {"fob_rate"},
+    "FOB": {"fob_rate"},
+    "CFR": {"fob_rate", "freight"},
+    "CIF": {"fob_rate", "freight", "insurance"},
+    "CPT": {"fob_rate", "freight"},
+    "CIP": {"fob_rate", "freight", "insurance"},
+    "DAP": {"fob_rate", "freight", "insurance"},
+    "DPU": {"fob_rate", "freight", "insurance"},
+    "DDP": {"fob_rate", "freight", "insurance"},
+}
+_ALL_CI_FIELDS = {"fob_rate", "freight", "insurance"}
+
+
 def safe(v: Any, default: str = "") -> str:
     return default if v is None else str(v)
 
@@ -520,23 +538,37 @@ def build_ci_story(ci, styles) -> list:
     freight_val = _fmt_money(getattr(ci, "freight", 0))
     insurance_val = _fmt_money(getattr(ci, "insurance", 0))
 
-    totals_charges_tbl = Table(
+    # Only print cost fields that are relevant for the selected Incoterm.
+    # If no Incoterm is set, show all three fields (safe default).
+    visible_fields = _INCOTERM_VISIBLE_FIELDS.get(incoterm_str, _ALL_CI_FIELDS)
+
+    # Build right-column charge rows — only for visible fields, in fixed order.
+    charge_rows: list = []
+    if "fob_rate" in visible_fields:
+        charge_rows.append(f"<b>FOB Rate:</b> {fob_rate_val}")
+    if "freight" in visible_fields:
+        charge_rows.append(f"<b>Freight:</b> {freight_val}")
+    if "insurance" in visible_fields:
+        charge_rows.append(f"<b>Insurance:</b> {insurance_val}")
+
+    # Left column is always: Net Weight, Gross Weight, L/C Details.
+    left_rows = [
+        f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)}",
+        f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)}",
+        f"<b>L/C Details:</b> {lc_details_val}",
+    ]
+
+    # Pair rows; pad the shorter side with empty strings so the table is rectangular.
+    n_rows = max(len(left_rows), len(charge_rows))
+    charges_table_data = [
         [
-            [
-                Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)}", style_text),
-                Paragraph(f"<b>FOB Rate:</b> {fob_rate_val}", style_text),
-            ],
-            [
-                Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)}", style_text),
-                Paragraph(f"<b>Freight:</b> {freight_val}", style_text),
-            ],
-            [
-                Paragraph(f"<b>L/C Details:</b> {lc_details_val}", style_text),
-                Paragraph(f"<b>Insurance:</b> {insurance_val}", style_text),
-            ],
-        ],
-        colWidths=[90 * mm, 90 * mm],
-    )
+            Paragraph(left_rows[i] if i < len(left_rows) else "", style_text),
+            Paragraph(charge_rows[i] if i < len(charge_rows) else "", style_text),
+        ]
+        for i in range(n_rows)
+    ]
+
+    totals_charges_tbl = Table(charges_table_data, colWidths=[90 * mm, 90 * mm])
     totals_charges_tbl.hAlign = "LEFT"
     totals_charges_tbl.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),

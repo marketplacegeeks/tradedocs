@@ -1501,6 +1501,8 @@ function Step4({
 
   const queryClient = useQueryClient();
   const [rateForm, setRateForm] = useState<Record<number, string>>({});
+  // Pre-populated from the auto-aggregated packages_kind on each CI line item; editable by Maker.
+  const [pkgForm, setPkgForm] = useState<Record<number, string>>({});
   const [financials, setFinancials] = useState<Record<string, string>>({
     fob_rate: "",
     freight: "",
@@ -1529,13 +1531,39 @@ function Step4({
     }));
   }
 
+  // When CI line items load for the first time, seed pkgForm with the auto-aggregated values.
+  const ciLineItemsKey = ci?.line_items.map((li) => li.id).join(",") ?? "";
+  useEffect(() => {
+    if (!ci) return;
+    setPkgForm((prev) => {
+      // Only seed entries that haven't been touched by the user yet.
+      const seeded: Record<number, string> = { ...prev };
+      for (const li of ci.line_items) {
+        if (!(li.id in seeded)) {
+          seeded[li.id] = li.packages_kind ?? "";
+        }
+      }
+      return seeded;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ciLineItemsKey]);
+
   async function handleSave() {
     if (!ci) return;
+    if (!financials.incoterms) {
+      message.error("Incoterms is required before saving.");
+      return;
+    }
     setSaving(true);
     try {
-      // Save each rate
-      for (const [idStr, rate] of Object.entries(rateForm)) {
-        await updateCILineItem(Number(idStr), { rate_usd: rate });
+      // Save rate_usd and packages_kind for each line item.
+      for (const li of ci.line_items) {
+        const updates: { rate_usd?: string; packages_kind?: string } = {};
+        if (rateForm[li.id] !== undefined) updates.rate_usd = rateForm[li.id];
+        if (pkgForm[li.id] !== undefined) updates.packages_kind = pkgForm[li.id];
+        if (Object.keys(updates).length > 0) {
+          await updateCILineItem(li.id, updates);
+        }
       }
       // Save financial fields on the PL (incoterms, payment_terms) and CI (fob_rate etc.)
       const { updatePackingList } = await import("../../api/packingLists");
@@ -1576,12 +1604,20 @@ function Step4({
               <th style={TH}>UOM</th>
               <th style={TH}>Rate (USD) *</th>
               <th style={TH}>Amount (USD)</th>
+              <th style={TH}>
+                No. &amp; Kind of Packages
+                <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  for commercial invoice
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
             {ci.line_items.map((li) => {
               const rate = rateForm[li.id] ?? li.rate_usd;
               const amount = (parseFloat(li.total_quantity) * parseFloat(rate || "0")).toFixed(2);
+              // pkgForm is seeded from li.packages_kind on load; user can edit freely.
+              const pkg = pkgForm[li.id] ?? li.packages_kind ?? "";
               return (
                 <tr key={li.id}>
                   <td style={{ ...TD, fontWeight: 600 }}>{li.item_code}</td>
@@ -1602,6 +1638,13 @@ function Step4({
                     )}
                   </td>
                   <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
+                  <td style={TD}>
+                    <textarea
+                      style={{ ...INPUT, minHeight: 60, resize: "vertical", width: "100%", fontSize: 13 }}
+                      value={pkg}
+                      onChange={(e) => setPkgForm({ ...pkgForm, [li.id]: e.target.value })}
+                    />
+                  </td>
                 </tr>
               );
             })}
@@ -1612,9 +1655,10 @@ function Step4({
       <p style={{ ...SECTION_TITLE, marginTop: 24 }}>Payment & Terms</p>
       <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
         <div>
-          <label style={LABEL}>Incoterms</label>
-          <Select allowClear style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
+          <label style={LABEL}>Incoterms *</label>
+          <Select style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
             onChange={(v) => handleIncotermChange(v)}
+            placeholder="Select Incoterms"
             options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
         </div>
         <div>

@@ -255,10 +255,11 @@ class TestPackingListDelete:
 class TestPackingListWorkflow:
 
     def _pl_with_ci(self, status_value=DRAFT, maker=None):
-        """Create a PL+CI pair in the given status."""
+        """Create a PL+CI pair in the given status. Incoterms is required for SUBMIT."""
         from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.master_data.tests.factories import IncotermFactory
         maker = maker or MakerFactory()
-        pl = PackingListFactory(status=status_value, created_by=maker)
+        pl = PackingListFactory(status=status_value, created_by=maker, incoterms=IncotermFactory())
         CommercialInvoiceFactory(packing_list=pl, status=status_value, created_by=maker)
         return pl, maker
 
