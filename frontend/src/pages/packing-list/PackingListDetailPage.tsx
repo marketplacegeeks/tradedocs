@@ -23,6 +23,7 @@ import {
 import type { PackingList, CILineItem } from "../../api/packingLists";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import { useAuth } from "../../store/AuthContext";
+import { extractApiError } from "../../utils/apiErrors";
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_CHIP,
@@ -271,7 +272,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", ciId] });
       message.success("Updated.");
     },
-    onError: () => message.error("Failed to update."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to update.")),
   });
 
   if (!ci) {
@@ -487,7 +488,7 @@ export default function PackingListDetailPage() {
       message.success("Packing List deleted.");
       navigate("/packing-lists");
     },
-    onError: () => message.error("Could not delete this document."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Could not delete this document.")),
   });
 
   const uploadPlSignedCopyMutation = useMutation({
@@ -496,10 +497,7 @@ export default function PackingListDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["packing-list", id] });
       message.success("PL signed copy uploaded.");
     },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   const uploadCiSignedCopyMutation = useMutation({
@@ -508,10 +506,7 @@ export default function PackingListDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl?.ci_id] });
       message.success("CI signed copy uploaded.");
     },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   if (isLoading || !pl) {

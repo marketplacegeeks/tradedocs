@@ -22,6 +22,7 @@ import {
 import { listBanks } from "../../api/banks";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
 import { SHIPMENT_OPTIONS, SHIPMENT_OPTION_LABELS } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Zod schema ------------------------------------------------------------
 
@@ -186,22 +187,8 @@ export default function ProformaInvoiceCreatePage() {
       message.success(`${pi.pi_number} created. Add line items now.`);
       navigate(`/proforma-invoices/${pi.id}`);
     },
-    onError: (err: any) => {
-      const data = err?.response?.data;
-      let msg = "Failed to create Proforma Invoice.";
-      if (data) {
-        if (typeof data === "string") {
-          msg = data;
-        } else if (data.detail) {
-          msg = data.detail;
-        } else if (typeof data === "object") {
-          // Field-level validation errors — join them into one readable string
-          msg = Object.entries(data)
-            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
-            .join(" | ");
-        }
-      }
-      message.error(msg, 8);
+    onError: (err: unknown) => {
+      message.error(extractApiError(err, "Failed to create Proforma Invoice."), 8);
     },
   });
 

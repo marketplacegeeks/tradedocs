@@ -29,6 +29,7 @@ import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { useAuth } from "../../store/AuthContext";
 import { DOCUMENT_STATUS, INCOTERM_PL_FIELDS, ROLES } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Styles (reuse the same tokens as Create page) --------------------------
 
@@ -259,9 +260,8 @@ export default function PackingListEditPage() {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
       message.success("Saved.");
       navigate(`/packing-lists/${pl.id}`);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail || "Failed to save.";
-      message.error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to save."));
     } finally {
       setSaving(false);
     }
@@ -287,8 +287,8 @@ export default function PackingListEditPage() {
       queryClient.invalidateQueries({ queryKey: ["packing-list", pl!.id] });
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl!.ci_id] });
       message.success("Item added.");
-    } catch (err: any) {
-      message.error(err?.response?.data ? JSON.stringify(err.response.data) : "Failed to add item.");
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to add item."));
     }
   }
 

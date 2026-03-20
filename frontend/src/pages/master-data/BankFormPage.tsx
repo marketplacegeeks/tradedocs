@@ -1,6 +1,6 @@
 // Bank create / edit form — design system card layout.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { ArrowLeft } from "lucide-react";
 
 import { createBank, getBank, updateBank } from "../../api/banks";
+import { extractApiError } from "../../utils/apiErrors";
 import { listCountries } from "../../api/countries";
 import { listCurrencies } from "../../api/currencies";
 import { listOrganisations } from "../../api/organisations";
@@ -199,7 +200,9 @@ export default function BankFormPage() {
   const queryClient = useQueryClient();
   const isEditing = Boolean(id);
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<BankFormValues>({
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const { control, handleSubmit, reset, setError, formState: { errors } } = useForm<BankFormValues>({
     resolver: zodResolver(bankSchema),
     defaultValues: {
       organisation: undefined,
@@ -248,12 +251,35 @@ export default function BankFormPage() {
     }
   }, [existingBank, reset]);
 
+  // Form fields the server can return validation errors for.
+  const BANK_FORM_FIELDS = new Set<string>([
+    "organisation", "nickname", "beneficiary_name", "bank_name", "bank_country",
+    "branch_name", "branch_address", "account_number", "account_type", "currency",
+    "swift_code", "iban", "routing_number", "ad_code",
+    "intermediary_bank_name", "intermediary_account_number",
+    "intermediary_swift_code", "intermediary_currency",
+  ]);
+
   const saveMutation = useMutation({
     mutationFn: (values: BankFormValues) =>
       isEditing ? updateBank(Number(id), values) : createBank(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["banks"] });
       navigate("/master-data/banks");
+    },
+    onError: (err: unknown) => {
+      const data = (err as { response?: { data?: unknown } })?.response?.data;
+      // Map any field-level server errors back onto the form for inline display.
+      if (data && typeof data === "object") {
+        for (const [field, messages] of Object.entries(data as Record<string, unknown>)) {
+          if (BANK_FORM_FIELDS.has(field)) {
+            const msg = Array.isArray(messages) ? messages[0] : String(messages);
+            setError(field as keyof BankFormValues, { message: msg });
+          }
+        }
+      }
+      // Always show the full extracted message in the banner so nothing is hidden.
+      setSubmitError(extractApiError(err, "Failed to save. Please fix the errors below."));
     },
   });
 
@@ -296,13 +322,13 @@ export default function BankFormPage() {
         </div>
       </div>
 
-      {saveMutation.isError && (
-        <div style={{ background: "var(--pastel-pink)", color: "var(--pastel-pink-text)", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontFamily: "var(--font-body)", fontSize: 13 }}>
-          Failed to save. Please check the form for errors.
+      {submitError && (
+        <div style={{ background: "var(--pastel-pink)", color: "var(--pastel-pink-text)", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontFamily: "var(--font-body)", fontSize: 13, whiteSpace: "pre-line" }}>
+          {submitError}
         </div>
       )}
 
-      <form onSubmit={handleSubmit((v) => saveMutation.mutate(v))}>
+      <form onSubmit={handleSubmit((v) => { setSubmitError(null); saveMutation.mutate(v); })}>
         <Section title="Account Details">
           {/* Exporter Organisation — full width */}
           <Field label="Exporter Organisation" required error={errors.organisation?.message}>

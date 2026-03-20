@@ -31,6 +31,7 @@ import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { listProformaInvoices } from "../../api/proformaInvoices";
 import { DOCUMENT_STATUS, INCOTERM_PL_FIELDS } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Styles -----------------------------------------------------------------
 
@@ -485,20 +486,8 @@ function Step1({
         result = await createPackingList({ proforma_invoice: form.proforma_invoice, ...sharedFields });
       }
       onNext(result);
-    } catch (err: any) {
-      const data = err?.response?.data;
-      let errorMsg = existingPl ? "Failed to save." : "Failed to create.";
-      if (data) {
-        if (typeof data === "string") {
-          errorMsg = data;
-        } else if (typeof data === "object") {
-          const parts = Object.entries(data).map(([field, msgs]) =>
-            `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`
-          );
-          errorMsg = parts.join(" | ");
-        }
-      }
-      message.error(errorMsg, 6);
+    } catch (err) {
+      message.error(extractApiError(err, existingPl ? "Failed to save." : "Failed to create."), 6);
     } finally {
       setSaving(false);
     }
@@ -748,8 +737,8 @@ function Step2({
         additional_description: form.additional_description || "",
       });
       onNext();
-    } catch {
-      message.error("Failed to save references.");
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to save references."));
     } finally {
       setSaving(false);
     }
@@ -883,8 +872,8 @@ function Step3({
         // Auto-open a pending item row for the new container
         setPendingItems((prev) => ({ ...prev, [newContainer.id]: [{}] }));
       }
-    } catch {
-      message.error("Failed to add container.");
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to add container."));
     }
   }
 
@@ -892,8 +881,8 @@ function Step3({
     try {
       await deleteContainer(id);
       invalidate();
-    } catch {
-      message.error("Cannot remove container.");
+    } catch (err) {
+      message.error(extractApiError(err, "Cannot remove container."));
     }
   }
 
@@ -901,8 +890,8 @@ function Step3({
     try {
       await copyContainer(id);
       invalidate();
-    } catch {
-      message.error("Failed to copy container.");
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to copy container."));
     }
   }
 
@@ -943,9 +932,8 @@ function Step3({
       removePendingItem(containerId, idx);
       invalidate();
       message.success("Item added.");
-    } catch (err: any) {
-      const detail = err?.response?.data || "Failed to add item.";
-      message.error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to add item."));
     }
   }
 
@@ -953,8 +941,8 @@ function Step3({
     try {
       await deleteContainerItem(id);
       invalidate();
-    } catch {
-      message.error("Cannot remove item.");
+    } catch (err) {
+      message.error(extractApiError(err, "Cannot remove item."));
     }
   }
 
@@ -1579,8 +1567,8 @@ function Step4({
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
       message.success("Rates saved.");
       onDone();
-    } catch {
-      message.error("Failed to save rates.");
+    } catch (err) {
+      message.error(extractApiError(err, "Failed to save rates."));
     } finally {
       setSaving(false);
     }

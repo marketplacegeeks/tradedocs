@@ -1,7 +1,7 @@
 // Proforma Invoice detail page — FR-09.5 (line items), FR-09.7 (cost breakdown), FR-08 (workflow).
 // Shows header, editable line items + charges (in DRAFT/REWORK), cost breakdown, workflow buttons, PDF download.
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal, Tooltip } from "antd";
@@ -22,8 +22,8 @@ import {
   getAuditLog,
   uploadSignedCopy,
 } from "../../api/proformaInvoices";
-import { listUOMs, listIncoterms } from "../../api/referenceData";
-import type { UOM, Incoterm } from "../../api/referenceData";
+import { listUOMs, listIncoterms, listPaymentTerms } from "../../api/referenceData";
+import type { UOM, Incoterm, PaymentTerm } from "../../api/referenceData";
 import type { ProformaInvoiceLineItem, ProformaInvoiceCharge, AuditLogEntry } from "../../api/proformaInvoices";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import { useAuth } from "../../store/AuthContext";
@@ -34,6 +34,7 @@ import {
   INCOTERM_SELLER_FIELDS,
   COST_FIELD_LABELS,
 } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Styles ----------------------------------------------------------------
 
@@ -144,6 +145,8 @@ export default function ProformaInvoiceDetailPage() {
   const [costFields, setCostFields] = useState<Record<string, string>>({
     freight: "", insurance_amount: "", import_duty: "", destination_charges: "",
   });
+  // Debounce timer ref — cost fields save 600ms after the user stops typing
+  const costSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: pi, isLoading } = useQuery({
     queryKey: ["proforma-invoice", piId],
@@ -166,6 +169,11 @@ export default function ProformaInvoiceDetailPage() {
     queryFn: listIncoterms,
   });
 
+  const { data: paymentTerms = [] } = useQuery<PaymentTerm[]>({
+    queryKey: ["payment-terms"],
+    queryFn: listPaymentTerms,
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["proforma-invoice", piId] });
     queryClient.invalidateQueries({ queryKey: ["proforma-invoices"] });
@@ -176,46 +184,43 @@ export default function ProformaInvoiceDetailPage() {
   const addLineItemMutation = useMutation({
     mutationFn: (data: any) => createLineItem(piId, data),
     onSuccess: () => { invalidate(); setAddingLineItem(false); setLineItemForm(EMPTY_LINE_ITEM); },
-    onError: (e: any) => message.error(e?.response?.data?.description?.[0] || "Failed to add line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to add line item.")),
   });
 
   const updateLineItemMutation = useMutation({
     mutationFn: ({ lid, data }: { lid: number; data: any }) => updateLineItem(piId, lid, data),
     onSuccess: () => { invalidate(); setEditingLineItem(null); },
-    onError: (e: any) => message.error("Failed to update line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to update line item.")),
   });
 
   const deleteLineItemMutation = useMutation({
     mutationFn: (lid: number) => deleteLineItem(piId, lid),
     onSuccess: invalidate,
-    onError: () => message.error("Failed to delete line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to delete line item.")),
   });
 
   const addChargeMutation = useMutation({
     mutationFn: (data: any) => createCharge(piId, data),
     onSuccess: () => { invalidate(); setAddingCharge(false); setChargeForm({ description: "", amount_usd: "" }); },
-    onError: () => message.error("Failed to add charge."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to add charge.")),
   });
 
   const deleteChargeMutation = useMutation({
     mutationFn: (cid: number) => deleteCharge(piId, cid),
     onSuccess: invalidate,
-    onError: () => message.error("Failed to delete charge."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to delete charge.")),
   });
 
   const updateCostFieldsMutation = useMutation({
     mutationFn: (data: any) => updateProformaInvoice(piId, data),
     onSuccess: () => { invalidate(); message.success("Saved."); },
-    onError: () => message.error("Failed to save."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to save.")),
   });
 
   const uploadSignedCopyMutation = useMutation({
     mutationFn: (file: File) => uploadSignedCopy(piId, file),
     onSuccess: () => { invalidate(); message.success("Signed copy uploaded."); },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   if (isLoading || !pi) {
@@ -558,8 +563,15 @@ export default function ProformaInvoiceDetailPage() {
                   <input
                     style={{ ...INPUT, width: 120, textAlign: "right" }}
                     value={costFields[field] ?? (pi as any)[field] ?? ""}
-                    onChange={(e) => setCostFields((p) => ({ ...p, [field]: e.target.value }))}
-                    onBlur={() => updateCostFieldsMutation.mutate({ [field]: costFields[field] || null })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCostFields((p) => ({ ...p, [field]: val }));
+                      // Debounce: save 600ms after the user stops typing
+                      if (costSaveTimer.current) clearTimeout(costSaveTimer.current);
+                      costSaveTimer.current = setTimeout(() => {
+                        updateCostFieldsMutation.mutate({ [field]: val || null });
+                      }, 600);
+                    }}
                     placeholder="0.00"
                   />
                 ) : (
@@ -700,11 +712,21 @@ export default function ProformaInvoiceDetailPage() {
             <Clock size={14} strokeWidth={1.5} /> History
           </button>
           <button
-            onClick={() =>
-              downloadPiPdf(piId, `${pi.pi_number}.pdf`).catch(() =>
+            onClick={() => {
+              const today = new Date();
+              const dd = String(today.getDate()).padStart(2, "0");
+              const mm = String(today.getMonth() + 1).padStart(2, "0");
+              const yyyy = today.getFullYear();
+              const dateStr = `${dd}${mm}${yyyy}`;
+              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+              const filename = isDraft
+                ? `${dateStr}_Draft_ProformaInvoice_${consigneeName}.pdf`
+                : `${dateStr}_ProformaInvoice_${consigneeName}.pdf`;
+              downloadPiPdf(piId, filename).catch(() =>
                 message.error("PDF download failed. Please try again.")
-              )
-            }
+              );
+            }}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               background: "var(--pastel-green)", color: "var(--pastel-green-text)",
@@ -759,7 +781,26 @@ export default function ProformaInvoiceDetailPage() {
               <span style={VALUE}>{pi.incoterms_code ?? "—"}</span>
             )}
           </div>
-          <LabelValue label="Payment Terms" value={pi.payment_terms_name ?? undefined} />
+          <div>
+            <span style={LABEL}>Payment Terms</span>
+            {canEdit ? (
+              <select
+                style={{ ...INPUT, marginTop: 4 }}
+                value={pi.payment_terms ?? ""}
+                onChange={(e) => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  updateCostFieldsMutation.mutate({ payment_terms: id });
+                }}
+              >
+                <option value="">— Select —</option>
+                {paymentTerms.filter(p => p.is_active).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={VALUE}>{pi.payment_terms_name ?? "—"}</span>
+            )}
+          </div>
           <LabelValue label="Port of Loading" value={pi.port_of_loading_name ?? undefined} />
           <LabelValue label="Port of Discharge" value={pi.port_of_discharge_name ?? undefined} />
           <LabelValue label="Place of Receipt" value={pi.place_of_receipt_name ?? undefined} />

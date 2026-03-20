@@ -6,7 +6,8 @@ from django.db.models.deletion import ProtectedError
 from .factories import (
     BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
     OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
-    OrganisationTaxCodeFactory, PortFactory, TCTemplateFactory, UOMFactory,
+    OrganisationTaxCodeFactory, PaymentTermFactory, PortFactory, PreCarriageByFactory,
+    TCTemplateFactory, UOMFactory,
 )
 
 
@@ -25,6 +26,10 @@ class TestCountryModel:
         CountryFactory(iso2="IN", iso3="IND")
         with pytest.raises(IntegrityError):
             CountryFactory(iso2="IO", iso3="IND")  # duplicate iso3
+
+    def test_is_active_defaults_to_true(self):
+        country = CountryFactory()
+        assert country.is_active is True
 
 
 @pytest.mark.django_db
@@ -45,6 +50,10 @@ class TestPortModel:
         with pytest.raises(ProtectedError):
             port.country.delete()
 
+    def test_is_active_defaults_to_true(self):
+        port = PortFactory()
+        assert port.is_active is True
+
 
 @pytest.mark.django_db
 class TestLocationModel:
@@ -59,6 +68,10 @@ class TestLocationModel:
         with pytest.raises(ProtectedError):
             location.country.delete()
 
+    def test_is_active_defaults_to_true(self):
+        location = LocationFactory()
+        assert location.is_active is True
+
 
 @pytest.mark.django_db
 class TestIncotermModel:
@@ -71,6 +84,10 @@ class TestIncotermModel:
         with pytest.raises(IntegrityError):
             IncotermFactory(code="FOB")
 
+    def test_is_active_defaults_to_true(self):
+        incoterm = IncotermFactory()
+        assert incoterm.is_active is True
+
 
 @pytest.mark.django_db
 class TestUOMModel:
@@ -82,6 +99,40 @@ class TestUOMModel:
         UOMFactory(abbreviation="MT")
         with pytest.raises(IntegrityError):
             UOMFactory(abbreviation="MT")
+
+    def test_is_active_defaults_to_true(self):
+        uom = UOMFactory()
+        assert uom.is_active is True
+
+
+# ---------------------------------------------------------------------------
+# PaymentTerm model tests (FR-06)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestPaymentTermModel:
+    def test_str(self):
+        term = PaymentTermFactory(name="Advance Payment")
+        assert str(term) == "Advance Payment"
+
+    def test_is_active_defaults_to_true(self):
+        term = PaymentTermFactory()
+        assert term.is_active is True
+
+
+# ---------------------------------------------------------------------------
+# PreCarriageBy model tests (FR-06)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestPreCarriageByModel:
+    def test_str(self):
+        carrier = PreCarriageByFactory(name="Truck")
+        assert str(carrier) == "Truck"
+
+    def test_is_active_defaults_to_true(self):
+        carrier = PreCarriageByFactory()
+        assert carrier.is_active is True
 
 
 # ---------------------------------------------------------------------------

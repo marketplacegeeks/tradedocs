@@ -55,6 +55,44 @@ class TestCountryEndpoints:
         response = api_client.get(reverse("country-list"))
         assert response.status_code == 401
 
+    def test_checker_can_patch_country(self):
+        country = CountryFactory(name="India", iso2="IN", iso3="IND")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("country-detail", args=[country.id]), {"name": "India Updated"})
+        assert response.status_code == 200
+        assert response.data["name"] == "India Updated"
+
+    def test_maker_cannot_patch_country(self):
+        country = CountryFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("country-detail", args=[country.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_country(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("country-detail", args=[country.id]))
+        assert response.status_code == 204
+        country.refresh_from_db()
+        assert country.is_active is False
+
+    def test_soft_deleted_country_hidden_from_default_list(self):
+        active = CountryFactory()
+        inactive = CountryFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("country-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_countries(self):
+        CountryFactory(is_active=True)
+        inactive = CountryFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("country-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
 
 # ---------------------------------------------------------------------------
 # Port endpoints
@@ -83,6 +121,63 @@ class TestPortEndpoints:
     def test_unauthenticated_cannot_list(self, api_client):
         response = api_client.get(reverse("port-list"))
         assert response.status_code == 401
+
+    def test_company_admin_can_create_port(self):
+        country = CountryFactory()
+        client = auth_client(CompanyAdminFactory())
+        response = client.post(reverse("port-list"), {"name": "Chennai", "code": "INMAA", "country": country.id})
+        assert response.status_code == 201
+
+    def test_checker_can_patch_port(self):
+        port = PortFactory(name="Mumbai")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("port-detail", args=[port.id]), {"name": "Mumbai Updated"})
+        assert response.status_code == 200
+        assert response.data["name"] == "Mumbai Updated"
+
+    def test_maker_cannot_patch_port(self):
+        port = PortFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("port-detail", args=[port.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_port(self):
+        port = PortFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("port-detail", args=[port.id]))
+        assert response.status_code == 204
+        port.refresh_from_db()
+        assert port.is_active is False
+
+    def test_soft_deleted_port_hidden_from_default_list(self):
+        active = PortFactory()
+        inactive = PortFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("port-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_ports(self):
+        PortFactory(is_active=True)
+        inactive = PortFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("port-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
+    def test_missing_country_returns_400_for_port(self):
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("port-list"), {"name": "Test Port", "code": "TPRT"})
+        assert response.status_code == 400
+        assert "country" in response.data
+
+    def test_response_includes_country_name_for_port(self):
+        country = CountryFactory(name="India")
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("port-list"), {"name": "Mumbai", "code": "INBOM", "country": country.id})
+        assert response.status_code == 201
+        assert response.data["country_name"] == "India"
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +208,63 @@ class TestLocationEndpoints:
         response = api_client.get(reverse("location-list"))
         assert response.status_code == 401
 
+    def test_company_admin_can_create_location(self):
+        country = CountryFactory()
+        client = auth_client(CompanyAdminFactory())
+        response = client.post(reverse("location-list"), {"name": "ICD Patparganj", "country": country.id})
+        assert response.status_code == 201
+
+    def test_checker_can_patch_location(self):
+        location = LocationFactory(name="Old Name")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("location-detail", args=[location.id]), {"name": "New Name"})
+        assert response.status_code == 200
+        assert response.data["name"] == "New Name"
+
+    def test_maker_cannot_patch_location(self):
+        location = LocationFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("location-detail", args=[location.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_location(self):
+        location = LocationFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("location-detail", args=[location.id]))
+        assert response.status_code == 204
+        location.refresh_from_db()
+        assert location.is_active is False
+
+    def test_soft_deleted_location_hidden_from_default_list(self):
+        active = LocationFactory()
+        inactive = LocationFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("location-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_locations(self):
+        LocationFactory(is_active=True)
+        inactive = LocationFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("location-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
+    def test_missing_country_returns_400_for_location(self):
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("location-list"), {"name": "Test Location"})
+        assert response.status_code == 400
+        assert "country" in response.data
+
+    def test_response_includes_country_name_for_location(self):
+        country = CountryFactory(name="India")
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("location-list"), {"name": "ICD Tughlakabad", "country": country.id})
+        assert response.status_code == 201
+        assert response.data["country_name"] == "India"
+
 
 # ---------------------------------------------------------------------------
 # Incoterm endpoints
@@ -135,6 +287,47 @@ class TestIncotermEndpoints:
 
     def test_unauthenticated_cannot_list(self, api_client):
         assert api_client.get(reverse("incoterm-list")).status_code == 401
+
+    def test_company_admin_can_create_incoterm(self):
+        client = auth_client(CompanyAdminFactory())
+        assert client.post(reverse("incoterm-list"), {"code": "CIF", "full_name": "Cost Insurance Freight"}).status_code == 201
+
+    def test_checker_can_patch_incoterm(self):
+        incoterm = IncotermFactory()
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("incoterm-detail", args=[incoterm.id]), {"description": "Updated description"})
+        assert response.status_code == 200
+
+    def test_maker_cannot_patch_incoterm(self):
+        incoterm = IncotermFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("incoterm-detail", args=[incoterm.id]), {"description": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_incoterm(self):
+        incoterm = IncotermFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("incoterm-detail", args=[incoterm.id]))
+        assert response.status_code == 204
+        incoterm.refresh_from_db()
+        assert incoterm.is_active is False
+
+    def test_soft_deleted_incoterm_hidden_from_default_list(self):
+        active = IncotermFactory()
+        inactive = IncotermFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("incoterm-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_incoterms(self):
+        IncotermFactory(is_active=True)
+        inactive = IncotermFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("incoterm-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +352,48 @@ class TestUOMEndpoints:
     def test_unauthenticated_cannot_list(self, api_client):
         assert api_client.get(reverse("uom-list")).status_code == 401
 
+    def test_company_admin_can_create_uom(self):
+        client = auth_client(CompanyAdminFactory())
+        assert client.post(reverse("uom-list"), {"name": "Kilograms", "abbreviation": "KG"}).status_code == 201
+
+    def test_checker_can_patch_uom(self):
+        uom = UOMFactory(name="Metric Tonnes", abbreviation="MT")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("uom-detail", args=[uom.id]), {"name": "Metric Tons"})
+        assert response.status_code == 200
+        assert response.data["name"] == "Metric Tons"
+
+    def test_maker_cannot_patch_uom(self):
+        uom = UOMFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("uom-detail", args=[uom.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_uom(self):
+        uom = UOMFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("uom-detail", args=[uom.id]))
+        assert response.status_code == 204
+        uom.refresh_from_db()
+        assert uom.is_active is False
+
+    def test_soft_deleted_uom_hidden_from_default_list(self):
+        active = UOMFactory()
+        inactive = UOMFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("uom-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_uoms(self):
+        UOMFactory(is_active=True)
+        inactive = UOMFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("uom-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
 
 # ---------------------------------------------------------------------------
 # PaymentTerm endpoints
@@ -182,6 +417,47 @@ class TestPaymentTermEndpoints:
     def test_unauthenticated_cannot_list(self, api_client):
         assert api_client.get(reverse("paymentterm-list")).status_code == 401
 
+    def test_company_admin_can_create_paymentterm(self):
+        client = auth_client(CompanyAdminFactory())
+        assert client.post(reverse("paymentterm-list"), {"name": "LC at Sight"}).status_code == 201
+
+    def test_checker_can_patch_paymentterm(self):
+        term = PaymentTermFactory(name="Advance Payment")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("paymentterm-detail", args=[term.id]), {"description": "Full upfront payment"})
+        assert response.status_code == 200
+
+    def test_maker_cannot_patch_paymentterm(self):
+        term = PaymentTermFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("paymentterm-detail", args=[term.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_paymentterm(self):
+        term = PaymentTermFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("paymentterm-detail", args=[term.id]))
+        assert response.status_code == 204
+        term.refresh_from_db()
+        assert term.is_active is False
+
+    def test_soft_deleted_paymentterm_hidden_from_default_list(self):
+        active = PaymentTermFactory()
+        inactive = PaymentTermFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("paymentterm-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_paymentterms(self):
+        PaymentTermFactory(is_active=True)
+        inactive = PaymentTermFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("paymentterm-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
 
 # ---------------------------------------------------------------------------
 # PreCarriageBy endpoints
@@ -204,6 +480,48 @@ class TestPreCarriageByEndpoints:
 
     def test_unauthenticated_cannot_list(self, api_client):
         assert api_client.get(reverse("precarriageby-list")).status_code == 401
+
+    def test_company_admin_can_create_precarriageby(self):
+        client = auth_client(CompanyAdminFactory())
+        assert client.post(reverse("precarriageby-list"), {"name": "Rail"}).status_code == 201
+
+    def test_checker_can_patch_precarriageby(self):
+        carrier = PreCarriageByFactory(name="Truck")
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("precarriageby-detail", args=[carrier.id]), {"name": "Road Truck"})
+        assert response.status_code == 200
+        assert response.data["name"] == "Road Truck"
+
+    def test_maker_cannot_patch_precarriageby(self):
+        carrier = PreCarriageByFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(reverse("precarriageby-detail", args=[carrier.id]), {"name": "Changed"})
+        assert response.status_code == 403
+
+    def test_checker_can_soft_delete_precarriageby(self):
+        carrier = PreCarriageByFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("precarriageby-detail", args=[carrier.id]))
+        assert response.status_code == 204
+        carrier.refresh_from_db()
+        assert carrier.is_active is False
+
+    def test_soft_deleted_precarriageby_hidden_from_default_list(self):
+        active = PreCarriageByFactory()
+        inactive = PreCarriageByFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("precarriageby-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_precarriageby(self):
+        PreCarriageByFactory(is_active=True)
+        inactive = PreCarriageByFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("precarriageby-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +670,112 @@ class TestOrganisationEndpoints:
         assert "Export Co" in names_returned
         assert "Consignee Co" not in names_returned
 
+    def test_invalid_iec_code_format_rejected(self):
+        """IEC code must be exactly 10 uppercase alphanumeric chars. Any other format is rejected."""
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        payload = _org_payload(country.id)
+        payload["tags"] = [{"tag": "EXPORTER"}]
+        payload["iec_code"] = "abc123"  # too short and lowercase
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+        assert "iec_code" in response.data
+
+    def test_create_with_valid_gstin_tax_code_succeeds(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        payload = _org_payload(country.id)
+        payload["tax_codes"] = [{"tax_type": "GSTIN", "tax_code": "22AAAAA0000A1Z5"}]
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 201
+        assert len(response.data["tax_codes"]) == 1
+
+    def test_create_with_invalid_gstin_rejected(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        payload = _org_payload(country.id)
+        payload["tax_codes"] = [{"tax_type": "GSTIN", "tax_code": "BADGSTIN"}]
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+
+    def test_create_with_invalid_pan_rejected(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        payload = _org_payload(country.id)
+        payload["tax_codes"] = [{"tax_type": "PAN", "tax_code": "BADPAN"}]
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 400
+
+    def test_maker_cannot_patch_organisation(self):
+        org = OrganisationFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(
+            reverse("organisation-detail", args=[org.id]),
+            {"name": "Attempted Change"},
+            format="json",
+        )
+        assert response.status_code == 403
+
+    def test_checker_can_patch_organisation_name(self):
+        org = OrganisationFactory(name="Original Name")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-detail", args=[org.id]),
+            {"name": "Updated Name"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["name"] == "Updated Name"
+
+    def test_patch_with_new_tags_replaces_existing_tags(self):
+        """Sending tags in a PATCH replaces the existing tags wholesale."""
+        org = OrganisationFactory()
+        OrganisationTagFactory(organisation=org, tag="CONSIGNEE")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-detail", args=[org.id]),
+            {"tags": [{"tag": "BUYER"}]},
+            format="json",
+        )
+        assert response.status_code == 200
+        tag_values = [t["tag"] for t in response.data["tags"]]
+        assert "BUYER" in tag_values
+        assert "CONSIGNEE" not in tag_values
+
+    def test_patch_omitting_tags_leaves_tags_unchanged(self):
+        """A PATCH that does not include 'tags' must leave existing tags intact."""
+        org = OrganisationFactory(name="Test Org")
+        OrganisationTagFactory(organisation=org, tag="CONSIGNEE")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-detail", args=[org.id]),
+            {"name": "Test Org Renamed"},
+            format="json",
+        )
+        assert response.status_code == 200
+        tag_values = [t["tag"] for t in response.data["tags"]]
+        assert "CONSIGNEE" in tag_values
+
+    def test_inactive_filter_returns_inactive_organisations(self):
+        OrganisationFactory(is_active=True)
+        inactive = OrganisationFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("organisation-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
+    def test_get_detail_returns_nested_addresses_and_tags(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        OrganisationTagFactory(organisation=org, tag="CONSIGNEE")
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("organisation-detail", args=[org.id]))
+        assert response.status_code == 200
+        assert "addresses" in response.data
+        assert "tags" in response.data
+        assert len(response.data["addresses"]) >= 1
+        assert len(response.data["tags"]) >= 1
+
 
 @pytest.mark.django_db
 class TestOrganisationAddressEndpoints:
@@ -482,6 +906,134 @@ class TestOrganisationAddressEndpoints:
         assert response.status_code == 400
         assert "addresses" in str(response.data)
 
+    def test_phone_number_without_country_code_rejected(self):
+        """Providing a phone number without a country code must be rejected."""
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Contact",
+                "phone_country_code": "",
+                "phone_number": "9876543210",
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "phone" in str(response.data)
+
+    def test_phone_country_code_without_number_rejected(self):
+        """Providing a country code without a phone number must be rejected."""
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Contact",
+                "phone_country_code": "+91",
+                "phone_number": "",
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "phone" in str(response.data)
+
+    def test_invalid_phone_format_rejected(self):
+        """Both fields provided but in an unparseable format must be rejected."""
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Contact",
+                "phone_country_code": "NOTACODE",
+                "phone_number": "NOTANUMBER",
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "phone" in str(response.data)
+
+    def test_valid_phone_accepted(self):
+        """A proper dial code + local number combo must be accepted."""
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org)
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "OFFICE",
+                "line1": "456 BKC",
+                "city": "Mumbai",
+                "country": country.id,
+                "email": "office@org.com",
+                "contact_name": "Contact",
+                "phone_country_code": "+91",
+                "phone_number": "9876543210",
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+
+    def test_maker_cannot_patch_address(self):
+        org = OrganisationFactory()
+        address = OrganisationAddressFactory(organisation=org)
+        client = auth_client(MakerFactory())
+        response = client.patch(
+            reverse("organisation-address-detail", args=[org.id, address.id]),
+            {"city": "Delhi"},
+            format="json",
+        )
+        assert response.status_code == 403
+
+    def test_checker_can_patch_address(self):
+        org = OrganisationFactory()
+        address = OrganisationAddressFactory(organisation=org, city="Mumbai")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-address-detail", args=[org.id, address.id]),
+            {"city": "Delhi"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["city"] == "Delhi"
+
+    def test_patch_to_existing_address_type_rejected(self):
+        """Changing an address's type to one that already exists for this org is blocked."""
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org, address_type="REGISTERED")
+        office = OrganisationAddressFactory(organisation=org, address_type="OFFICE")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("organisation-address-detail", args=[org.id, office.id]),
+            {"address_type": "REGISTERED"},  # REGISTERED already exists on this org
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "address_type" in str(response.data)
+
 
 # ---------------------------------------------------------------------------
 # Currency endpoints (FR-05)
@@ -515,6 +1067,33 @@ class TestCurrencyEndpoints:
         client = APIClient()
         response = client.get(reverse("currency-list"))
         assert response.status_code == 401
+
+    def test_company_admin_can_create_currency(self):
+        client = auth_client(CompanyAdminFactory())
+        response = client.post(reverse("currency-list"), {"code": "EUR", "name": "Euro"})
+        assert response.status_code == 201
+
+    def test_checker_can_patch_currency(self):
+        currency = CurrencyFactory(code="USD", name="US Dollar")
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("currency-detail", args=[currency.id]),
+            {"name": "United States Dollar"},
+        )
+        assert response.status_code == 200
+        assert response.data["name"] == "United States Dollar"
+
+    def test_delete_currency_does_not_hard_delete_record(self):
+        """CurrencyViewSet inherits ReferenceDataViewSet.destroy which sets instance.is_active = False.
+        Currency has no is_active field so the attribute is set in memory but not persisted.
+        The row must NOT be removed from the database — the response is still 204."""
+        from apps.master_data.models import Currency as CurrencyModel
+        currency = CurrencyFactory()
+        currency_id = currency.id
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("currency-detail", args=[currency_id]))
+        assert response.status_code == 204
+        assert CurrencyModel.objects.filter(id=currency_id).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -644,6 +1223,109 @@ class TestBankEndpoints:
         assert response.status_code == 200
         assert response.data["nickname"] == "Updated Nickname"
 
+    def test_checker_can_create_bank(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), self._valid_payload(country, currency))
+        assert response.status_code == 201
+
+    def test_non_exporter_org_rejected(self):
+        """A bank must belong to an Exporter-tagged organisation — other tags are not allowed."""
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        org = OrganisationFactory()
+        OrganisationTagFactory(organisation=org, tag="CONSIGNEE")
+        # Build the payload manually to avoid _valid_payload adding an EXPORTER tag.
+        payload = {
+            "organisation": org.id,
+            "nickname": "Test Account",
+            "beneficiary_name": "Test Co",
+            "bank_name": "Test Bank",
+            "bank_country": country.id,
+            "branch_name": "Main Branch",
+            "account_number": "ACC12345",
+            "account_type": "CURRENT",
+            "currency": currency.id,
+        }
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+        assert "organisation" in response.data
+
+    def test_intermediary_partial_fields_rejected(self):
+        """Providing some but not all 4 intermediary fields must be rejected."""
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["intermediary_bank_name"] = "Correspondent Bank"
+        # intentionally omitting: intermediary_account_number, intermediary_swift_code, intermediary_currency
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+
+    def test_intermediary_all_fields_accepted(self):
+        """Providing all 4 intermediary fields together is a valid submission."""
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        intermediary_currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["intermediary_bank_name"] = "Correspondent Bank"
+        payload["intermediary_account_number"] = "ACC123456"
+        payload["intermediary_swift_code"] = "CORRUS33"
+        payload["intermediary_currency"] = intermediary_currency.id
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 201
+
+    def test_intermediary_swift_invalid_format_rejected(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        intermediary_currency = CurrencyFactory()
+        payload = self._valid_payload(country, currency)
+        payload["intermediary_bank_name"] = "Correspondent Bank"
+        payload["intermediary_account_number"] = "ACC123456"
+        payload["intermediary_swift_code"] = "BADC0DE"  # 7 chars — invalid
+        payload["intermediary_currency"] = intermediary_currency.id
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("bank-list"), payload)
+        assert response.status_code == 400
+        assert "intermediary_swift_code" in response.data
+
+    def test_maker_cannot_patch_bank(self):
+        bank = BankFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(
+            reverse("bank-detail", args=[bank.id]),
+            {"nickname": "Attempted Change"},
+        )
+        assert response.status_code == 403
+
+    def test_checker_can_deactivate_bank_via_patch(self):
+        bank = BankFactory(is_active=True)
+        client = auth_client(CheckerFactory())
+        response = client.patch(reverse("bank-detail", args=[bank.id]), {"is_active": False})
+        assert response.status_code == 200
+        bank.refresh_from_db()
+        assert bank.is_active is False
+
+    def test_inactive_bank_hidden_from_default_list(self):
+        active = BankFactory(is_active=True)
+        inactive = BankFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("bank-list"))
+        ids = [item["id"] for item in response.data]
+        assert active.id in ids
+        assert inactive.id not in ids
+
+    def test_inactive_filter_returns_inactive_banks(self):
+        BankFactory(is_active=True)
+        inactive = BankFactory(is_active=False)
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("bank-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
+
 
 # ---------------------------------------------------------------------------
 # T&C Template endpoints (FR-07)
@@ -752,3 +1434,56 @@ class TestTCTemplateEndpoints:
         client = APIClient()
         response = client.get(reverse("tctemplate-list"))
         assert response.status_code == 401
+
+    def test_maker_cannot_patch_template(self):
+        template = TCTemplateFactory()
+        client = auth_client(MakerFactory())
+        response = client.patch(
+            reverse("tctemplate-detail", args=[template.id]),
+            {"name": "Attempted Change"},
+            format="json",
+        )
+        assert response.status_code == 403
+
+    def test_checker_can_patch_template(self):
+        org = OrganisationFactory()
+        template = TCTemplateFactory(name="Original Name", organisations=[org])
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("tctemplate-detail", args=[template.id]),
+            {"name": "Updated Name"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["name"] == "Updated Name"
+
+    def test_name_update_excludes_self_from_uniqueness_check(self):
+        """PATCHing a template with its own existing name must not trigger a duplicate error."""
+        org = OrganisationFactory()
+        template = TCTemplateFactory(name="My Terms", organisations=[org])
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("tctemplate-detail", args=[template.id]),
+            {"name": "My Terms"},  # same name — should be allowed
+            format="json",
+        )
+        assert response.status_code == 200
+
+    def test_response_includes_organisation_names(self):
+        org = OrganisationFactory(name="Sunrise Exports")
+        template = TCTemplateFactory(organisations=[org])
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 200
+        assert "organisation_names" in response.data
+        assert "Sunrise Exports" in response.data["organisation_names"]
+
+    def test_inactive_filter_returns_inactive_templates(self):
+        TCTemplateFactory()
+        inactive = TCTemplateFactory()
+        inactive.is_active = False
+        inactive.save()
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("tctemplate-list") + "?is_active=false")
+        ids = [item["id"] for item in response.data]
+        assert inactive.id in ids
