@@ -419,6 +419,12 @@ class OrganisationAddress(models.Model):
     class Meta:
         db_table = "master_data_organisation_address"
         ordering = ["address_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organisation", "address_type"],
+                name="unique_address_type_per_organisation",
+            )
+        ]
 
     def __str__(self):
         return f"{self.organisation.name} — {self.get_address_type_display()} — {self.city}"

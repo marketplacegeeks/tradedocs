@@ -402,8 +402,8 @@ class TestOrganisationAddressEndpoints:
     # Test 23: Deleting one of two addresses succeeds — there's still one left.
     def test_can_delete_address_when_another_exists(self):
         org = OrganisationFactory()
-        address1 = OrganisationAddressFactory(organisation=org)
-        address2 = OrganisationAddressFactory(organisation=org)
+        address1 = OrganisationAddressFactory(organisation=org, address_type="REGISTERED")
+        OrganisationAddressFactory(organisation=org, address_type="OFFICE")
         client = auth_client(CheckerFactory())
         response = client.delete(
             reverse("organisation-address-detail", args=[org.id, address1.id])
@@ -419,6 +419,68 @@ class TestOrganisationAddressEndpoints:
             reverse("organisation-address-detail", args=[org.id, address.id])
         )
         assert response.status_code == 400
+
+    # Test 25: Adding a second address of the same type to an organisation is blocked.
+    def test_cannot_add_duplicate_address_type(self):
+        org = OrganisationFactory()
+        OrganisationAddressFactory(organisation=org, address_type="REGISTERED")
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-address-list", args=[org.id]),
+            {
+                "address_type": "REGISTERED",
+                "line1": "Another Registered Address",
+                "city": "Delhi",
+                "country": country.id,
+                "email": "reg2@org.com",
+                "contact_name": "Second Reg",
+                "phone_country_code": "",
+                "phone_number": "",
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "address_type" in str(response.data)
+
+    # Test 26: Org create with two addresses of the same type is blocked.
+    def test_org_create_duplicate_address_type_rejected(self):
+        country = CountryFactory()
+        client = auth_client(CheckerFactory())
+        response = client.post(
+            reverse("organisation-list"),
+            {
+                "name": "Duplicate Addr Org",
+                "iec_code": "",
+                "tags": [{"tag": "CONSIGNEE"}],
+                "addresses": [
+                    {
+                        "address_type": "OFFICE",
+                        "line1": "First Office",
+                        "city": "Mumbai",
+                        "country": country.id,
+                        "email": "a@org.com",
+                        "contact_name": "Contact A",
+                        "phone_country_code": "",
+                        "phone_number": "",
+                    },
+                    {
+                        "address_type": "OFFICE",
+                        "line1": "Second Office",
+                        "city": "Delhi",
+                        "country": country.id,
+                        "email": "b@org.com",
+                        "contact_name": "Contact B",
+                        "phone_country_code": "",
+                        "phone_number": "",
+                    },
+                ],
+                "tax_codes": [],
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "addresses" in str(response.data)
 
 
 # ---------------------------------------------------------------------------
