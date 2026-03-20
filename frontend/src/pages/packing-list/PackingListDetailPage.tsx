@@ -5,7 +5,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { message, Modal, Drawer, Input } from "antd";
+import { message, Modal, Input } from "antd";
+import AuditLogDrawer from "../../components/AuditLogDrawer";
 import { ArrowLeft, Edit2, Clock, Trash2, FileDown, Upload, Paperclip } from "lucide-react";
 
 import {
@@ -22,6 +23,7 @@ import {
 import type { PackingList, CILineItem } from "../../api/packingLists";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import { useAuth } from "../../store/AuthContext";
+import { extractApiError } from "../../utils/apiErrors";
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_CHIP,
@@ -270,7 +272,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", ciId] });
       message.success("Updated.");
     },
-    onError: () => message.error("Failed to update."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to update.")),
   });
 
   if (!ci) {
@@ -486,7 +488,7 @@ export default function PackingListDetailPage() {
       message.success("Packing List deleted.");
       navigate("/packing-lists");
     },
-    onError: () => message.error("Could not delete this document."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Could not delete this document.")),
   });
 
   const uploadPlSignedCopyMutation = useMutation({
@@ -495,10 +497,7 @@ export default function PackingListDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["packing-list", id] });
       message.success("PL signed copy uploaded.");
     },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   const uploadCiSignedCopyMutation = useMutation({
@@ -507,10 +506,7 @@ export default function PackingListDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl?.ci_id] });
       message.success("CI signed copy uploaded.");
     },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   if (isLoading || !pl) {
@@ -705,38 +701,11 @@ export default function PackingListDetailPage() {
         </div>
       )}
 
-      {/* Audit trail drawer */}
-      <Drawer
-        title="Audit Trail"
+      <AuditLogDrawer
         open={auditOpen}
         onClose={() => setAuditOpen(false)}
-        width={480}
-      >
-        {auditLog.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontFamily: "var(--font-body)", fontSize: 14 }}>No entries yet.</p>
-        ) : (
-          auditLog.map((entry) => (
-            <div key={entry.id} style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: 12, marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {entry.action}
-                </span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)" }}>
-                  {new Date(entry.created_at).toLocaleString()}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)" }}>
-                {entry.from_status} → {entry.to_status} · {entry.performed_by}
-              </p>
-              {entry.comment && (
-                <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic" }}>
-                  "{entry.comment}"
-                </p>
-              )}
-            </div>
-          ))
-        )}
-      </Drawer>
+        entries={auditLog}
+      />
 
       {/* Delete confirmation modal */}
       <Modal

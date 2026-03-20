@@ -8,6 +8,7 @@ import { Modal, Select, message } from "antd";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "../../store/AuthContext";
+import { extractApiError } from "../../utils/apiErrors";
 import { ROLES } from "../../utils/constants";
 import { listCountries, createCountry, updateCountry, deleteCountry } from "../../api/countries";
 import type { Country, CountryPayload } from "../../api/countries";
@@ -298,8 +299,8 @@ export default function ReferenceDataPage() {
       message.success(modal === "add" ? "Record added." : "Record updated.");
       closeModal();
     },
-    onError: () => {
-      message.error("Failed to save. Please check your inputs and try again.");
+    onError: (err: unknown) => {
+      message.error(extractApiError(err, "Failed to save. Please check your inputs and try again."));
     },
   });
 
@@ -318,8 +319,8 @@ export default function ReferenceDataPage() {
       message.success("Record deactivated.");
       setDeletingId(null);
     },
-    onError: () => {
-      message.error("Failed to deactivate. Please try again.");
+    onError: (err: unknown) => {
+      message.error(extractApiError(err, "Failed to deactivate. Please try again."));
       setDeletingId(null);
     },
   });

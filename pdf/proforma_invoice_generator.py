@@ -1,25 +1,221 @@
 """
-Proforma Invoice PDF generator — pdf1/ reference layout, mapped to actual model fields.
-
-Field mapping summary (pdf1/ attribute → actual model field):
-  invoice.number                     → invoice.pi_number
-  invoice.date                       → invoice.pi_date
-  invoice.incoterm.code              → invoice.incoterms.code      (FK field is 'incoterms')
-  invoice.payment_term.name          → invoice.payment_terms.name  (FK field is 'payment_terms')
-  invoice.port_loading.name          → invoice.port_of_loading.name
-  invoice.port_discharge.name        → invoice.port_of_discharge.name
-  invoice.pre_carriage.name          → invoice.pre_carriage_by.name
-  invoice.marks_and_nos              → (field does not exist — omitted)
-  invoice.kind_of_packages           → (field does not exist — omitted)
-  invoice.bank_charges               → (field does not exist — omitted)
-  invoice.terms_and_conditions       → invoice.tc_content
-  invoice.partial_shipment / transshipment → CharField ("ALLOWED"/"NOT_ALLOWED")
-  invoice.total_amount_usd           → computed: sum(li.amount_usd)
-  it.hs_code                         → it.hsn_code
-  it.unit_price_usd                  → it.rate_usd
-  it.uom (string)                    → it.uom.abbreviation  (UOM FK)
-  line_items.filter(is_active=True)  → .all()  (no is_active on ProformaInvoiceLineItem)
-  exp.address / exp.email_id         → org.addresses helper functions
+# PROFORMA INVOICE PDF LAYOUT GUIDE (ASCII VISUAL + VARIABLE MAP)
+# ============================================================================
+# Generates a PROFORMA INVOICE / CUM SALES CONTRACT PDF using ReportLab
+# Platypus Tables. Use this guide to understand every section's layout,
+# column widths, and which model variable populates each cell.
+#
+# PAGE:
+# - A4 portrait (210mm x 297mm)
+# - Margins: left=15mm, right=15mm, top=10mm, bottom=15mm
+# - Effective content width = 210 - 30 = 180mm
+#
+# WATERMARK (non-Approved documents — FR-08.3):
+# - Diagonal "DRAFT" at 45°, Helvetica-Bold 80pt, alpha=0.07
+# - Controlled by: is_draft = (invoice.status != APPROVED)
+#
+# FOOTER (every page):
+# - Centered 8pt text: "This is a computer-generated document..."
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 1 — DOCUMENT HEADER  (centered Paragraphs, no table)
+# ─────────────────────────────────────────────────────────────────────────────
+#   Variable         Source field
+#   ───────────────  ────────────────────────────────
+#   exp_name         invoice.exporter.name            (16pt bold, center)
+#   "PROFORMA INVOICE CUM SALES CONTRACT"            (12pt bold, center)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 2 — MAIN INFO TABLE (top half)
+# Total width = 180mm  |  4 columns: [36mm | 36mm | 54mm | 54mm]
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   ┌──────────────────────────────────────────┬──────────────────────────────┬─────────────────────┐
+#   │ Exporter:                                │ Proforma Invoice No & Date:  │ Buyer Order No      │  Row 0
+#   │ exp_detail_html                          │ pi_number  &  pi_date        │ and Date:           │
+#   │ (exp_name, exp_address, exp_country,     │ (col 2 standalone)           │ buyer_order_no &    │
+#   │  exp_email — all from exporter.addresses)│                              │ buyer_order_date    │
+#   │ (merged: col 0-1, rows 0-1)              ├──────────────────────────────┼─────────────────────┤
+#   │                                          │ Country of Origin of Goods:  │ Country of Final    │  Row 1
+#   │                                          │ origin_country               │ Destination:        │
+#   │                                          │ (col 2 standalone)           │ final_country       │
+#   │                                          │                              │ (col 3 standalone)  │
+#   ├──────────────────────────────────────────┼──────────────────────────────┼─────────────────────┤
+#   │ Consignee:                               │ Buyer if other than          │ Other reference(s): │  Row 2
+#   │ consignee_details_html                   │ consignee:                   │ other_references    │
+#   │ (cons_name, cons_address, cons_country,  │ buyer_details_html           │ (merged: col 3,     │
+#   │  cons_email — via consignee.addresses)   │ (buyer_name, buyer_addr,     │  rows 2-3)          │
+#   │ (merged: col 0-1, rows 2-3)              │  buyer_country, buyer_email) │                     │  Row 3
+#   │                                          │ (merged: col 2, rows 2-3)    │ (continued)         │
+#   └──────────────────────────────────────────┴──────────────────────────────┴─────────────────────┘
+#        36mm (col 0)      36mm (col 1)              54mm (col 2)                54mm (col 3)
+#                                                                                     Total = 180mm
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 3 — MAIN INFO TABLE (bottom half)
+# Total width = 180mm  |  5 equal columns: [36mm | 36mm | 36mm | 36mm | 36mm]
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   ┌──────────────────┬──────────────────────────┬──────────────────┬──────────────────┬──────────────────┐
+#   │ Pre-Carriaged By:│ Place of Receipt by       │ Vessel/Flight No:│ Incoterms:       │ Payment Terms:   │ Row 0
+#   │ pre_carriage     │ Pre-Carrier:              │ invoice.vessel_  │ incoterm_disp    │ payment_term_    │
+#   │ (pre_carriage_by │ por_pre                   │ flight_no        │ (incoterms.code) │ name             │
+#   │  .name)          │ (place_of_receipt_by_     │                  │                  │ (payment_terms   │
+#   │                  │  pre_carrier.name)        │                  │                  │  .name)          │
+#   ├──────────────────┼──────────────────────────┼──────────────────┼──────────────────┼──────────────────┤
+#   │ Port of Loading: │ Port of Discharge:        │ Final            │ Marks & Nos /    │ No & Kind of     │ Row 1
+#   │ port_loading     │ port_discharge            │ Destination:     │ Container No     │ Packages         │
+#   │ (port_of_loading │ (port_of_discharge        │ final_dest       │ (blank — no      │ (blank — no      │
+#   │  .name)          │  .name)                   │ (final_          │  model field)    │  model field)    │
+#   │                  │                           │ destination.name)│                  │                  │
+#   └──────────────────┴──────────────────────────┴──────────────────┴──────────────────┴──────────────────┘
+#        36mm                   36mm                    36mm               36mm               36mm
+#                                                                                     Total = 180mm
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 4 — LINE ITEMS TABLE
+# Total width = 180mm  |  7 columns: [10 | 24 | 24 | 50 | 22 | 26 | 24] mm
+# repeatRows=1 → header repeats on page break
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   ┌──────┬──────────┬──────────┬──────────────────────────────┬────────────┬───────────┬────────────┐
+#   │ Sr.  │ HSN Code │ Item Code│ Description of Goods         │ Qty        │ Rate (USD)│ Amount(USD)│ Header
+#   ├──────┼──────────┼──────────┼──────────────────────────────┼────────────┼───────────┼────────────┤
+#   │ idx  │ it.hsn_  │ it.item_ │ it.description               │ it.quantity│ it.rate_  │ it.amount_ │ Row N
+#   │      │ code     │ code     │                              │ + uom_disp │ usd       │ usd        │
+#   │      │          │          │                              │ (uom.abbrev│           │            │
+#   │      │          │          │                              │ iation)    │ RIGHT-    │ RIGHT-     │
+#   │      │          │          │                              │ RIGHT-ALIGN│ ALIGNED   │ ALIGNED    │
+#   └──────┴──────────┴──────────┴──────────────────────────────┴────────────┴───────────┴────────────┘
+#     10mm    24mm       24mm              50mm                     22mm        26mm        24mm
+#                                                          total_amount_usd = sum(it.amount_usd)
+#                                                                                     Total = 180mm
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 5 — TOTALS ROW
+# Total width = 180mm  |  3 columns: [100mm | 40mm | 40mm]
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   ┌────────────────────────────────────────────────────────────────┬──────────────────┬──────────────────┐
+#   │ Amount Chargeable in: USD                                      │ Total            │ $total_amount_usd│
+#   └────────────────────────────────────────────────────────────────┴──────────────────┴──────────────────┘
+#                100mm                                                      40mm               40mm
+#                                                                                     Total = 180mm
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 6 — AMOUNT IN WORDS  (single Paragraph, full width)
+# ─────────────────────────────────────────────────────────────────────────────
+#   Variable           Source
+#   ─────────────────  ──────────────────────────────────
+#   total_amount_usd   computed from sum of line item amount_usd values
+#   → amount_to_words(total_amount_usd)  e.g. "One Thousand Two Hundred USD Only"
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 7 — VALIDITY & SHIPMENT TABLE
+# Total width = 180mm  |  1 column: [180mm]  |  4 rows
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   ┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+#   │ Validity for Acceptance: invoice.validity_for_acceptance                                           │ Row 0
+#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+#   │ Validity for Shipment:   invoice.validity_for_shipment                                             │ Row 1
+#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+#   │ Partial Shipment:        bool_yn(invoice.partial_shipment)  → "Yes" / "No"                        │ Row 2
+#   │                          (CharField: "ALLOWED" → "Yes", "NOT_ALLOWED" → "No")                     │
+#   ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+#   │ Transshipment:           bool_yn(invoice.transshipment)     → "Yes" / "No"                        │ Row 3
+#   └────────────────────────────────────────────────────────────────────────────────────────────────────┘
+#                                            180mm                                       Total = 180mm
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 8 — MT103 ADVISORY + DECLARATION  (plain Paragraphs, full width)
+# ─────────────────────────────────────────────────────────────────────────────
+#   Static text — no model variables.
+#   Line 1: MT103 payment tracing instruction.
+#   Line 2: Declaration of invoice accuracy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 9 — BANK DETAILS  (conditional: only if invoice.bank is set)
+# Total width = 180mm  |  2 columns: [60mm label | 120mm value]
+# Three sub-sections printed as separate tables, each with a grey header row.
+# Optional fields (swift, iban, routing_number, ad_code) only printed when non-empty.
+# Intermediary Bank sub-section only printed when intermediary_bank_name is set.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   Sub-section 1 — BENEFICIARY DETAILS (always shown)
+#   ┌──────────────────────┬──────────────────────────────────────────────────┐
+#   │ BENEFICIARY DETAILS (merged header, grey background)                   │
+#   ├──────────────────────┼──────────────────────────────────────────────────┤
+#   │ Beneficiary Name     │ bank.beneficiary_name                            │
+#   │ Bank Name            │ bank.bank_name                                   │
+#   │ Bank Country         │ bank.bank_country.name                           │
+#   │ Branch Name          │ bank.branch_name                                 │
+#   │ Branch Address       │ bank.branch_address                              │
+#   │ Account No.          │ bank.account_number                              │
+#   │ Account Type         │ bank.account_type  (Current/Savings/Checking)    │
+#   │ Currency             │ bank.currency.code                               │
+#   └──────────────────────┴──────────────────────────────────────────────────┘
+#
+#   Sub-section 2 — ROUTING & IDENTIFIERS (shown if any field is non-empty)
+#   ┌──────────────────────┬──────────────────────────────────────────────────┐
+#   │ ROUTING & IDENTIFIERS (merged header, grey background)                 │
+#   ├──────────────────────┼──────────────────────────────────────────────────┤
+#   │ SWIFT / BIC Code     │ bank.swift_code          (if set)                │
+#   │ IBAN                 │ bank.iban                (if set)                │
+#   │ Routing No. / IFSC   │ bank.routing_number      (if set)                │
+#   │ AD Code              │ bank.ad_code             (if set)                │
+#   └──────────────────────┴──────────────────────────────────────────────────┘
+#
+#   Sub-section 3 — INTERMEDIARY BANK (shown only when intermediary_bank_name is set)
+#   ┌──────────────────────┬──────────────────────────────────────────────────┐
+#   │ INTERMEDIARY BANK (merged header, grey background)                     │
+#   ├──────────────────────┼──────────────────────────────────────────────────┤
+#   │ Bank Name            │ bank.intermediary_bank_name                      │
+#   │ Account No.          │ bank.intermediary_account_number                 │
+#   │ SWIFT / BIC Code     │ bank.intermediary_swift_code                     │
+#   │ Currency             │ bank.intermediary_currency.code                  │
+#   └──────────────────────┴──────────────────────────────────────────────────┘
+#       60mm label                   120mm value                  Total = 180mm
+#   Variable: bank = invoice.bank (FK → Bank model)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 10 — TERMS & CONDITIONS  (conditional: only if invoice.tc_content set)
+# Starts on a new page. Full width Paragraphs.
+# ─────────────────────────────────────────────────────────────────────────────
+#   Variable    Source
+#   ──────────  ──────────────────────────────────────────────────────────────
+#   tc_content  invoice.tc_content  (Tiptap HTML → stripped via strip_html())
+#               Split on double-newlines → individual Paragraph flowables
+#
+# HOW TO MODIFY:
+# - Change table widths via colWidths lists (keep total = 180mm).
+# - Adjust cell padding via TableStyle LEFT/RIGHT/TOP/BOTTOMPADDING.
+# - Change font/size via ParagraphStyle (style_text, style_label, style_small).
+# - Watermark threshold: change APPROVED import in add_footer().
+# - Bank section: conditionally rendered — check `if bank:` block (~line 542).
+# - T&C section:  conditionally rendered — check `if tc_content.strip():` block.
+#
+# FIELD MAPPING (pdf1/ reference name → actual Django model field):
+#   invoice.number                    → invoice.pi_number
+#   invoice.date                      → invoice.pi_date
+#   invoice.incoterm.code             → invoice.incoterms.code       (FK: 'incoterms')
+#   invoice.payment_term.name         → invoice.payment_terms.name   (FK: 'payment_terms')
+#   invoice.port_loading.name         → invoice.port_of_loading.name
+#   invoice.port_discharge.name       → invoice.port_of_discharge.name
+#   invoice.pre_carriage.name         → invoice.pre_carriage_by.name
+#   invoice.marks_and_nos             → (no model field — cell left blank)
+#   invoice.kind_of_packages          → (no model field — cell left blank)
+#   invoice.bank_charges              → (no model field — omitted)
+#   invoice.terms_and_conditions      → invoice.tc_content
+#   invoice.partial_shipment          → CharField "ALLOWED"/"NOT_ALLOWED"
+#   invoice.transshipment             → CharField "ALLOWED"/"NOT_ALLOWED"
+#   invoice.total_amount_usd          → computed: sum(li.amount_usd)
+#   it.hs_code                        → it.hsn_code
+#   it.unit_price_usd                 → it.rate_usd
+#   it.uom (string)                   → it.uom.abbreviation  (UOM FK)
+#   line_items.filter(is_active=True) → .all()  (no is_active on ProformaInvoiceLineItem)
+#   exp.address / exp.email_id        → org.addresses relation helpers
+# ============================================================================
 
 Constraint #20: generate_proforma_invoice_pdf_bytes() returns bytes in-memory — never
 writes to disk.
@@ -290,64 +486,67 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(Paragraph("PROFORMA INVOICE CUM SALES CONTRACT", style_title))
     story.append(Spacer(1, 8))
 
-    # ---- Main information table (Rows 0-5, 4 columns) -------------------------
+    # ---- Main information table (4 rows, 4 columns) ---------------------------
     #
     # Visual layout:
-    #   Col 0-1 (rows 0-2): Exporter block
-    #   Col 2-3 (row 0):    PI No & Date
-    #   Col 2-3 (row 1):    Buyer Order No and Date
-    #   Col 2-3 (row 2):    Other reference(s)
-    #   Col 0-1 (rows 3-5): Consignee block
-    #   Col 2-3 (rows 3-4): Buyer if other than consignee
-    #   Col 2   (row 5):    Country of Origin
-    #   Col 3   (row 5):    Country of Final Destination
+    #   Col 0-1 (rows 0-1): Exporter block (merged)
+    #   Col 2   (row 0):    PI No & Date
+    #   Col 3   (row 0):    Buyer Order No and Date
+    #   Col 2   (row 1):    Country of Origin of Goods
+    #   Col 3   (row 1):    Country of Final Destination
+    #   Col 0-1 (rows 2-3): Consignee block (merged)
+    #   Col 2   (rows 2-3): Buyer if other than consignee (merged vertically)
+    #   Col 3   (rows 2-3): Other reference(s) (merged vertically)
     #
     buyer_obj = getattr(invoice, "buyer", None)
     buyer_name = safe(getattr(buyer_obj, "name", "")) if buyer_obj else cons_name
 
+    # Build full buyer details (name + address + country + email)
+    if buyer_obj:
+        buyer_address = _org_address_str(buyer_obj)
+        buyer_email = _org_email(buyer_obj)
+        buyer_country = _org_country_name(buyer_obj)
+        buyer_addr_parts = []
+        if buyer_address:
+            buyer_addr_parts.append(buyer_address)
+        if buyer_country:
+            buyer_addr_parts.append(buyer_country)
+        buyer_addr_line = ", ".join(buyer_addr_parts)
+        buyer_lines = [x for x in [buyer_name, buyer_addr_line, buyer_email] if x]
+        buyer_details_html = "<br/>".join(buyer_lines)
+    else:
+        buyer_details_html = cons_name  # fallback: same as consignee
+
     main_info_data = [
         # Row 0
         [
-            Paragraph(
-                f"<b>Exporter:</b><br/>{exp_detail_html}",
-                style_text,
-            ),
+            Paragraph(f"<b>Exporter:</b><br/>{exp_detail_html}", style_text),
             "",
             Paragraph(
                 f"<b>Proforma Invoice No &amp; Date:</b><br/>{pi_number} &amp; {pi_date}",
                 style_text,
             ),
-            "",
-        ],
-        # Row 1
-        [
-            "", "",
             Paragraph(
                 f"<b>Buyer Order No and Date:</b><br/>{buyer_order_no} &amp; {buyer_order_date}",
                 style_text,
             ),
-            "",
         ],
-        # Row 2
-        [
-            "", "",
-            Paragraph(f"<b>Other reference(s):</b><br/>{other_references}", style_text),
-            "",
-        ],
-        # Row 3
-        [
-            Paragraph(f"<b>Consignee:</b><br/>{consignee_details_html}", style_text),
-            "",
-            Paragraph(f"<b>Buyer if other than consignee</b><br/>{buyer_name}", style_text),
-            "",
-        ],
-        # Row 4
-        ["", "", "", ""],
-        # Row 5
+        # Row 1
         [
             "", "",
             Paragraph(f"<b>Country of Origin of Goods:</b><br/>{origin_country}", style_text),
             Paragraph(f"<b>Country of Final Destination:</b><br/>{final_country}", style_text),
+        ],
+        # Row 2
+        [
+            Paragraph(f"<b>Consignee:</b><br/>{consignee_details_html}", style_text),
+            "",
+            Paragraph(f"<b>Buyer if other than consignee</b><br/>{buyer_details_html}", style_text),
+            Paragraph(f"<b>Other reference(s):</b><br/>{other_references}", style_text),
+        ],
+        # Row 3
+        [
+            "", "", "", "",
         ],
     ]
 
@@ -362,19 +561,16 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING",   (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
-        # Merge: Exporter block col 0-1, rows 0-2
-        ("SPAN",         (0, 0), (1, 2)),
-        # Merge: PI No & Date col 2-3, row 0
-        ("SPAN",         (2, 0), (3, 0)),
-        # Merge: Buyer Order col 2-3, row 1
-        ("SPAN",         (2, 1), (3, 1)),
-        # Merge: Other refs col 2-3, row 2
-        ("SPAN",         (2, 2), (3, 2)),
-        # Merge: Consignee col 0-1, rows 3-5
-        ("SPAN",         (0, 3), (1, 5)),
-        # Merge: Buyer col 2-3, rows 3-4
-        ("SPAN",         (2, 3), (3, 4)),
-        # Row 5 col 2 and col 3 remain separate (Country of Origin / Final Destination)
+        # Merge: Exporter block col 0-1, rows 0-1
+        ("SPAN",         (0, 0), (1, 1)),
+        # Col 2 row 0: PI No & Date (standalone); col 3 row 0: Buyer Order (standalone)
+        # Row 1 col 2: Country of Origin (standalone); col 3: Country of Final Destination (standalone)
+        # Merge: Consignee col 0-1, rows 2-3
+        ("SPAN",         (0, 2), (1, 3)),
+        # Merge: Buyer col 2 only, rows 2-3
+        ("SPAN",         (2, 2), (2, 3)),
+        # Merge: Other References col 3 only, rows 2-3
+        ("SPAN",         (3, 2), (3, 3)),
     ]))
 
     # Second table (rows 6-7 in reference): Pre-carriage / Vessel / Ports
@@ -465,29 +661,121 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(li_table)
     story.append(Spacer(1, 10))
 
-    # ---- Total amount table ---------------------------------------------------
-    amount_table = Table(
-        [[
-            Paragraph("<b>Amount Chargeable in:</b> USD", style_text),
-            Paragraph("<b>Total</b>", style_text),
-            Paragraph(f"${fmt_money(total_amount_usd)}", style_text),
-        ]],
-        colWidths=[100 * mm, 40 * mm, 40 * mm],
-    )
-    amount_table.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING",   (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
-    ]))
-    story.append(amount_table)
-    story.append(Spacer(1, 4))
+    # ---- Totals section -------------------------------------------------------
+    # Mirrors the on-screen totals card exactly:
+    #   - Additional charges breakdown (when charges exist and no cost breakdown)
+    #   - Grand Total Amount (when no incoterm is set)
+    #   - Cost Breakdown with FOB Value + seller-borne fields (for non-EXW incoterms)
+    #   - Invoice Total (Amount Payable) (whenever an incoterm is set)
 
-    # Amount in words
+    # Compute charges total
+    charges_list = list(invoice.charges.all().order_by("id"))
+    charges_total = Decimal("0.00")
+    for charge in charges_list:
+        charges_total += Decimal(str(charge.amount_usd or 0))
+
+    # FOB Value = line items + additional charges
+    grand_total = total_amount_usd + charges_total
+
+    # Incoterm seller fields map (matches frontend INCOTERM_SELLER_FIELDS)
+    _SELLER_FIELDS = {
+        "EXW": [],
+        "FCA": [],
+        "FOB": [],
+        "CFR": ["freight"],
+        "CPT": ["freight"],
+        "CIF": ["freight", "insurance_amount"],
+        "CIP": ["freight", "insurance_amount"],
+        "DAP": ["freight", "insurance_amount"],
+        "DPU": ["freight", "insurance_amount", "destination_charges"],
+        "DDP": ["freight", "insurance_amount", "import_duty", "destination_charges"],
+    }
+    _FIELD_LABELS = {
+        "freight":             "Freight",
+        "insurance_amount":    "Insurance Amount",
+        "import_duty":         "Import Duty",
+        "destination_charges": "Destination Charges",
+    }
+    seller_fields = _SELLER_FIELDS.get(incoterm_disp, [])
+    show_cost_breakdown = bool(incoterm_disp) and incoterm_disp != "EXW"
+
+    # Compute invoice total = grand_total + applicable seller-borne fields
+    invoice_total_pdf = grand_total
+    for field in seller_fields:
+        val = getattr(invoice, field, None)
+        if val is not None:
+            try:
+                invoice_total_pdf += Decimal(str(val))
+            except Exception:
+                pass
+
+    # The amount used for "Amount in Words" is the final payable total
+    final_total = invoice_total_pdf if incoterm_disp else grand_total
+
+    # Build rows: [label | value], right-align value column
+    totals_rows = []
+
+    # Item Total + each charge (only when charges exist and no cost breakdown section)
+    if charges_list and not show_cost_breakdown:
+        totals_rows.append([
+            Paragraph("Item Total", style_text),
+            Paragraph(f"${fmt_money(total_amount_usd)}", style_text),
+        ])
+        for charge in charges_list:
+            totals_rows.append([
+                Paragraph(safe(charge.description), style_text),
+                Paragraph(f"${fmt_money(charge.amount_usd)}", style_text),
+            ])
+
+    # Grand Total Amount — only when no incoterm is set
+    if not incoterm_disp:
+        totals_rows.append([
+            Paragraph("<b>Grand Total Amount</b>", style_label),
+            Paragraph(f"<b>${fmt_money(grand_total)}</b>", style_label),
+        ])
+
+    # Cost Breakdown section — for all incoterms except EXW
+    if show_cost_breakdown:
+        totals_rows.append([
+            Paragraph(f"<b>Cost Breakdown ({incoterm_disp})</b>", style_label),
+            Paragraph("", style_text),
+        ])
+        totals_rows.append([
+            Paragraph("FOB Value", style_text),
+            Paragraph(f"${fmt_money(grand_total)}", style_text),
+        ])
+        for field in seller_fields:
+            val = getattr(invoice, field, None)
+            val_str = f"${fmt_money(val)}" if val is not None else "—"
+            totals_rows.append([
+                Paragraph(_FIELD_LABELS.get(field, field), style_text),
+                Paragraph(val_str, style_text),
+            ])
+
+    # Invoice Total (Amount Payable) — shown whenever an incoterm is selected
+    if incoterm_disp:
+        totals_rows.append([
+            Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
+            Paragraph(f"<b>${fmt_money(invoice_total_pdf)}</b>", style_label),
+        ])
+
+    if totals_rows:
+        totals_table = Table(totals_rows, colWidths=[140 * mm, 40 * mm])
+        totals_table.setStyle(TableStyle([
+            ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN",         (1, 0), (1, -1),  "RIGHT"),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        story.append(totals_table)
+        story.append(Spacer(1, 4))
+
+    # Amount in words — reflects the final payable total
     story.append(Paragraph(
-        f"<b>Amount in Words:</b> {amount_to_words(total_amount_usd, currency='USD')}",
+        f"<b>Amount in Words:</b> {amount_to_words(final_total, currency='USD')}",
         style_text,
     ))
     story.append(Spacer(1, 10))
@@ -539,26 +827,99 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(Spacer(1, 10))
 
     # ---- Bank details ---------------------------------------------------------
+    # Printed in three sections matching the Bank model structure:
+    #   1. Beneficiary Details  — always shown
+    #   2. Routing & Identifiers — optional fields shown only when non-empty
+    #   3. Intermediary Bank    — shown only when intermediary_bank_name is set
+    # Layout: 2 columns [label 60mm | value 120mm] = 180mm total.
     if bank:
-        beneficiary_data = [
-            [Paragraph(f"<b>BENEFICIARY NAME:</b> {safe(bank.beneficiary_name)}", style_text)],
-            [Paragraph(f"<b>BANK NAME:</b> {safe(bank.bank_name)}", style_text)],
-            [Paragraph(f"<b>BRANCH NAME:</b> {safe(bank.branch_name)}", style_text)],
-            [Paragraph(f"<b>BRANCH ADDRESS:</b> {safe(bank.branch_address)}", style_text)],
-            [Paragraph(f"<b>A/C NO.:</b> {safe(bank.account_number)}", style_text)],
-            [Paragraph(f"<b>SWIFT CODE:</b> {safe(bank.swift_code)}", style_text)],
-        ]
-        beneficiary_table = Table(beneficiary_data, colWidths=[180 * mm])
-        beneficiary_table.setStyle(TableStyle([
+        bank_style = TableStyle([
             ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
             ("VALIGN",       (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING",  (0, 0), (-1, -1), 4),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ("TOPPADDING",   (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+        ])
+
+        def _bank_row(label, value):
+            return [
+                Paragraph(f"<b>{label}</b>", style_label),
+                Paragraph(safe(value), style_text),
+            ]
+
+        # Section 1: Beneficiary Details (all fields always present on the model)
+        bank_country_name = safe(getattr(bank.bank_country, "name", "")) if getattr(bank, "bank_country", None) else ""
+        currency_code = safe(getattr(bank.currency, "code", "")) if getattr(bank, "currency", None) else ""
+        account_type_display = safe(bank.account_type).title() if bank.account_type else ""
+
+        beneficiary_data = [
+            [Paragraph("<b>BENEFICIARY DETAILS</b>", style_label), Paragraph("", style_text)],
+            _bank_row("Beneficiary Name",  bank.beneficiary_name),
+            _bank_row("Bank Name",         bank.bank_name),
+            _bank_row("Bank Country",      bank_country_name),
+            _bank_row("Branch Name",       bank.branch_name),
+            _bank_row("Branch Address",    bank.branch_address),
+            _bank_row("Account No.",       bank.account_number),
+            _bank_row("Account Type",      account_type_display),
+            _bank_row("Currency",          currency_code),
+        ]
+        beneficiary_table = Table(beneficiary_data, colWidths=[60 * mm, 120 * mm])
+        beneficiary_table.setStyle(TableStyle([
+            *bank_style._cmds,
+            # Section header spans both columns
+            ("SPAN",       (0, 0), (1, 0)),
+            ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
         ]))
         story.append(beneficiary_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 4))
+
+        # Section 2: Routing & Identifiers — only rows with a saved value
+        routing_rows = [
+            [Paragraph("<b>ROUTING &amp; IDENTIFIERS</b>", style_label), Paragraph("", style_text)],
+        ]
+        if bank.swift_code:
+            routing_rows.append(_bank_row("SWIFT / BIC Code", bank.swift_code))
+        if bank.iban:
+            routing_rows.append(_bank_row("IBAN", bank.iban))
+        if bank.routing_number:
+            routing_rows.append(_bank_row("Routing No. / IFSC", bank.routing_number))
+        if bank.ad_code:
+            routing_rows.append(_bank_row("AD Code", bank.ad_code))
+
+        if len(routing_rows) > 1:  # at least one identifier field is set
+            routing_table = Table(routing_rows, colWidths=[60 * mm, 120 * mm])
+            routing_table.setStyle(TableStyle([
+                *bank_style._cmds,
+                ("SPAN",       (0, 0), (1, 0)),
+                ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
+            ]))
+            story.append(routing_table)
+            story.append(Spacer(1, 4))
+
+        # Section 3: Intermediary Bank — only when all four fields are saved
+        if safe(bank.intermediary_bank_name):
+            intermediary_currency_code = (
+                safe(getattr(bank.intermediary_currency, "code", ""))
+                if getattr(bank, "intermediary_currency", None) else ""
+            )
+            intermediary_data = [
+                [Paragraph("<b>INTERMEDIARY BANK</b>", style_label), Paragraph("", style_text)],
+                _bank_row("Bank Name",       bank.intermediary_bank_name),
+                _bank_row("Account No.",     bank.intermediary_account_number),
+                _bank_row("SWIFT / BIC Code", bank.intermediary_swift_code),
+                _bank_row("Currency",        intermediary_currency_code),
+            ]
+            intermediary_table = Table(intermediary_data, colWidths=[60 * mm, 120 * mm])
+            intermediary_table.setStyle(TableStyle([
+                *bank_style._cmds,
+                ("SPAN",       (0, 0), (1, 0)),
+                ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
+            ]))
+            story.append(intermediary_table)
+            story.append(Spacer(1, 4))
+
+        story.append(Spacer(1, 6))
 
     # ---- Terms & Conditions (new page) ----------------------------------------
     # The actual field is tc_content (not terms_and_conditions).

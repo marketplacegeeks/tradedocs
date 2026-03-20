@@ -101,6 +101,12 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
         if not action_name:
             raise ValidationError({"action": "This field is required."})
 
+        # FR-09 / requirements.md §13.2.1: at least one line item must exist before submission.
+        if action_name == "SUBMIT" and not pi.line_items.exists():
+            raise ValidationError(
+                {"detail": "A Proforma Invoice must have at least one line item before it can be submitted."}
+            )
+
         new_status = WorkflowService.transition(
             document=pi,
             document_type="proforma_invoice",

@@ -22,6 +22,7 @@ import {
 import { listBanks } from "../../api/banks";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
 import { SHIPMENT_OPTION_LABELS, DOCUMENT_STATUS } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Zod schema (same shape as create) ------------------------------------
 
@@ -188,21 +189,8 @@ export default function ProformaInvoiceEditPage() {
       message.success("Invoice header updated.");
       navigate(`/proforma-invoices/${piId}`);
     },
-    onError: (err: any) => {
-      const data = err?.response?.data;
-      let detail = "Failed to update Proforma Invoice.";
-      if (data) {
-        if (typeof data === "string") {
-          detail = data;
-        } else if (data.detail) {
-          detail = data.detail;
-        } else if (typeof data === "object") {
-          detail = Object.entries(data)
-            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
-            .join(" | ");
-        }
-      }
-      message.error(detail, 8);
+    onError: (err: unknown) => {
+      message.error(extractApiError(err, "Failed to update Proforma Invoice."), 8);
     },
   });
 

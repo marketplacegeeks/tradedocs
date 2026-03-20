@@ -1,10 +1,11 @@
 // Proforma Invoice detail page — FR-09.5 (line items), FR-09.7 (cost breakdown), FR-08 (workflow).
 // Shows header, editable line items + charges (in DRAFT/REWORK), cost breakdown, workflow buttons, PDF download.
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { message, Modal, Tooltip, Drawer } from "antd";
+import { message, Modal, Tooltip } from "antd";
+import AuditLogDrawer from "../../components/AuditLogDrawer";
 import { ArrowLeft, Download, FileText, Plus, Trash2, Edit2, Clock, Upload, Paperclip } from "lucide-react";
 
 import {
@@ -21,8 +22,8 @@ import {
   getAuditLog,
   uploadSignedCopy,
 } from "../../api/proformaInvoices";
-import { listUOMs } from "../../api/referenceData";
-import type { UOM } from "../../api/referenceData";
+import { listUOMs, listIncoterms, listPaymentTerms } from "../../api/referenceData";
+import type { UOM, Incoterm, PaymentTerm } from "../../api/referenceData";
 import type { ProformaInvoiceLineItem, ProformaInvoiceCharge, AuditLogEntry } from "../../api/proformaInvoices";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import { useAuth } from "../../store/AuthContext";
@@ -33,6 +34,7 @@ import {
   INCOTERM_SELLER_FIELDS,
   COST_FIELD_LABELS,
 } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 // ---- Styles ----------------------------------------------------------------
 
@@ -143,6 +145,8 @@ export default function ProformaInvoiceDetailPage() {
   const [costFields, setCostFields] = useState<Record<string, string>>({
     freight: "", insurance_amount: "", import_duty: "", destination_charges: "",
   });
+  // Debounce timer ref — cost fields save 600ms after the user stops typing
+  const costSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: pi, isLoading } = useQuery({
     queryKey: ["proforma-invoice", piId],
@@ -160,6 +164,16 @@ export default function ProformaInvoiceDetailPage() {
     queryFn: listUOMs,
   });
 
+  const { data: incoterms = [] } = useQuery<Incoterm[]>({
+    queryKey: ["incoterms"],
+    queryFn: listIncoterms,
+  });
+
+  const { data: paymentTerms = [] } = useQuery<PaymentTerm[]>({
+    queryKey: ["payment-terms"],
+    queryFn: listPaymentTerms,
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["proforma-invoice", piId] });
     queryClient.invalidateQueries({ queryKey: ["proforma-invoices"] });
@@ -170,46 +184,43 @@ export default function ProformaInvoiceDetailPage() {
   const addLineItemMutation = useMutation({
     mutationFn: (data: any) => createLineItem(piId, data),
     onSuccess: () => { invalidate(); setAddingLineItem(false); setLineItemForm(EMPTY_LINE_ITEM); },
-    onError: (e: any) => message.error(e?.response?.data?.description?.[0] || "Failed to add line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to add line item.")),
   });
 
   const updateLineItemMutation = useMutation({
     mutationFn: ({ lid, data }: { lid: number; data: any }) => updateLineItem(piId, lid, data),
     onSuccess: () => { invalidate(); setEditingLineItem(null); },
-    onError: (e: any) => message.error("Failed to update line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to update line item.")),
   });
 
   const deleteLineItemMutation = useMutation({
     mutationFn: (lid: number) => deleteLineItem(piId, lid),
     onSuccess: invalidate,
-    onError: () => message.error("Failed to delete line item."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to delete line item.")),
   });
 
   const addChargeMutation = useMutation({
     mutationFn: (data: any) => createCharge(piId, data),
     onSuccess: () => { invalidate(); setAddingCharge(false); setChargeForm({ description: "", amount_usd: "" }); },
-    onError: () => message.error("Failed to add charge."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to add charge.")),
   });
 
   const deleteChargeMutation = useMutation({
     mutationFn: (cid: number) => deleteCharge(piId, cid),
     onSuccess: invalidate,
-    onError: () => message.error("Failed to delete charge."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to delete charge.")),
   });
 
   const updateCostFieldsMutation = useMutation({
     mutationFn: (data: any) => updateProformaInvoice(piId, data),
-    onSuccess: () => { invalidate(); message.success("Cost breakdown saved."); },
-    onError: () => message.error("Failed to save cost breakdown."),
+    onSuccess: () => { invalidate(); message.success("Saved."); },
+    onError: (err: unknown) => message.error(extractApiError(err, "Failed to save.")),
   });
 
   const uploadSignedCopyMutation = useMutation({
     mutationFn: (file: File) => uploadSignedCopy(piId, file),
     onSuccess: () => { invalidate(); message.success("Signed copy uploaded."); },
-    onError: (e: any) => {
-      const detail = e?.response?.data?.file?.[0] || e?.response?.data?.detail || "Upload failed.";
-      message.error(detail);
-    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
 
   if (isLoading || !pi) {
@@ -260,7 +271,18 @@ export default function ProformaInvoiceDetailPage() {
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700, tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: 40 }} />   {/* # */}
+              <col style={{ width: 100 }} />  {/* HSN Code */}
+              <col style={{ width: 110 }} />  {/* Item Code */}
+              <col />                          {/* Description — takes remaining space */}
+              <col style={{ width: 95 }} />   {/* Qty */}
+              <col style={{ width: 75 }} />   {/* UOM */}
+              <col style={{ width: 115 }} />  {/* Rate (USD) */}
+              <col style={{ width: 125 }} />  {/* Amount (USD) */}
+              {canEdit && <col style={{ width: 72 }} />}  {/* Actions */}
+            </colgroup>
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
                 {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM", "Rate (USD)", "Amount (USD)", canEdit ? "" : null]
@@ -329,7 +351,7 @@ export default function ProformaInvoiceDetailPage() {
                     <td style={TD}>{item.item_code || "—"}</td>
                     <td style={TD}>{item.description}</td>
                     <td style={{ ...TD, textAlign: "right" }}>{parseFloat(item.quantity).toLocaleString(undefined, { minimumFractionDigits: 3 })}</td>
-                    <td style={TD}>{(item.uom as any)?.abbreviation ?? "—"}</td>
+                    <td style={TD}>{uoms.find(u => u.id === (item.uom as any))?.abbreviation ?? "—"}</td>
                     <td style={{ ...TD, textAlign: "right" }}>{formatMoney(item.rate_usd)}</td>
                     <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(item.amount_usd)}</td>
                     {canEdit && (
@@ -404,7 +426,7 @@ export default function ProformaInvoiceDetailPage() {
 
               {/* Totals row */}
               <tr style={{ background: "var(--bg-base)" }}>
-                <td colSpan={canEdit ? 7 : 6} style={{ ...TD, textAlign: "right", fontWeight: 600, fontSize: 13 }}>Total Amount (USD)</td>
+                <td colSpan={canEdit ? 7 : 6} style={{ ...TD, textAlign: "right", fontWeight: 600, fontSize: 13 }}>Item Total</td>
                 <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
                   {formatMoney(pi.line_items_total)}
                 </td>
@@ -484,24 +506,21 @@ export default function ProformaInvoiceDetailPage() {
   // ---- Render: Totals + Cost breakdown (FR-09.7) ---------------------------
 
   function renderTotals() {
-    // Cost breakdown is shown only when the seller bears costs (not EXW, not FCA/FOB).
-    // FCA/FOB: buyer pays freight so FOB Value = Grand Total — showing the section adds nothing.
-    const FOB_ONLY = new Set(["FCA", "FOB"]);
-    const showCostBreakdown = incotermsCode && incotermsCode !== "EXW" && !FOB_ONLY.has(incotermsCode) && sellerFields.size > 0;
+    // Show Cost Breakdown for any incoterm except EXW (EXW has no FOB concept).
+    // FCA/FOB: sellerFields is empty so only the FOB Value row is shown, no cost input rows.
+    const showCostBreakdown = !!incotermsCode && incotermsCode !== "EXW";
 
-    // Invoice Total (Amount Payable) is only shown when it exceeds Grand Total —
-    // avoids printing two identical numbers side by side.
-    const invoiceTotalNum = parseFloat(pi.invoice_total || "0");
-    const grandTotalNum = parseFloat(pi.grand_total || "0");
-    const showInvoiceTotal = showCostBreakdown && invoiceTotalNum > grandTotalNum;
+    // Invoice Total shown for any selected incoterm (including EXW where it equals FOB Value).
+    // When no incoterm is set, Grand Total Amount is shown instead.
+    const showInvoiceTotal = !!incotermsCode;
 
     return (
-      <div style={{ ...CARD, maxWidth: 480, marginLeft: "auto" }}>
-        {/* Sub Total row only when there are additional charges */}
-        {pi.charges.length > 0 && (
+      <div style={{ ...CARD }}>
+        {/* Item Total + charges breakdown only when there are charges and no Cost Breakdown section (EXW or no incoterm) */}
+        {pi.charges.length > 0 && !showCostBreakdown && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Sub Total</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Item Total</span>
               <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>{formatMoney(pi.line_items_total)}</span>
             </div>
             {pi.charges.map((c) => (
@@ -513,10 +532,13 @@ export default function ProformaInvoiceDetailPage() {
           </>
         )}
 
-        <div style={{ borderTop: pi.charges.length > 0 ? "1px solid var(--border-light)" : "none", paddingTop: pi.charges.length > 0 ? 8 : 0, marginTop: pi.charges.length > 0 ? 4 : 0, display: "flex", justifyContent: "space-between", marginBottom: showCostBreakdown ? 16 : 0 }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Grand Total Amount</span>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{formatMoney(pi.grand_total)}</span>
-        </div>
+        {/* Grand Total Amount only shown when no incoterm is set; Invoice Total replaces it otherwise */}
+        {!incotermsCode && (
+          <div style={{ borderTop: pi.charges.length > 0 ? "1px solid var(--border-light)" : "none", paddingTop: pi.charges.length > 0 ? 8 : 0, marginTop: pi.charges.length > 0 ? 4 : 0, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Grand Total Amount</span>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{formatMoney(pi.grand_total)}</span>
+          </div>
+        )}
 
         {showCostBreakdown && (
           <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
@@ -524,7 +546,7 @@ export default function ProformaInvoiceDetailPage() {
               Cost Breakdown ({incotermsCode})
             </p>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value (Item Cost+Additional Charges)</span>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(pi.grand_total)}</span>
             </div>
             {Array.from(sellerFields).map((field) => (
@@ -541,8 +563,15 @@ export default function ProformaInvoiceDetailPage() {
                   <input
                     style={{ ...INPUT, width: 120, textAlign: "right" }}
                     value={costFields[field] ?? (pi as any)[field] ?? ""}
-                    onChange={(e) => setCostFields((p) => ({ ...p, [field]: e.target.value }))}
-                    onBlur={() => updateCostFieldsMutation.mutate({ [field]: costFields[field] || null })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCostFields((p) => ({ ...p, [field]: val }));
+                      // Debounce: save 600ms after the user stops typing
+                      if (costSaveTimer.current) clearTimeout(costSaveTimer.current);
+                      costSaveTimer.current = setTimeout(() => {
+                        updateCostFieldsMutation.mutate({ [field]: val || null });
+                      }, 600);
+                    }}
                     placeholder="0.00"
                   />
                 ) : (
@@ -560,46 +589,6 @@ export default function ProformaInvoiceDetailPage() {
           </div>
         )}
       </div>
-    );
-  }
-
-  // ---- Audit log drawer ----------------------------------------------------
-
-  function renderAuditLog() {
-    return (
-      <Drawer
-        title="Audit Log"
-        open={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-        width={400}
-      >
-        {auditLogs.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontFamily: "var(--font-body)", fontSize: 13 }}>No activity yet.</p>
-        ) : (
-          auditLogs.map((log) => (
-            <div
-              key={log.id}
-              style={{
-                padding: "12px 0",
-                borderBottom: "1px solid var(--border-light)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span className={DOCUMENT_STATUS_CHIP[log.to_status] ?? "chip-blue"}>
-                  {DOCUMENT_STATUS_LABELS[log.action] ?? log.action}
-                </span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)" }}>
-                  {new Date(log.performed_at).toLocaleString()}
-                </span>
-              </div>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)", margin: "4px 0 0" }}>
-                by {log.performed_by_name}
-                {log.comment && <> · "{log.comment}"</>}
-              </p>
-            </div>
-          ))
-        )}
-      </Drawer>
     );
   }
 
@@ -682,8 +671,8 @@ export default function ProformaInvoiceDetailPage() {
         <ArrowLeft size={15} strokeWidth={1.5} /> Back to Proforma Invoices
       </button>
 
-      {/* Header bar */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+      {/* Header bar — sticky so PI number and actions stay visible while scrolling */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "var(--bg-base)", paddingBottom: 16, marginBottom: 8, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
@@ -723,11 +712,21 @@ export default function ProformaInvoiceDetailPage() {
             <Clock size={14} strokeWidth={1.5} /> History
           </button>
           <button
-            onClick={() =>
-              downloadPiPdf(piId, `${pi.pi_number}.pdf`).catch(() =>
+            onClick={() => {
+              const today = new Date();
+              const dd = String(today.getDate()).padStart(2, "0");
+              const mm = String(today.getMonth() + 1).padStart(2, "0");
+              const yyyy = today.getFullYear();
+              const dateStr = `${dd}${mm}${yyyy}`;
+              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+              const filename = isDraft
+                ? `${dateStr}_Draft_ProformaInvoice_${consigneeName}.pdf`
+                : `${dateStr}_ProformaInvoice_${consigneeName}.pdf`;
+              downloadPiPdf(piId, filename).catch(() =>
                 message.error("PDF download failed. Please try again.")
-              )
-            }
+              );
+            }}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               background: "var(--pastel-green)", color: "var(--pastel-green-text)",
@@ -762,8 +761,46 @@ export default function ProformaInvoiceDetailPage() {
           <LabelValue label="Invoice Date" value={pi.pi_date} />
           <LabelValue label="Buyer Order No" value={pi.buyer_order_no} />
           <LabelValue label="Buyer Order Date" value={pi.buyer_order_date ?? undefined} />
-          <LabelValue label="Incoterms" value={pi.incoterms_code ?? "—"} />
-          <LabelValue label="Payment Terms" value={pi.payment_terms_name ?? undefined} />
+          <div>
+            <span style={LABEL}>Incoterms</span>
+            {canEdit ? (
+              <select
+                style={{ ...INPUT, marginTop: 4 }}
+                value={pi.incoterms ?? ""}
+                onChange={(e) => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  updateCostFieldsMutation.mutate({ incoterms: id });
+                }}
+              >
+                <option value="">— Select —</option>
+                {incoterms.filter(i => i.is_active).map((i) => (
+                  <option key={i.id} value={i.id}>{i.code} — {i.full_name}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={VALUE}>{pi.incoterms_code ?? "—"}</span>
+            )}
+          </div>
+          <div>
+            <span style={LABEL}>Payment Terms</span>
+            {canEdit ? (
+              <select
+                style={{ ...INPUT, marginTop: 4 }}
+                value={pi.payment_terms ?? ""}
+                onChange={(e) => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  updateCostFieldsMutation.mutate({ payment_terms: id });
+                }}
+              >
+                <option value="">— Select —</option>
+                {paymentTerms.filter(p => p.is_active).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={VALUE}>{pi.payment_terms_name ?? "—"}</span>
+            )}
+          </div>
           <LabelValue label="Port of Loading" value={pi.port_of_loading_name ?? undefined} />
           <LabelValue label="Port of Discharge" value={pi.port_of_discharge_name ?? undefined} />
           <LabelValue label="Place of Receipt" value={pi.place_of_receipt_name ?? undefined} />
@@ -802,7 +839,12 @@ export default function ProformaInvoiceDetailPage() {
         </div>
       )}
 
-      {renderAuditLog()}
+      <AuditLogDrawer
+        open={auditDrawerOpen}
+        onClose={() => setAuditDrawerOpen(false)}
+        entries={auditLogs}
+        title="Audit Log"
+      />
     </div>
   );
 }

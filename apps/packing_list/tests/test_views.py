@@ -255,10 +255,11 @@ class TestPackingListDelete:
 class TestPackingListWorkflow:
 
     def _pl_with_ci(self, status_value=DRAFT, maker=None):
-        """Create a PL+CI pair in the given status."""
+        """Create a PL+CI pair in the given status. Incoterms is required for SUBMIT."""
         from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.master_data.tests.factories import IncotermFactory
         maker = maker or MakerFactory()
-        pl = PackingListFactory(status=status_value, created_by=maker)
+        pl = PackingListFactory(status=status_value, created_by=maker, incoterms=IncotermFactory())
         CommercialInvoiceFactory(packing_list=pl, status=status_value, created_by=maker)
         return pl, maker
 
@@ -376,6 +377,66 @@ class TestPackingListWorkflow:
         )
         assert pl_logs.count() == 1
         assert ci_logs.count() == 1
+
+    # ---- GET audit-log endpoint tests ----------------------------------------
+
+    def test_audit_log_endpoint_returns_entries(self):
+        """Happy path: maker submits, then audit-log endpoint returns the entry."""
+        pl, maker = self._pl_with_ci(DRAFT)
+        auth_client(maker).post(
+            pl_workflow_url(pl.pk), {"action": "SUBMIT"}, format="json"
+        )
+        resp = auth_client(maker).get(pl_audit_url(pl.pk))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        entry = data[0]
+        # Must use performed_at + performed_by_name (not created_at / performed_by)
+        assert "performed_at" in entry
+        assert "performed_by_name" in entry
+        assert "created_at" not in entry
+        assert entry["action"] == "SUBMIT"
+        assert entry["from_status"] == "DRAFT"
+        assert entry["to_status"] == "PENDING_APPROVAL"
+        assert entry["comment"] == ""
+
+    def test_audit_log_endpoint_empty_before_any_action(self):
+        """A freshly created PL has no audit entries (creation isn't a workflow transition)."""
+        pl, maker = self._pl_with_ci(DRAFT)
+        resp = auth_client(maker).get(pl_audit_url(pl.pk))
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_audit_log_entries_ordered_newest_first(self):
+        """Multiple transitions must be returned most-recent first."""
+        pl, maker = self._pl_with_ci(DRAFT)
+        checker = CheckerFactory()
+        # SUBMIT → REWORK → SUBMIT (three entries)
+        auth_client(maker).post(
+            pl_workflow_url(pl.pk), {"action": "SUBMIT"}, format="json"
+        )
+        auth_client(checker).post(
+            pl_workflow_url(pl.pk),
+            {"action": "REWORK", "comment": "needs changes"},
+            format="json",
+        )
+        auth_client(maker).post(
+            pl_workflow_url(pl.pk), {"action": "SUBMIT"}, format="json"
+        )
+        resp = auth_client(maker).get(pl_audit_url(pl.pk))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 3
+        # Newest entry first — last SUBMIT should be first
+        assert data[0]["action"] == "SUBMIT"
+        assert data[0]["from_status"] == "REWORK"
+
+    def test_audit_log_endpoint_requires_authentication(self):
+        """Unauthenticated request must be denied."""
+        from rest_framework.test import APIClient
+        pl, _ = self._pl_with_ci(DRAFT)
+        resp = APIClient().get(pl_audit_url(pl.pk))
+        assert resp.status_code == 401
 
 
 # ---- Containers -------------------------------------------------------------

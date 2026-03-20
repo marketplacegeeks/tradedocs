@@ -193,8 +193,10 @@ class OrganisationAddressSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """
-        Phone validation: if either the country code or the local number is provided,
-        both are required and the combination must be a valid phone number.
+        1. Phone validation: if either field is provided, both are required and must parse.
+        2. Uniqueness: each address_type can appear at most once per organisation.
+           This is enforced here (in addition to the DB constraint) to return a clear
+           error message before hitting the database.
         """
         code = data.get("phone_country_code", "").strip()
         number = data.get("phone_number", "").strip()
@@ -213,6 +215,26 @@ class OrganisationAddressSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"phone": "Invalid phone number format. Use a dial code like +91 and a local number."}
                 )
+
+        # Duplicate address_type check for the standalone address endpoint.
+        # self.context["view"] carries the organisation_pk from the URL.
+        address_type = data.get("address_type")
+        view = self.context.get("view")
+        if address_type and view and hasattr(view, "kwargs"):
+            org_pk = view.kwargs.get("organisation_pk")
+            if org_pk:
+                qs = OrganisationAddress.objects.filter(
+                    organisation_id=org_pk,
+                    address_type=address_type,
+                )
+                # On update (PUT/PATCH), exclude the current instance.
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        {"address_type": f"This organisation already has a {address_type.capitalize()} address."}
+                    )
+
         return data
 
 
@@ -240,6 +262,17 @@ class OrganisationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"addresses": "At least one address is required."}
             )
+
+        # Each address_type must appear at most once in the submitted list.
+        if "addresses" in data:
+            seen_types = set()
+            for addr in data["addresses"]:
+                atype = addr.get("address_type")
+                if atype in seen_types:
+                    raise serializers.ValidationError(
+                        {"addresses": f"Duplicate address type: only one {atype.capitalize()} address is allowed per organisation."}
+                    )
+                seen_types.add(atype)
 
         # Determine the effective tag list: either from the request or from the existing record.
         if "tags" in data:

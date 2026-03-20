@@ -151,16 +151,15 @@ export interface BankDetails {
   intermediary_currency: string | null;
 }
 
+// Shape matches apps/workflow/serializers.py AuditLogSerializer.
 export interface AuditEntry {
   id: number;
-  document_type: string;
-  document_number: string;
   action: string;
   from_status: string;
   to_status: string;
   comment: string;
-  performed_by: string;
-  created_at: string;
+  performed_by_name: string;
+  performed_at: string;
 }
 
 // ---- Packing List endpoints -------------------------------------------------
