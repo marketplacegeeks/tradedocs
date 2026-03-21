@@ -12,3 +12,6 @@ frontend/dist/
 
 # Ignore user-uploaded media files (signed copies, etc.)
 media/
+
+# Playwright MCP artifacts (screenshots, PDFs, console logs)
+.playwright-mcp/
