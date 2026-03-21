@@ -45,17 +45,17 @@ from reportlab.platypus import (
 # L/C Details is always shown and is NOT in these sets (FR-14M.8B).
 _INCOTERM_VISIBLE_FIELDS: dict = {
     "EXW": set(),
-    "FCA": {"fob_rate"},
-    "FOB": {"fob_rate"},
-    "CFR": {"fob_rate", "freight"},
-    "CIF": {"fob_rate", "freight", "insurance"},
-    "CPT": {"fob_rate", "freight"},
-    "CIP": {"fob_rate", "freight", "insurance"},
-    "DAP": {"fob_rate", "freight", "insurance"},
-    "DPU": {"fob_rate", "freight", "insurance"},
-    "DDP": {"fob_rate", "freight", "insurance"},
+    "FCA": set(),
+    "FOB": set(),
+    "CFR": {"freight"},
+    "CIF": {"freight", "insurance"},
+    "CPT": {"freight"},
+    "CIP": {"freight", "insurance"},
+    "DAP": {"freight", "insurance"},
+    "DPU": {"freight", "insurance"},
+    "DDP": {"freight", "insurance"},
 }
-_ALL_CI_FIELDS = {"fob_rate", "freight", "insurance"}
+_ALL_CI_FIELDS = {"freight", "insurance"}
 
 
 def safe(v: Any, default: str = "") -> str:
@@ -562,13 +562,12 @@ def build_ci_story(ci, styles) -> list:
     story.append(li_table)
     story.append(Spacer(1, 6))
 
-    # ---- Weight totals + LC Details + FOB/Freight/Insurance ------------------
+    # ---- Weight totals ---------------------------------------------------------
     total_net_val = Decimal("0.000")
     total_gross_val = Decimal("0.000")
     if pl:
         try:
             for cont in pl.containers.all().order_by("id"):
-                # Net weight computed from items (Container has no .net_weight field)
                 for item in cont.items.all():
                     if item.net_weight is not None and item.quantity is not None:
                         try:
@@ -577,7 +576,6 @@ def build_ci_story(ci, styles) -> list:
                             )
                         except Exception:
                             pass
-                # Gross weight is stored on Container
                 gw = getattr(cont, "gross_weight", None)
                 if gw is not None:
                     try:
@@ -588,36 +586,50 @@ def build_ci_story(ci, styles) -> list:
             pass
 
     lc_details_val = safe(getattr(ci, "lc_details", ""))
-    fob_rate_val = _fmt_money(getattr(ci, "fob_rate", 0))
-    freight_val = _fmt_money(getattr(ci, "freight", 0))
-    insurance_val = _fmt_money(getattr(ci, "insurance", 0))
 
-    # Only print cost fields that are relevant for the selected Incoterm.
-    # If no Incoterm is set, show all three fields (safe default).
+    # Only show cost fields relevant to the selected Incoterm.
     visible_fields = _INCOTERM_VISIBLE_FIELDS.get(incoterm_str, _ALL_CI_FIELDS)
 
-    # Build right-column charge rows — only for visible fields, in fixed order.
-    charge_rows: list = []
-    if "fob_rate" in visible_fields:
-        charge_rows.append(f"<b>FOB Rate:</b> {fob_rate_val}")
+    # ---- Cost breakdown --------------------------------------------------------
+    # freight and insurance are absolute USD amounts added on top of the line items total.
+    freight_amount = Decimal("0.00")
+    insurance_amount = Decimal("0.00")
     if "freight" in visible_fields:
-        charge_rows.append(f"<b>Freight:</b> {freight_val}")
+        try:
+            freight_amount = Decimal(str(getattr(ci, "freight", None) or "0"))
+        except Exception:
+            pass
     if "insurance" in visible_fields:
-        charge_rows.append(f"<b>Insurance:</b> {insurance_val}")
+        try:
+            insurance_amount = Decimal(str(getattr(ci, "insurance", None) or "0"))
+        except Exception:
+            pass
+    invoice_total = total_amount_usd + freight_amount + insurance_amount
 
-    # Left column is always: Net Weight, Gross Weight, L/C Details.
+    # Left column: weights + L/C Details.
     left_rows = [
         f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)}",
         f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)}",
-        f"<b>L/C Details:</b> {lc_details_val}",
     ]
+    if lc_details_val:
+        left_rows.append(f"<b>L/C Details:</b> {lc_details_val}")
 
-    # Pair rows; pad the shorter side with empty strings so the table is rectangular.
-    n_rows = max(len(left_rows), len(charge_rows))
+    # Right column: cost breakdown lines.
+    breakdown_header = f"COST BREAKDOWN ({incoterm_str})" if incoterm_str else "COST BREAKDOWN"
+    right_rows = [
+        f"<b>{breakdown_header}</b>",
+        f"FOB Value (Line Items):  ${_fmt_money(total_amount_usd)}",
+    ]
+    if "freight" in visible_fields:
+        right_rows.append(f"Freight:  ${_fmt_money(freight_amount)}")
+    if "insurance" in visible_fields:
+        right_rows.append(f"Insurance Amount:  ${_fmt_money(insurance_amount)}")
+
+    n_rows = max(len(left_rows), len(right_rows))
     charges_table_data = [
         [
             Paragraph(left_rows[i] if i < len(left_rows) else "", style_text),
-            Paragraph(charge_rows[i] if i < len(charge_rows) else "", style_text),
+            Paragraph(right_rows[i] if i < len(right_rows) else "", style_text),
         ]
         for i in range(n_rows)
     ]
@@ -633,32 +645,31 @@ def build_ci_story(ci, styles) -> list:
         ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
     ]))
     story.append(totals_charges_tbl)
-    story.append(Spacer(1, 6))
 
-    # ---- Total Amount (USD) row -----------------------------------------------
-    totals_table = Table(
+    # ---- Invoice Total row (full width) ----------------------------------------
+    invoice_total_tbl = Table(
         [[
-            Paragraph("<b>Amount (Local):</b>", style_text),
-            Paragraph("", style_text),  # No local-amount field on CI model
-            Paragraph("<b>Total Amount (USD):</b>", style_text),
-            Paragraph(f"${_fmt_money(total_amount_usd)}", style_text),
+            Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
+            Paragraph(f"<b>${_fmt_money(invoice_total)}</b>", style_label),
         ]],
-        colWidths=[50 * mm, 40 * mm, 60 * mm, 30 * mm],
+        colWidths=[140 * mm, 40 * mm],
     )
-    totals_table.hAlign = "LEFT"
-    totals_table.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING",   (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+    invoice_total_tbl.hAlign = "LEFT"
+    invoice_total_tbl.setStyle(TableStyle([
+        ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN",         (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BACKGROUND",    (0, 0), (-1, -1), colors.whitesmoke),
     ]))
-    story.append(totals_table)
+    story.append(invoice_total_tbl)
     story.append(Spacer(1, 6))
 
     # ---- Amount in words -------------------------------------------------------
-    amount_in_words_str = _amount_to_words(total_amount_usd, currency="USD")
+    amount_in_words_str = _amount_to_words(invoice_total, currency="USD")
     if amount_in_words_str:
         story.append(Paragraph(f"<b>Amount in Words:</b> {amount_in_words_str}", style_text))
         story.append(Spacer(1, 6))
@@ -671,34 +682,47 @@ def build_ci_story(ci, styles) -> list:
     ))
     story.append(Spacer(1, 6))
 
-    # ---- Bank details ----------------------------------------------------------
+    # ---- Bank details (same format as PI PDF) ----------------------------------
     bank = getattr(ci, "bank", None)
     if bank:
-        beneficiary_data = [
-            [Paragraph(
-                f"<b>BENEFICIARY NAME:</b> {safe(getattr(bank, 'beneficiary_name', ''))}",
-                style_text,
-            )],
-            [Paragraph(f"<b>BANK NAME:</b> {safe(getattr(bank, 'bank_name', ''))}", style_text)],
-            [Paragraph(f"<b>BRANCH NAME:</b> {safe(getattr(bank, 'branch_name', ''))}", style_text)],
-            [Paragraph(
-                f"<b>BRANCH ADDRESS:</b> {safe(getattr(bank, 'branch_address', ''))}",
-                style_text,
-            )],
-            [Paragraph(f"<b>A/C NO.:</b> {safe(getattr(bank, 'account_number', ''))}", style_text)],
-            [Paragraph(f"<b>SWIFT CODE:</b> {safe(getattr(bank, 'swift_code', ''))}", style_text)],
-        ]
-        beneficiary_table = Table(beneficiary_data, colWidths=[180 * mm])
-        beneficiary_table.hAlign = "LEFT"
-        beneficiary_table.setStyle(TableStyle([
-            ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
+        bank_lines = []
+        bank_lines.append(f"<b>BENEFICIARY NAME:</b> {safe(getattr(bank, 'beneficiary_name', ''))}")
+        bank_lines.append(f"<b>BANK NAME:</b> {safe(getattr(bank, 'bank_name', ''))}")
+        bank_lines.append(f"<b>BRANCH NAME:</b> {safe(getattr(bank, 'branch_name', ''))}")
+        bank_lines.append(f"<b>BRANCH ADDRESS:</b> {safe(getattr(bank, 'branch_address', ''))}")
+        bank_lines.append(f"<b>A/C NO.:</b> {safe(getattr(bank, 'account_number', ''))}")
+        if getattr(bank, "routing_number", None):
+            bank_lines.append(f"<b>IFSC CODE:</b> {safe(bank.routing_number)}")
+        if getattr(bank, "swift_code", None):
+            bank_lines.append(f"<b>SWIFT CODE:</b> {safe(bank.swift_code)}")
+        if getattr(bank, "iban", None):
+            bank_lines.append(f"<b>IBAN:</b> {safe(bank.iban)}")
+        if safe(getattr(bank, "intermediary_bank_name", "")):
+            intermediary_currency_code = (
+                safe(getattr(bank.intermediary_currency, "code", ""))
+                if getattr(bank, "intermediary_currency", None) else ""
+            )
+            bank_lines.append(
+                f"<b>Intermediary Institution Routing for Currency</b> {intermediary_currency_code} "
+                f"<b>A/C No.:</b> {safe(bank.intermediary_account_number)} "
+                f"The Bank of {safe(bank.intermediary_bank_name)} "
+                f"<b>SWIFT Code:</b> {safe(bank.intermediary_swift_code)}"
+            )
+        bank_lines.append(
+            "Request your bank to send MT 103 Message to our bank and send us copy of this "
+            "message to trace &amp; claim the payment from our bank."
+        )
+        bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
+        bank_box = Table(bank_rows, colWidths=[180 * mm])
+        bank_box.setStyle(TableStyle([
+            ("BOX",          (0, 0), (-1, -1), 0.5, colors.black),
             ("VALIGN",       (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING",  (0, 0), (-1, -1), 4),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING",   (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+            ("TOPPADDING",   (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 1),
         ]))
-        story.append(beneficiary_table)
+        story.append(bank_box)
         story.append(Spacer(1, 10))
 
     return story

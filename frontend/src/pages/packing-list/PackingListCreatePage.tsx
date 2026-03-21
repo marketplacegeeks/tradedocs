@@ -1467,6 +1467,31 @@ function Step3({
   );
 }
 
+// ---- Amount in Words helper --------------------------------------------------
+
+function amountToWords(amount: number): string {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+    "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  function toWords(n: number): string {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? "-" + ones[n % 10] : "");
+    if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + toWords(n % 100) : "");
+    if (n < 1_000_000) return toWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + toWords(n % 1000) : "");
+    return toWords(Math.floor(n / 1_000_000)) + " Million" + (n % 1_000_000 ? " " + toWords(n % 1_000_000) : "");
+  }
+
+  const rounded = Math.round(amount * 100) / 100;
+  const dollars = Math.floor(rounded);
+  const cents = Math.round((rounded - dollars) * 100);
+  const dollarWords = dollars === 0 ? "Zero" : toWords(dollars);
+  const centsText = cents > 0 ? ` and ${toWords(cents)} Cents` : "";
+  return `${dollarWords} US Dollars${centsText} Only`;
+}
+
 // ---- Step 4: Final Rates ----------------------------------------------------
 
 function Step4({
@@ -1578,6 +1603,22 @@ function Step4({
     <div style={CARD}>
       <p style={SECTION_TITLE}>Final Rates</p>
 
+      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr", marginBottom: 24 }}>
+        <div>
+          <label style={LABEL}>Incoterms *</label>
+          <Select style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
+            onChange={(v) => handleIncotermChange(v)}
+            placeholder="Select Incoterms"
+            options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
+        </div>
+        <div>
+          <label style={LABEL}>Payment Terms</label>
+          <Select allowClear style={{ width: "100%" }} value={financials.payment_terms ? Number(financials.payment_terms) : undefined}
+            onChange={(v) => setFinancials({ ...financials, payment_terms: v ? String(v) : "" })}
+            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
+        </div>
+      </div>
+
       {!ci || ci.line_items.length === 0 ? (
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
           No items found. Go back and add containers with items first.
@@ -1588,16 +1629,16 @@ function Step4({
             <tr>
               <th style={TH}>Item Code</th>
               <th style={TH}>Description</th>
-              <th style={TH}>Total Qty</th>
-              <th style={TH}>UOM</th>
-              <th style={TH}>Rate (USD) *</th>
-              <th style={TH}>Amount (USD)</th>
               <th style={TH}>
                 No. &amp; Kind of Packages
                 <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                   for commercial invoice
                 </div>
               </th>
+              <th style={TH}>Total Qty</th>
+              <th style={TH}>UOM</th>
+              <th style={TH}>Rate (USD) *</th>
+              <th style={TH}>Amount (USD)</th>
             </tr>
           </thead>
           <tbody>
@@ -1611,6 +1652,13 @@ function Step4({
                 <tr key={li.id}>
                   <td style={{ ...TD, fontWeight: 600 }}>{li.item_code}</td>
                   <td style={TD}>{li.description}</td>
+                  <td style={TD}>
+                    <textarea
+                      style={{ ...INPUT, minHeight: 60, resize: "vertical", width: "100%", fontSize: 13 }}
+                      value={pkg}
+                      onChange={(e) => setPkgForm({ ...pkgForm, [li.id]: e.target.value })}
+                    />
+                  </td>
                   <td style={TD}>{parseFloat(li.total_quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
                   <td style={TD}>{li.uom_abbr ?? "—"}</td>
                   <td style={TD}>
@@ -1627,13 +1675,6 @@ function Step4({
                     )}
                   </td>
                   <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
-                  <td style={TD}>
-                    <textarea
-                      style={{ ...INPUT, minHeight: 60, resize: "vertical", width: "100%", fontSize: 13 }}
-                      value={pkg}
-                      onChange={(e) => setPkgForm({ ...pkgForm, [li.id]: e.target.value })}
-                    />
-                  </td>
                 </tr>
               );
             })}
@@ -1641,44 +1682,60 @@ function Step4({
         </table>
       )}
 
-      <p style={{ ...SECTION_TITLE, marginTop: 24 }}>Payment & Terms</p>
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={LABEL}>Incoterms *</label>
-          <Select style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
-            onChange={(v) => handleIncotermChange(v)}
-            placeholder="Select Incoterms"
-            options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
-        </div>
-        <div>
-          <label style={LABEL}>Payment Terms</label>
-          <Select allowClear style={{ width: "100%" }} value={financials.payment_terms ? Number(financials.payment_terms) : undefined}
-            onChange={(v) => setFinancials({ ...financials, payment_terms: v ? String(v) : "" })}
-            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
-        </div>
-      </div>
 
-      <p style={{ ...SECTION_TITLE, marginTop: 24 }}>Break-up in USD</p>
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
-        {visibleCostFields.has("fob_rate") && (
-          <div>
-            <label style={LABEL}>FOB Rate (USD per UOM)</label>
-            <input type="number" style={INPUT} value={financials.fob_rate || ""} onChange={(e) => setFinancials({ ...financials, fob_rate: e.target.value })} />
-          </div>
-        )}
-        {visibleCostFields.has("freight") && (
-          <div>
-            <label style={LABEL}>Freight (USD)</label>
-            <input type="number" style={INPUT} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} />
-          </div>
-        )}
-        {visibleCostFields.has("insurance") && (
-          <div>
-            <label style={LABEL}>Insurance (USD)</label>
-            <input type="number" style={INPUT} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} />
-          </div>
-        )}
-      </div>
+      {/* Cost Breakdown — PI-style summary box */}
+      {ci && ci.line_items.length > 0 && (() => {
+        const itemTotal = ci.line_items.reduce((sum, li) => {
+          const rate = parseFloat(rateForm[li.id] ?? li.rate_usd ?? "0") || 0;
+          return sum + parseFloat(li.total_quantity) * rate;
+        }, 0);
+        const freightAmt = parseFloat(financials.freight) || 0;
+        const insuranceAmt = parseFloat(financials.insurance) || 0;
+        // Invoice Total = line item amounts only (freight/insurance are reference figures on the CI PDF)
+        const invoiceTotal = itemTotal;
+        const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        return (
+          <>
+            <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10, marginTop: 24 }}>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
+                Cost Breakdown{selectedIncotermCode ? ` (${selectedIncotermCode})` : ""}
+              </p>
+              {/* Invoice Value row — computed from line items, read-only */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Invoice Value (Line Items)</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+              </div>
+              {/* Freight */}
+              {visibleCostFields.has("freight") && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
+                  <input type="number" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
+                </div>
+              )}
+              {/* Insurance */}
+              {visibleCostFields.has("insurance") && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
+                  <input type="number" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
+                </div>
+              )}
+            </div>
+
+            {/* Invoice Total row */}
+            <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>${fmt(invoiceTotal)}</span>
+            </div>
+
+            {/* Amount in Words */}
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
+              <strong>Amount in Words:</strong> {amountToWords(invoiceTotal)}
+            </div>
+          </>
+        );
+      })()}
+
       <div>
         <label style={LABEL}>L/C Details</label>
         <textarea style={{ ...INPUT, minHeight: 80, resize: "vertical" }} value={financials.lc_details || ""} onChange={(e) => setFinancials({ ...financials, lc_details: e.target.value })} />

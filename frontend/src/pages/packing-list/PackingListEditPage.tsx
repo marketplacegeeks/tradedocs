@@ -475,12 +475,6 @@ export default function PackingListEditPage() {
               onChange={(v) => setHeaderForm({ ...headerForm, incoterms: v ?? null })}
               options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
           </div>
-          <div>
-            <label style={LABEL}>Payment Terms</label>
-            <Select allowClear style={{ width: "100%" }} value={headerForm.payment_terms}
-              onChange={(v) => setHeaderForm({ ...headerForm, payment_terms: v ?? null })}
-              options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
-          </div>
         </div>
       </div>
 
@@ -583,6 +577,17 @@ export default function PackingListEditPage() {
         ))}
       </div>
 
+      {/* Payment Terms */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Payment Terms</p>
+        <div style={{ maxWidth: 360 }}>
+          <label style={LABEL}>Payment Terms</label>
+          <Select allowClear style={{ width: "100%" }} value={headerForm.payment_terms}
+            onChange={(v) => setHeaderForm({ ...headerForm, payment_terms: v ?? null })}
+            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
+        </div>
+      </div>
+
       {/* Final Rates */}
       {ci && ci.line_items.length > 0 && (
         <div style={CARD}>
@@ -592,6 +597,7 @@ export default function PackingListEditPage() {
               <tr>
                 <th style={TH}>Item Code</th>
                 <th style={TH}>Description</th>
+                <th style={TH}>No. & Kind of Packages</th>
                 <th style={TH}>Total Qty</th>
                 <th style={TH}>UOM</th>
                 <th style={TH}>Rate (USD per UOM) *</th>
@@ -606,6 +612,7 @@ export default function PackingListEditPage() {
                   <tr key={li.id}>
                     <td style={{ ...TD, fontWeight: 600 }}>{li.item_code}</td>
                     <td style={TD}>{li.description}</td>
+                    <td style={TD}>{li.packages_kind || "—"}</td>
                     <td style={TD}>{li.total_quantity}</td>
                     <td style={TD}>{li.uom_abbr ?? "—"}</td>
                     <td style={TD}>
