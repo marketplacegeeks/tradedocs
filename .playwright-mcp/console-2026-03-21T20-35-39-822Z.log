@@ -1,0 +1,2 @@
+[     199ms] [ERROR] Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259
+[     205ms] [ERROR] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259

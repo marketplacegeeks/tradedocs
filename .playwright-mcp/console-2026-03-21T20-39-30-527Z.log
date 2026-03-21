@@ -1,0 +1,36 @@
+[     191ms] [ERROR] Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259
+[     196ms] [ERROR] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259
+[ 2836330ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8000/api/v1/proforma-invoices/:0
+[ 2837810ms] [ERROR] In HTML, whitespace text nodes cannot be a child of <%s>. Make sure you don't have any extra whitespace between tags on each line of your source code.
+This will cause a hydration error.%s colgroup 
+
+  ...
+    <ProtectedRoute>
+      <AppLayout>
+        <div style={{display:"flex", ...}}>
+          <div>
+          <div style={{flex:1, ...}}>
+            <div>
+            <div style={{flex:1, ...}}>
+              <Outlet>
+                <RenderedRoute match={{...}} routeContext={{outlet:null, ...}}>
+                  <ProformaInvoiceDetailPage>
+                    <div>
+                      <button>
+                      <div>
+                      <div>
+                      <div style={{...}}>
+                        <div>
+                        <div style={{...}}>
+                          <table style={{width:"100%", ...}}>
+>                           <colgroup>
+                              <col>
+>                             {"   "}
+                              ...
+                            ...
+                      ...
+ @ http://localhost:5173/node_modules/.vite/deps/client-nSmsNIeu.js?v=e8cefe74:1785
+[ 3872446ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/packing-lists/15/:0
+[ 3873514ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/packing-lists/15/:0
+[ 3875569ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/packing-lists/15/:0
+[ 3879650ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/packing-lists/15/:0

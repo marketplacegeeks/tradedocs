@@ -45,10 +45,6 @@ from reportlab.platypus import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Generic helpers
-# ---------------------------------------------------------------------------
-
 def safe(v: Any, default: str = "") -> str:
     """Return empty string for None, otherwise str(v)."""
     return default if v is None else str(v)
@@ -66,10 +62,6 @@ def _fmt_decimal(v: Optional[Decimal], places: int = 3) -> str:
         except Exception:
             return str(v)
 
-
-# ---------------------------------------------------------------------------
-# Address helpers
-# ---------------------------------------------------------------------------
 
 def _org_address_by_type(org, address_type: str):
     """Return the OrganisationAddress of the given type, or None."""
@@ -97,22 +89,18 @@ def _format_address_html(org, addr) -> str:
     """
     parts = []
 
-    # Line 1: organisation name
     if org:
         name = safe(getattr(org, "name", ""))
         if name:
             parts.append(name)
 
     if addr:
-        # Line 2: address line 1
         if getattr(addr, "line1", ""):
             parts.append(addr.line1)
 
-        # Line 3: address line 2
         if getattr(addr, "line2", ""):
             parts.append(addr.line2)
 
-        # Line 4: City, Pin, State, Country
         city_parts = []
         for field in ("city", "pin", "state"):
             val = getattr(addr, field, "")
@@ -124,7 +112,6 @@ def _format_address_html(org, addr) -> str:
         if city_parts:
             parts.append(", ".join(city_parts))
 
-        # Line 5: phone
         phone_cc = getattr(addr, "phone_country_code", "")
         phone_no = getattr(addr, "phone_number", "")
         if phone_cc and phone_no:
@@ -132,18 +119,15 @@ def _format_address_html(org, addr) -> str:
         elif phone_no:
             parts.append(f"Ph: {phone_no}")
 
-        # Line 6: email
         email = getattr(addr, "email", "")
         if email:
             parts.append(email)
 
     if addr:
-        # Line 7: IEC code (address-level — only printed if set for this address)
         iec = getattr(addr, "iec_code", "")
         if iec:
             parts.append(f"IEC: {iec}")
 
-        # Line 8: tax code (address-level — only printed if both type and code are set)
         tax_type = getattr(addr, "tax_type", "")
         tax_code_val = getattr(addr, "tax_code", "")
         if tax_type and tax_code_val:
@@ -168,10 +152,6 @@ def _party_html(label: str, org) -> str:
     return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
 
-# ---------------------------------------------------------------------------
-# Paragraph style factory
-# ---------------------------------------------------------------------------
-
 def _make_pl_styles():
     """
     Build and return the paragraph styles used in the PL PDF.
@@ -181,51 +161,44 @@ def _make_pl_styles():
 
     style_company_header = ParagraphStyle(
         "PLCompanyHeader", parent=base["Normal"],
-        fontSize=14, leading=18, spaceAfter=4,
+        fontSize=18, leading=22, spaceAfter=4,
         alignment=TA_CENTER, fontName="Helvetica-Bold",
     )
     style_title = ParagraphStyle(
         "PLTitle", parent=base["Normal"],
-        fontSize=11, leading=14, spaceAfter=8,
+        fontSize=13, leading=16, spaceAfter=14,
         alignment=TA_CENTER, fontName="Helvetica-Bold",
     )
     style_label = ParagraphStyle(
         "PLLabel", parent=base["Normal"],
-        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
     )
     style_label_center = ParagraphStyle(
         "PLLabelCenter", parent=base["Normal"],
-        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
         alignment=TA_CENTER,
     )
     style_text = ParagraphStyle(
         "PLText", parent=base["Normal"],
-        fontSize=8, leading=10,
+        fontSize=9, leading=12,
     )
     style_small = ParagraphStyle(
         "PLSmall", parent=base["Normal"],
-        fontSize=7, leading=9,
+        fontSize=8, leading=11,
     )
     return style_company_header, style_title, style_label, style_label_center, style_text, style_small
 
 
-# ---------------------------------------------------------------------------
-# Common table style (grid + padding)
-# ---------------------------------------------------------------------------
-
 _GRID_STYLE = [
-    ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+    ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+    ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
     ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-    ("LEFTPADDING",   (0, 0), (-1, -1), 5),
-    ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
-    ("TOPPADDING",    (0, 0), (-1, -1), 4),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+    ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+    ("TOPPADDING",    (0, 0), (-1, -1), 5),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
 ]
 
-
-# ---------------------------------------------------------------------------
-# Story builder
-# ---------------------------------------------------------------------------
 
 def build_pl_story(packing_list, styles):
     """
@@ -244,30 +217,28 @@ def build_pl_story(packing_list, styles):
 
     story = []
 
-    # Usable page width (180mm content area) minus 5mm margin each side: 170mm
-    PAGE_W = 170 * mm
+    PAGE_W = 180 * mm
 
-    # ------------------------------------------------------------------
-    # Header: Exporter name + document title
-    # ------------------------------------------------------------------
     exp = getattr(packing_list, "exporter", None)
     exporter_name = safe(getattr(exp, "name", ""))
 
     story.append(Paragraph(exporter_name, style_company_header))
     story.append(Paragraph("Packing List / Weight Note", style_title))
 
-    # ------------------------------------------------------------------
-    # Table 1 — References  (3 equal cols)
-    # ------------------------------------------------------------------
+    line_table = Table([[""]], colWidths=[180 * mm])
+    line_table.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (-1, 0), 1.5, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(line_table)
+    story.append(Spacer(1, 10))
 
-    # Pull PI number from the linked Proforma Invoice
     pi_obj = getattr(packing_list, "proforma_invoice", None)
     pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
 
     pl_number = safe(getattr(packing_list, "pl_number", ""))
 
-    # Pull CI number — commercial_invoice is a reverse OneToOneField, so access
-    # the object directly (not via .first()).
     ci_number = ""
     try:
         ci_obj = packing_list.commercial_invoice
@@ -278,26 +249,18 @@ def build_pl_story(packing_list, styles):
 
     col_3 = PAGE_W / 3
 
-    # ------------------------------------------------------------------
-    # Table 2 — Exporter  (conditional: 4 cols with FACTORY, 3 cols without)
-    # ------------------------------------------------------------------
-
-    # Fetch address types. Corporate Office falls back to Registered if no OFFICE address exists.
     office_addr = _org_address_by_type(exp, "OFFICE") or _org_address_by_type(exp, "REGISTERED")
-    reg_addr    = _org_address_by_type(exp, "REGISTERED")
+    reg_addr = _org_address_by_type(exp, "REGISTERED")
     factory_addr = _org_address_by_type(exp, "FACTORY")
 
-    # Build exporter address cells using the standard 8-line format.
-    # IEC and tax codes are included automatically by _format_address_html.
     def _exp_cell(label: str, addr) -> str:
         body = _format_address_html(exp, addr)
         return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
-    office_cell_html  = _exp_cell("Corporate Office",   office_addr)
-    reg_cell_html     = _exp_cell("Registered Address", reg_addr)
-    factory_cell_html = _exp_cell("Factory Address",    factory_addr)
+    office_cell_html = _exp_cell("Corporate Office", office_addr)
+    reg_cell_html = _exp_cell("Registered Address", reg_addr)
+    factory_cell_html = _exp_cell("Factory Address", factory_addr)
 
-    # Build Other References cell content (PO / LC / BL / SO / Other)
     ref_lines = []
     po_no = safe(getattr(packing_list, "po_number", ""))
     po_date = safe(getattr(packing_list, "po_date", "")) if getattr(packing_list, "po_date", None) else ""
@@ -329,9 +292,6 @@ def build_pl_story(packing_list, styles):
 
     col_4 = PAGE_W / 4
 
-    # ------------------------------------------------------------------
-    # New header table — 4 equal cols: "Exporter" (cols 0-1 merged) | PL No. | CI No.
-    # ------------------------------------------------------------------
     header_data = [[
         Paragraph("<b>Exporter</b>", style_label),
         "",
@@ -340,52 +300,39 @@ def build_pl_story(packing_list, styles):
     ]]
     header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
     header_tbl.setStyle(TableStyle(_GRID_STYLE + [
-        ("SPAN",       (0, 0), (1, 0)),   # merge cols 0-1 for "Exporter"
-        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("SPAN", (0, 0), (1, 0)),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
     ]))
     header_tbl.hAlign = "LEFT"
     story.append(header_tbl)
 
-    # ------------------------------------------------------------------
-    # Exporter address table — address rows only (header row removed)
-    # ------------------------------------------------------------------
     if factory_addr:
-        # 4-column variant
         exp_data = [[
             Paragraph(office_cell_html, style_text),
             Paragraph(reg_cell_html, style_text),
             Paragraph(factory_cell_html, style_text),
-            Paragraph(refs_cell_html, style_text),
         ]]
-        exp_tbl = Table(exp_data, colWidths=[col_4, col_4, col_4, col_4])
+        exp_tbl = Table(exp_data, colWidths=[col_3, col_3, col_3])
     else:
-        # 3-column variant
         exp_data = [[
             Paragraph(office_cell_html, style_text),
             Paragraph(reg_cell_html, style_text),
-            Paragraph(refs_cell_html, style_text),
         ]]
-        exp_tbl = Table(exp_data, colWidths=[col_3, col_3, col_3])
+        exp_tbl = Table(exp_data, colWidths=[col_2, col_2])
 
     exp_tbl.setStyle(TableStyle(_GRID_STYLE))
     exp_tbl.hAlign = "LEFT"
     story.append(exp_tbl)
 
-    # ------------------------------------------------------------------
-    # Table 3 — Parties  (conditional: 3 cols with notify, 2 cols without)
-    # ------------------------------------------------------------------
-
     cons = getattr(packing_list, "consignee", None)
     buyer = getattr(packing_list, "buyer", None)
     notify_party = getattr(packing_list, "notify_party", None)
 
-    # Buyer cell: show buyer if set; otherwise mirror consignee
     buyer_org = buyer if buyer else cons
     buyer_cell_html = _party_html("Buyer", buyer_org)
-    cons_cell_html  = _party_html("Consignee", cons)
+    cons_cell_html = _party_html("Consignee", cons)
 
     if notify_party:
-        # 3-column variant
         notify_cell_html = _party_html("Notify Party", notify_party)
         party_data = [[
             Paragraph(buyer_cell_html, style_text),
@@ -394,7 +341,6 @@ def build_pl_story(packing_list, styles):
         ]]
         party_tbl = Table(party_data, colWidths=[col_3, col_3, col_3])
     else:
-        # 2-column variant
         col_2 = PAGE_W / 2
         party_data = [[
             Paragraph(buyer_cell_html, style_text),
@@ -405,10 +351,6 @@ def build_pl_story(packing_list, styles):
     party_tbl.hAlign = "LEFT"
     party_tbl.setStyle(TableStyle(_GRID_STYLE))
     story.append(party_tbl)
-
-    # ------------------------------------------------------------------
-    # Table 4 — Shipping  (4 cols × 2 rows, single table for aligned borders)
-    # ------------------------------------------------------------------
 
     pre_carriage_obj = getattr(packing_list, "pre_carriage_by", None)
     pre_carriage_val = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
@@ -453,39 +395,31 @@ def build_pl_story(packing_list, styles):
     shipping_tbl.setStyle(TableStyle(_GRID_STYLE))
     story.append(shipping_tbl)
 
-    # ------------------------------------------------------------------
-    # Table 5 — Terms  (2 cols × 1 row)
-    # ------------------------------------------------------------------
-
     payment_term_obj = getattr(packing_list, "payment_terms", None)
     payment_term_val = safe(getattr(payment_term_obj, "name", "")) if payment_term_obj else ""
 
     incoterm_obj = getattr(packing_list, "incoterms", None)
     incoterm_val = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
 
-    col_2 = PAGE_W / 2
     terms_data = [[
         Paragraph(f"<b>Payment Terms</b><br/>{payment_term_val}", style_text),
         Paragraph(f"<b>Incoterms</b><br/>{incoterm_val}", style_text),
+        Paragraph(refs_cell_html, style_text),
     ]]
-    terms_tbl = Table(terms_data, colWidths=[col_2, col_2])
+    terms_tbl = Table(terms_data, colWidths=[col_3, col_3, col_3])
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID_STYLE))
     story.append(terms_tbl)
 
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 12))
 
-    # ------------------------------------------------------------------
-    # Container section — UNCHANGED
-    # ------------------------------------------------------------------
-
-    total_net   = Decimal("0.000")
-    total_tare  = Decimal("0.000")
+    total_net = Decimal("0.000")
+    total_tare = Decimal("0.000")
     total_gross = Decimal("0.000")
 
     for cont in packing_list.containers.all().order_by("id"):
         cont_ref = safe(getattr(cont, "container_ref", ""))
-        marks    = safe(getattr(cont, "marks_numbers", ""))
+        marks = safe(getattr(cont, "marks_numbers", ""))
 
         cont_header = Table(
             [[
@@ -496,19 +430,19 @@ def build_pl_story(packing_list, styles):
         )
         cont_header.hAlign = "LEFT"
         cont_header.setStyle(TableStyle([
-            ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-            ("BACKGROUND",   (0, 0), (-1, -1), colors.whitesmoke),
-            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING",   (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
 
-        tare_val  = getattr(cont, "tare_weight", None)
+        tare_val = getattr(cont, "tare_weight", None)
         gross_val = getattr(cont, "gross_weight", None)
 
-        # Net weight computed from items (net_weight × quantity per item)
         net_val = None
         try:
             computed_net = sum(
@@ -533,46 +467,46 @@ def build_pl_story(packing_list, styles):
         weights_table = Table(
             [[
                 Paragraph("<b>Net Weight</b>", style_label),
-                Paragraph(_fmt_decimal(net_val, 3) or "-", style_text),
+                Paragraph(f"{_fmt_decimal(net_val, 3)} KGS" if net_val is not None else "-", style_text),
                 Paragraph("<b>Tare Weight</b>", style_label),
-                Paragraph(_fmt_decimal(tare_val, 3) or "-", style_text),
+                Paragraph(f"{_fmt_decimal(tare_val, 3)} KGS" if tare_val is not None else "-", style_text),
                 Paragraph("<b>Gross Weight</b>", style_label),
-                Paragraph(_fmt_decimal(gross_val, 3) or "-", style_text),
+                Paragraph(f"{_fmt_decimal(gross_val, 3)} KGS" if gross_val is not None else "-", style_text),
             ]],
-            colWidths=[26 * mm, 26 * mm, 26 * mm, 26 * mm, 26 * mm, 40 * mm],
+            colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
         )
         weights_table.hAlign = "LEFT"
         weights_table.setStyle(TableStyle([
-            ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-            ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING",   (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-            ("ALIGN",        (1, 0), (1, 0), "RIGHT"),
-            ("ALIGN",        (3, 0), (3, 0), "RIGHT"),
-            ("ALIGN",        (5, 0), (5, 0), "RIGHT"),
-            ("BACKGROUND",   (0, 0), (-1, -1), colors.whitesmoke),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
+            ("ALIGN", (5, 0), (5, 0), "RIGHT"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
         ]))
 
-        # Items table
         item_header = [
-            Paragraph("<b>Sr.</b>", style_label),
-            Paragraph("<b>HSN Code</b>", style_label),
-            Paragraph("<b>Item Code</b>", style_label),
-            Paragraph("<b>No &amp; Kind of Packages</b>", style_label),
-            Paragraph("<b>Description of Goods</b>", style_label),
-            Paragraph("<b>Qty</b>", style_label),
-            Paragraph("<b>UOM</b>", style_label),
-            Paragraph("<b>Batch Details</b>", style_label),
+            Paragraph("<b>Sr.</b>", style_label_center),
+            Paragraph("<b>HSN Code</b>", style_label_center),
+            Paragraph("<b>Item Code</b>", style_label_center),
+            Paragraph("<b>No &amp; Kind of Packages</b>", style_label_center),
+            Paragraph("<b>Description of Goods</b>", style_label_center),
+            Paragraph("<b>Qty</b>", style_label_center),
+            Paragraph("<b>UOM</b>", style_label_center),
+            Paragraph("<b>Batch Details</b>", style_label_center),
         ]
         item_rows = [item_header]
         sr = 0
         for it in cont.items.all().order_by("id"):
             sr += 1
-            uom_obj      = getattr(it, "uom", None)
-            uom_display  = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
-            qty_display  = _fmt_decimal(getattr(it, "quantity", None))
+            uom_obj = getattr(it, "uom", None)
+            uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
+            qty_display = _fmt_decimal(getattr(it, "quantity", None))
 
             item_rows.append([
                 Paragraph(str(sr), style_text),
@@ -585,54 +519,58 @@ def build_pl_story(packing_list, styles):
                 Paragraph(safe(getattr(it, "batch_details", "")) or "-", style_text),
             ])
 
-        # Col widths: Sr(10)+HSN(18)+ItemCode(18)+Packages(24)+Desc(46)+Qty(14)+UOM(10)+Batch(30)=170mm
         items_table = Table(
             item_rows,
-            colWidths=[10*mm, 18*mm, 18*mm, 24*mm, 46*mm, 14*mm, 10*mm, 30*mm],
+            colWidths=[10 * mm, 20 * mm, 20 * mm, 26 * mm, 45 * mm, 15 * mm, 14 * mm, 30 * mm],
             repeatRows=1,
         )
         items_table.hAlign = "LEFT"
         items_table.setStyle(TableStyle([
-            ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-            ("ALIGN",        (0, 0), (0, -1),  "CENTER"),
-            ("ALIGN",        (5, 1), (5, -1),  "RIGHT"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 2),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-            ("TOPPADDING",   (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 2),
-            ("BACKGROUND",   (0, 0), (-1, 0),  colors.lightgrey),
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "CENTER"),
+            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (0, 0), 6),
+            ("BOTTOMPADDING", (0, 0), (0, 0), 6),
+            ("TOPPADDING", (0, 1), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
         ]))
 
         story.append(KeepTogether([cont_header, weights_table, items_table]))
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 10))
 
-    # Grand totals row
     totals_tbl = Table(
         [[
             Paragraph("<b>Total Net Weight</b>", style_label),
-            Paragraph(_fmt_decimal(total_net, 3), style_text),
+            Paragraph(f"{_fmt_decimal(total_net, 3)} KGS", style_text),
             Paragraph("<b>Total Tare Weight</b>", style_label),
-            Paragraph(_fmt_decimal(total_tare, 3), style_text),
+            Paragraph(f"{_fmt_decimal(total_tare, 3)} KGS", style_text),
             Paragraph("<b>Total Gross Weight</b>", style_label),
-            Paragraph(_fmt_decimal(total_gross, 3), style_text),
+            Paragraph(f"{_fmt_decimal(total_gross, 3)} KGS", style_text),
         ]],
-        colWidths=[30*mm, 23*mm, 30*mm, 23*mm, 30*mm, 34*mm],
+        colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
     )
     totals_tbl.hAlign = "LEFT"
     totals_tbl.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+        ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-        ("ALIGN",        (1, 0), (1, 0), "RIGHT"),
-        ("ALIGN",        (3, 0), (3, 0), "RIGHT"),
-        ("ALIGN",        (5, 0), (5, 0), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("ALIGN", (3, 0), (3, 0), "RIGHT"),
+        ("ALIGN", (5, 0), (5, 0), "RIGHT"),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
     ]))
     story.append(totals_tbl)
-    story.append(Spacer(1, 4))
+    story.append(Spacer(1, 6))
     story.append(Paragraph("Quantities and UOM as per container item details.", style_small))
 
     return story
@@ -647,18 +585,23 @@ def generate_packing_list_pdf_bytes(packing_list) -> bytes:
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        leftMargin=10 * mm,
-        rightMargin=10 * mm,
-        topMargin=10 * mm,
-        bottomMargin=10 * mm,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=20 * mm,
     )
 
     def add_footer(canvas, _doc):
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         canvas.drawCentredString(
+            A4[0] / 2, 12 * mm,
+            "This is a computer generated document and does not require signature",
+        )
+        canvas.setFont("Helvetica", 7)
+        canvas.drawCentredString(
             A4[0] / 2, 8 * mm,
-            "This is a computer-generated document. Signature is not required.",
+            f"Page {canvas.getPageNumber()}",
         )
         canvas.restoreState()
 

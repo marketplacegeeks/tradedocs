@@ -1,0 +1,31 @@
+[     216ms] [ERROR] Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259
+[     221ms] [ERROR] In HTML, whitespace text nodes cannot be a child of <%s>. Make sure you don't have any extra whitespace between tags on each line of your source code.
+This will cause a hydration error.%s colgroup 
+
+  ...
+    <ProtectedRoute>
+      <AppLayout>
+        <div style={{display:"flex", ...}}>
+          <div>
+          <div style={{flex:1, ...}}>
+            <div>
+            <div style={{flex:1, ...}}>
+              <Outlet>
+                <RenderedRoute match={{...}} routeContext={{outlet:null, ...}}>
+                  <ProformaInvoiceDetailPage>
+                    <div>
+                      <button>
+                      <div>
+                      <div>
+                      <div style={{...}}>
+                        <div>
+                        <div style={{...}}>
+                          <table style={{width:"100%", ...}}>
+>                           <colgroup>
+                              <col>
+>                             {"   "}
+                              ...
+                            ...
+                      ...
+ @ http://localhost:5173/node_modules/.vite/deps/client-nSmsNIeu.js?v=e8cefe74:1785
+[     224ms] [ERROR] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead. @ http://localhost:5173/node_modules/.vite/deps/ref-Cf278VWM.js?v=e8cefe74:1259

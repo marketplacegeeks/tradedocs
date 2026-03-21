@@ -11,14 +11,14 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, Table, TableStyle
 
-# ---- Colour palette ----------------------------------------------------------
-COLOR_NAVY        = HexColor('#0A3D62')   # table headers, section rules
-COLOR_BLUE_ACCENT = HexColor('#1E88E5')   # left accent bar, banking box border
-COLOR_LIGHT_BG    = HexColor('#F4F7FB')   # alternating rows, info boxes
-COLOR_BORDER      = HexColor('#D0DCE8')   # all borders and dividers
-COLOR_TEXT_DARK   = HexColor('#1A1A2E')   # body text
-COLOR_TEXT_MUTED  = HexColor('#5A7A9F')   # labels, section headers
-COLOR_DRAFT_RED   = HexColor('#CC0000')   # watermark (alpha 0.07)
+# ---- Colour palette (Black & White Professional) -----------------------------
+COLOR_NAVY        = HexColor('#000000')   # Pure black for headers
+COLOR_BLUE_ACCENT = HexColor('#000000')   # Black accent bars
+COLOR_LIGHT_BG    = HexColor('#E8E8E8')   # Light gray backgrounds
+COLOR_BORDER      = HexColor('#000000')   # Black borders
+COLOR_TEXT_DARK   = HexColor('#000000')   # Black text
+COLOR_TEXT_MUTED  = HexColor('#4A4A4A')   # Dark gray for labels
+COLOR_DRAFT_RED   = HexColor('#000000')   # Black watermark (alpha 0.05)
 COLOR_WHITE       = white
 
 # ---- Fonts (ReportLab built-ins — no external files required) ----------------
@@ -29,21 +29,21 @@ FONT_ITALIC  = 'Helvetica-Oblique'
 FONT_MONO    = 'Courier'          # batch numbers, reference codes
 
 # ---- Type sizes (pt) ---------------------------------------------------------
-SIZE_COMPANY   = 14
-SIZE_DOC_TITLE = 12
-SIZE_SECTION   =  7
+SIZE_COMPANY   = 18
+SIZE_DOC_TITLE = 13
+SIZE_SECTION   =  9
 SIZE_BODY      =  9
-SIZE_SMALL     =  7.5
-SIZE_TABLE     =  8.5
-SIZE_TABLE_HDR =  7
+SIZE_SMALL     =  8
+SIZE_TABLE     =  9
+SIZE_TABLE_HDR =  9
 
 # ---- Page geometry -----------------------------------------------------------
 PAGE_W, PAGE_H = A4
-MARGIN_H       = 18 * mm    # left / right margin
+MARGIN_H       = 15 * mm    # left / right margin
 MARGIN_TOP     = 15 * mm    # gap between paper edge and header top
 MARGIN_BOTTOM  = 20 * mm    # gap between paper edge and footer bottom
 CONTENT_W      = PAGE_W - 2 * MARGIN_H
-HEADER_H       = 24 * mm    # height of the canvas-drawn page header
+HEADER_H       = 30 * mm    # height of the canvas-drawn page header
 
 # Platypus SimpleDocTemplate topMargin must clear the physical margin + header.
 DOC_TOP_MARGIN = MARGIN_TOP + HEADER_H
@@ -53,39 +53,39 @@ DOC_TOP_MARGIN = MARGIN_TOP + HEADER_H
 
 _BODY = ParagraphStyle(
     'td_body', fontName=FONT_BODY, fontSize=SIZE_TABLE,
-    leading=11, textColor=COLOR_TEXT_DARK,
+    leading=12, textColor=COLOR_TEXT_DARK,
 )
 _BOLD = ParagraphStyle(
     'td_bold', fontName=FONT_LABEL, fontSize=SIZE_TABLE,
-    leading=11, textColor=COLOR_TEXT_DARK,
+    leading=12, textColor=COLOR_TEXT_DARK,
 )
 _LABEL = ParagraphStyle(
     'td_label', fontName=FONT_BODY, fontSize=SIZE_SECTION,
-    leading=9, textColor=COLOR_TEXT_MUTED,
+    leading=11, textColor=COLOR_TEXT_MUTED,
 )
 _RIGHT = ParagraphStyle(
     'td_right', fontName=FONT_BODY, fontSize=SIZE_TABLE,
-    leading=11, alignment=TA_RIGHT, textColor=COLOR_TEXT_DARK,
+    leading=12, alignment=TA_RIGHT, textColor=COLOR_TEXT_DARK,
 )
 _RIGHT_BOLD = ParagraphStyle(
     'td_right_bold', fontName=FONT_LABEL, fontSize=SIZE_TABLE,
-    leading=11, alignment=TA_RIGHT, textColor=COLOR_TEXT_DARK,
+    leading=12, alignment=TA_RIGHT, textColor=COLOR_TEXT_DARK,
 )
 _ITALIC = ParagraphStyle(
     'td_italic', fontName=FONT_ITALIC, fontSize=SIZE_TABLE,
-    leading=11, textColor=COLOR_NAVY,
+    leading=12, textColor=COLOR_TEXT_DARK,
 )
 _SECTION_STYLE = ParagraphStyle(
     'td_section', fontName=FONT_LABEL, fontSize=SIZE_SECTION,
-    leading=9, textColor=COLOR_TEXT_MUTED, spaceBefore=8, spaceAfter=2,
+    leading=11, textColor=COLOR_TEXT_MUTED, spaceBefore=8, spaceAfter=2,
 )
 _HDR_WHITE = ParagraphStyle(
     'td_hdr_white', fontName=FONT_LABEL, fontSize=SIZE_TABLE_HDR,
-    leading=10, textColor=COLOR_WHITE,
+    leading=11, textColor=COLOR_TEXT_DARK,
 )
 _NAVY_WHITE = ParagraphStyle(
     'td_navy_white', fontName=FONT_LABEL, fontSize=SIZE_SECTION,
-    leading=9, textColor=COLOR_WHITE,
+    leading=11, textColor=COLOR_TEXT_DARK,
 )
 
 
@@ -95,7 +95,7 @@ def _p(text, style=None):
 
 
 def section_label(text):
-    """Return a Paragraph styled as a section label (ALL CAPS, muted blue-grey)."""
+    """Return a Paragraph styled as a section label (ALL CAPS, muted)."""
     return _p(text.upper(), _SECTION_STYLE)
 
 
@@ -105,7 +105,7 @@ def draw_watermark(canvas):
     """Faint diagonal 'DRAFT' watermark. Call for all non-APPROVED documents."""
     canvas.saveState()
     canvas.setFont(FONT_HEADING, 80)
-    canvas.setFillColor(COLOR_DRAFT_RED, alpha=0.07)
+    canvas.setFillColor(COLOR_DRAFT_RED, alpha=0.05)
     canvas.translate(PAGE_W / 2, PAGE_H / 2)
     canvas.rotate(35)
     canvas.drawCentredString(0, 0, 'DRAFT')
@@ -113,20 +113,23 @@ def draw_watermark(canvas):
 
 
 def draw_footer(canvas, doc_number):
-    """Hairline rule + document reference (left) + page number (right)."""
+    """Hairline rule + document reference (center) + page number (center bottom)."""
     canvas.saveState()
     y_rule = MARGIN_BOTTOM - 5 * mm
     canvas.setStrokeColor(COLOR_BORDER)
     canvas.setLineWidth(0.5)
-    canvas.line(MARGIN_H, y_rule + 5, PAGE_W - MARGIN_H, y_rule + 5)
-    canvas.setFont(FONT_BODY, 6.5)
+    canvas.line(MARGIN_H, y_rule + 8, PAGE_W - MARGIN_H, y_rule + 8)
+
+    canvas.setFont(FONT_BODY, 8)
     canvas.setFillColor(COLOR_TEXT_MUTED)
-    canvas.drawString(
-        MARGIN_H, y_rule,
-        f'{doc_number} · This is a computer-generated document.',
+    canvas.drawCentredString(
+        PAGE_W / 2, y_rule + 3,
+        'This is a computer generated document and does not require signature',
     )
-    canvas.drawRightString(
-        PAGE_W - MARGIN_H, y_rule,
+
+    canvas.setFont(FONT_BODY, 7)
+    canvas.drawCentredString(
+        PAGE_W / 2, y_rule - 3,
         f'Page {canvas.getPageNumber()}',
     )
     canvas.restoreState()
@@ -135,63 +138,57 @@ def draw_footer(canvas, doc_number):
 def draw_page_header(canvas, exporter_name, exporter_addr_lines,
                      doc_title_lines, doc_number, doc_date, iec_code=None):
     """
-    Canvas-drawn page header: left = company info, right = document title + ref.
+    Canvas-drawn page header: centered company info + document title.
     Called from page callbacks so it appears on every page.
     """
     canvas.saveState()
 
     y_top    = PAGE_H - MARGIN_TOP          # top of header area
     y_bottom = y_top - HEADER_H             # bottom of header area (where hairline sits)
-    x_left   = MARGIN_H
-    x_right  = PAGE_W - MARGIN_H
-    mid_x    = x_left + CONTENT_W * 0.55   # left block ends here
+    x_center = PAGE_W / 2
 
-    # --- Blue left accent bar (4 pt wide) ------------------------------------
-    canvas.setFillColor(COLOR_BLUE_ACCENT)
-    canvas.rect(x_left, y_bottom, 4, HEADER_H, fill=1, stroke=0)
-
-    text_x = x_left + 8   # text starts just after the accent bar
-
-    # --- Company name ---------------------------------------------------------
+    # --- Company name (centered, bold) ----------------------------------------
     canvas.setFont(FONT_HEADING, SIZE_COMPANY)
     canvas.setFillColor(COLOR_TEXT_DARK)
-    y_cursor = y_top - SIZE_COMPANY - 1
-    canvas.drawString(text_x, y_cursor, exporter_name or '')
+    y_cursor = y_top - SIZE_COMPANY - 2
+    canvas.drawCentredString(x_center, y_cursor, exporter_name or '')
 
+    # --- IEC code (if present) ------------------------------------------------
     if iec_code:
-        y_cursor -= 10
+        y_cursor -= 11
         canvas.setFont(FONT_BODY, SIZE_SMALL)
         canvas.setFillColor(COLOR_TEXT_MUTED)
-        canvas.drawString(text_x, y_cursor, f'IEC: {iec_code}')
+        canvas.drawCentredString(x_center, y_cursor, f'IEC: {iec_code}')
 
-    # --- Address lines --------------------------------------------------------
+    # --- Address lines (centered, smaller font) ------------------------------
     canvas.setFont(FONT_BODY, SIZE_SMALL)
     canvas.setFillColor(COLOR_TEXT_MUTED)
-    for line in (exporter_addr_lines or []):
+    for line in (exporter_addr_lines or [])[:3]:  # Limit to 3 lines for space
         y_cursor -= 10
-        canvas.drawString(text_x, y_cursor, line)
+        canvas.drawCentredString(x_center, y_cursor, line)
 
-    # --- Right side: document title ------------------------------------------
+    # --- Horizontal separator line --------------------------------------------
+    y_cursor -= 8
+    canvas.setStrokeColor(COLOR_BORDER)
+    canvas.setLineWidth(1.5)
+    canvas.line(MARGIN_H, y_cursor, PAGE_W - MARGIN_H, y_cursor)
+
+    # --- Document title (centered, bold) --------------------------------------
+    y_cursor -= 6
     canvas.setFont(FONT_HEADING, SIZE_DOC_TITLE)
-    canvas.setFillColor(COLOR_NAVY)
-    y_right = y_top - SIZE_DOC_TITLE - 1
+    canvas.setFillColor(COLOR_TEXT_DARK)
     for title_line in (doc_title_lines or []):
-        canvas.drawRightString(x_right, y_right, title_line.upper())
-        y_right -= SIZE_DOC_TITLE + 3
+        y_cursor -= SIZE_DOC_TITLE + 2
+        canvas.drawCentredString(x_center, y_cursor, title_line.upper())
 
-    # --- Doc number + date ---------------------------------------------------
+    # --- Doc number + date (centered, smaller) --------------------------------
     canvas.setFont(FONT_BODY, SIZE_SMALL)
     canvas.setFillColor(COLOR_TEXT_MUTED)
-    y_right -= 4
-    canvas.drawRightString(x_right, y_right, f'No: {doc_number}')
+    y_cursor -= 12
+    canvas.drawCentredString(x_center, y_cursor, f'No: {doc_number}')
     if doc_date:
-        y_right -= 10
-        canvas.drawRightString(x_right, y_right, f'Date: {doc_date}')
-
-    # --- Bottom hairline rule ------------------------------------------------
-    canvas.setStrokeColor(COLOR_BORDER)
-    canvas.setLineWidth(0.5)
-    canvas.line(x_left, y_bottom, x_right, y_bottom)
+        y_cursor -= 10
+        canvas.drawCentredString(x_center, y_cursor, f'Date: {doc_date}')
 
     canvas.restoreState()
 
@@ -211,22 +208,23 @@ def build_items_table(headers, rows, col_widths, right_cols=None):
     all_rows = [header_row] + rows
 
     cmds = [
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
-        ('GRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_LIGHT_BG),
+        ('BOX', (0, 0), (-1, -1), 1.2, COLOR_BORDER),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
         ('FONTNAME', (0, 0), (-1, -1), FONT_BODY),
         ('FONTSIZE', (0, 0), (-1, -1), SIZE_TABLE),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING',   (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING',  (0, 0), (-1, -1), 7),
-        ('TOPPADDING',    (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
+        ('TOPPADDING',    (0, 0), (0, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (0, 0), 6),
+        ('TOPPADDING',    (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
     ]
-    # Alternating row shading (data rows only — skip header at index 0)
-    for i in range(2, len(all_rows), 2):
-        cmds.append(('BACKGROUND', (0, i), (-1, i), COLOR_LIGHT_BG))
 
     for c in right_cols:
-        cmds.append(('ALIGN', (c, 0), (c, -1), 'RIGHT'))
+        cmds.append(('ALIGN', (c, 1), (c, -1), 'RIGHT'))
 
     tbl = Table(all_rows, colWidths=col_widths, repeatRows=1)
     tbl.setStyle(TableStyle(cmds))
@@ -259,8 +257,8 @@ def build_info_grid(cells, cols=4):
             ('BOX',           (0, 0), (-1, -1), 0.5, COLOR_BORDER),
             ('LEFTPADDING',   (0, 0), (-1, -1), 7),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 7),
-            ('TOPPADDING',    (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
         return outer
 
@@ -311,7 +309,6 @@ def build_party_grid(parties, gap=6):
         return outer
 
     boxes = [_box(lbl, name, lines) for lbl, name, lines in parties]
-    # Spacers between boxes using a single-row table with equal-width columns
     col_widths = []
     for i, _ in enumerate(boxes):
         col_widths.append(box_w)
@@ -322,7 +319,7 @@ def build_party_grid(parties, gap=6):
     for i, box in enumerate(boxes):
         row.append(box)
         if i < n - 1:
-            row.append('')   # gap cell
+            row.append('')
 
     tbl = Table([row], colWidths=col_widths)
     tbl.setStyle(TableStyle([
@@ -338,7 +335,7 @@ def build_party_grid(parties, gap=6):
 def build_banking_box(bank):
     """
     Returns a Table styled as the banking details box.
-    Left edge has a 4pt blue accent strip. Background is light grey.
+    Black border with light gray background.
     Returns None if bank is None.
     """
     if not bank:
@@ -364,35 +361,24 @@ def build_banking_box(bank):
             ('  SWIFT',     bank.intermediary_swift_code or '—'),
         ])
 
-    ACCENT = 4
-    LABEL_W = CONTENT_W * 0.32
-    VALUE_W = CONTENT_W - ACCENT - LABEL_W
+    LABEL_W = CONTENT_W * 0.35
+    VALUE_W = CONTENT_W - LABEL_W
 
-    title_row = ['', _p('BENEFICIARY BANK INFORMATION', _NAVY_WHITE), '']
-    data_rows = [['', _p(lbl, _LABEL), _p(str(val or '—'), _BODY)] for lbl, val in pairs]
+    title_row = [_p('BENEFICIARY BANK INFORMATION', _NAVY_WHITE), '']
+    data_rows = [[_p(lbl, _LABEL), _p(str(val or '—'), _BODY)] for lbl, val in pairs]
     all_rows = [title_row] + data_rows
 
-    tbl = Table(all_rows, colWidths=[ACCENT, LABEL_W, VALUE_W])
+    tbl = Table(all_rows, colWidths=[LABEL_W, VALUE_W])
     tbl.setStyle(TableStyle([
-        # Blue accent strip
-        ('BACKGROUND',    (0, 0), (0, -1), COLOR_BLUE_ACCENT),
-        # Title row navy background
-        ('BACKGROUND',    (1, 0), (2, 0),  COLOR_NAVY),
-        # Data rows light background
-        ('BACKGROUND',    (1, 1), (2, -1), COLOR_LIGHT_BG),
-        # Outer border only
-        ('BOX',           (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('INNERGRID',     (0, 0), (-1, -1), 0,   COLOR_BORDER),
-        # Accent strip: no padding
-        ('LEFTPADDING',   (0, 0), (0, -1), 0),
-        ('RIGHTPADDING',  (0, 0), (0, -1), 0),
-        ('TOPPADDING',    (0, 0), (0, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (0, -1), 0),
-        # Content padding
-        ('LEFTPADDING',   (1, 0), (-1, -1), 8),
-        ('RIGHTPADDING',  (1, 0), (-1, -1), 8),
-        ('TOPPADDING',    (1, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (1, 0), (-1, -1), 3),
+        ('BACKGROUND',    (0, 0), (1, 0),  COLOR_LIGHT_BG),
+        ('BACKGROUND',    (0, 1), (1, -1), COLOR_LIGHT_BG),
+        ('BOX',           (0, 0), (-1, -1), 1.2, COLOR_BORDER),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('SPAN',          (0, 0), (1, 0)),
     ]))
     return tbl

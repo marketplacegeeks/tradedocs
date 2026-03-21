@@ -27,7 +27,7 @@ from io import BytesIO
 from typing import Any
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
@@ -40,9 +40,6 @@ from reportlab.platypus import (
 )
 
 
-# Mirrors INCOTERM_PL_FIELDS in frontend/src/utils/constants.ts.
-# Keys are Incoterm codes; values are the set of CI cost fields that should be printed.
-# L/C Details is always shown and is NOT in these sets (FR-14M.8B).
 _INCOTERM_VISIBLE_FIELDS: dict = {
     "EXW": set(),
     "FCA": set(),
@@ -64,7 +61,6 @@ def safe(v: Any, default: str = "") -> str:
 
 def _fmt_money(v: Any) -> str:
     try:
-        # Strip trailing zeros: 12.00 → "12", 12.50 → "12.5"
         s = f"{float(v):,.2f}"
         if "." in s:
             s = s.rstrip("0").rstrip(".")
@@ -75,7 +71,6 @@ def _fmt_money(v: Any) -> str:
 
 def _fmt_qty(v: Any) -> str:
     try:
-        # Strip trailing zeros: 12.000 → "12", 12.500 → "12.5"
         s = f"{float(v):,.3f}"
         if "." in s:
             s = s.rstrip("0").rstrip(".")
@@ -94,13 +89,7 @@ def _amount_to_words(n: Any, currency: str = "USD") -> str:
         return ""
 
 
-# ---------------------------------------------------------------------------
-# Organisation address helpers
-# (Organisation has no direct address/email fields; must go via .addresses relation)
-# ---------------------------------------------------------------------------
-
 def _org_address_str(org) -> str:
-    """Return address string from the Organisation's OFFICE address, falling back to REGISTERED."""
     if not org:
         return ""
     try:
@@ -128,7 +117,6 @@ def _org_address_str(org) -> str:
 
 
 def _org_email(org) -> str:
-    """Return email from the Organisation's OFFICE address, falling back to REGISTERED."""
     if not org:
         return ""
     try:
@@ -142,7 +130,6 @@ def _org_email(org) -> str:
 
 
 def _org_registered_address(org):
-    """Return the REGISTERED OrganisationAddress instance, or None."""
     if not org:
         return None
     try:
@@ -152,12 +139,6 @@ def _org_registered_address(org):
 
 
 def _party_cell_html(label: str, org) -> str:
-    """
-    Build a labelled address block for Buyer, Consignee, or Notify Party.
-    Uses the org's first available address for contact details.
-    Format: name / line1 / line2 / city,pin,state,country / phone / email
-    Pass label="" to omit the bold label prefix (used for the right column of the notify party row).
-    """
     if not org:
         return f"<b>{label}</b>" if label else ""
     parts = []
@@ -199,95 +180,83 @@ def _party_cell_html(label: str, org) -> str:
 
 
 def _make_ci_styles():
-    """
-    Build and return paragraph styles for the CI section.
-    Names are prefixed 'CI' to avoid collisions when combined with PL story.
-    """
     base = getSampleStyleSheet()
 
     style_company_header = ParagraphStyle(
         "CICompanyHeader", parent=base["Normal"],
-        fontSize=16, leading=20, spaceAfter=6,
+        fontSize=18, leading=22, spaceAfter=4,
         alignment=TA_CENTER, fontName="Helvetica-Bold",
     )
     style_title = ParagraphStyle(
         "CITitle", parent=base["Normal"],
-        fontSize=12, leading=15, spaceAfter=10,
+        fontSize=13, leading=16, spaceAfter=14,
         alignment=TA_CENTER, fontName="Helvetica-Bold",
     )
     style_label = ParagraphStyle(
         "CILabel", parent=base["Normal"],
-        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
     )
     style_text = ParagraphStyle(
         "CIText", parent=base["Normal"],
-        fontSize=9, leading=11,
+        fontSize=9, leading=12,
     )
     style_small = ParagraphStyle(
         "CISmall", parent=base["Normal"],
-        fontSize=8, leading=10,
+        fontSize=8, leading=11,
     )
-    return style_company_header, style_title, style_label, style_text, style_small
+    style_table_header = ParagraphStyle(
+        "CITableHeader", parent=base["Normal"],
+        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+    )
+    return style_company_header, style_title, style_label, style_text, style_small, style_table_header
 
-
-# ---------------------------------------------------------------------------
-# Story builder — used by generate_pl_ci_pdf to embed CI in a combined document.
-# ---------------------------------------------------------------------------
 
 def build_ci_story(ci, styles) -> list:
-    """
-    Build and return the list of story flowables for the Commercial Invoice section.
-
-    Args:
-        ci: CommercialInvoice model instance.
-        styles: tuple returned by _make_ci_styles().
-
-    Returns:
-        list of ReportLab flowables (does NOT include a leading PageBreak).
-    """
-    style_company_header, style_title, style_label, style_text, style_small = styles
+    style_company_header, style_title, style_label, style_text, style_small, style_table_header = styles
     story = []
 
-    # Access the linked packing list for all shipping / party fields.
     pl = getattr(ci, "packing_list", None)
-
-    # Exporter / Consignee / Buyer are on the PL, not directly on CI.
     exp = getattr(pl, "exporter", None) if pl else None
     cons = getattr(pl, "consignee", None) if pl else None
     buyer = getattr(pl, "buyer", None) if pl else None
     notify_party_org = getattr(pl, "notify_party", None) if pl else None
 
-    # ---- Header ----------------------------------------------------------------
     story.append(Paragraph(safe(getattr(exp, "name", "")), style_company_header))
     story.append(Paragraph("COMMERCIAL INVOICE", style_title))
-    story.append(Spacer(1, 8))
 
-    # Shared column-width bases (content width = 180mm)
-    col_4 = 180 * mm / 4   # 45mm
-    col_3 = 180 * mm / 3   # 60mm
-    col_2 = 90 * mm        # 90mm
+    line_table = Table([[""]], colWidths=[180 * mm])
+    line_table.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (-1, 0), 1.5, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(line_table)
+    story.append(Spacer(1, 10))
+
+    col_4 = 180 * mm / 4
+    col_3 = 180 * mm / 3
+    col_2 = 90 * mm
 
     _GRID = [
-        ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+        ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",   (0, 0), (-1, -1), 6),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
-        ("TOPPADDING",    (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]
 
-    # ---- Exporter address lookups -----------------------------------------------
-    # Corporate Office = OFFICE address, falling back to REGISTERED if none exists.
-    corp_addr    = (
+    corp_addr = (
         (exp.addresses.filter(address_type="OFFICE").first()
          or exp.addresses.filter(address_type="REGISTERED").first())
         if exp else None
     )
-    reg_addr     = (exp.addresses.filter(address_type="REGISTERED").first() if exp else None)
-    factory_addr = (exp.addresses.filter(address_type="FACTORY").first()    if exp else None)
+    reg_addr = (exp.addresses.filter(address_type="REGISTERED").first() if exp else None)
+    factory_addr = (exp.addresses.filter(address_type="FACTORY").first() if exp else None)
 
     def _exp_cell(label: str, addr) -> str:
-        """Build an exporter address cell: org name + address fields + IEC/tax."""
         parts = []
         if exp:
             parts.append(safe(getattr(exp, "name", "")))
@@ -320,18 +289,17 @@ def build_ci_story(ci, styles) -> list:
         body = "<br/>".join(parts)
         return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
-    # ---- Order references (sourced from PL) ------------------------------------
     ref_lines = []
     if pl:
-        po_no          = safe(getattr(pl, "po_number", ""))
-        po_date        = safe(getattr(pl, "po_date", "")) if getattr(pl, "po_date", None) else ""
-        lc_no          = safe(getattr(pl, "lc_number", ""))
-        lc_date        = safe(getattr(pl, "lc_date", "")) if getattr(pl, "lc_date", None) else ""
-        bl_no          = safe(getattr(pl, "bl_number", ""))
-        bl_date        = safe(getattr(pl, "bl_date", "")) if getattr(pl, "bl_date", None) else ""
-        so_no          = safe(getattr(pl, "so_number", ""))
-        so_date        = safe(getattr(pl, "so_date", "")) if getattr(pl, "so_date", None) else ""
-        other_ref      = safe(getattr(pl, "other_references", ""))
+        po_no = safe(getattr(pl, "po_number", ""))
+        po_date = safe(getattr(pl, "po_date", "")) if getattr(pl, "po_date", None) else ""
+        lc_no = safe(getattr(pl, "lc_number", ""))
+        lc_date = safe(getattr(pl, "lc_date", "")) if getattr(pl, "lc_date", None) else ""
+        bl_no = safe(getattr(pl, "bl_number", ""))
+        bl_date = safe(getattr(pl, "bl_date", "")) if getattr(pl, "bl_date", None) else ""
+        so_no = safe(getattr(pl, "so_number", ""))
+        so_date = safe(getattr(pl, "so_date", "")) if getattr(pl, "so_date", None) else ""
+        other_ref = safe(getattr(pl, "other_references", ""))
         other_ref_date = (
             safe(getattr(pl, "other_references_date", ""))
             if getattr(pl, "other_references_date", None) else ""
@@ -354,16 +322,10 @@ def build_ci_story(ci, styles) -> list:
         if ref_lines else "<b>Other References</b>"
     )
 
-    # ---- Document numbers for header row ----------------------------------------
-    pi_obj    = getattr(pl, "proforma_invoice", None) if pl else None
+    pi_obj = getattr(pl, "proforma_invoice", None) if pl else None
     pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
     ci_number = safe(getattr(ci, "ci_number", ""))
 
-    # ---- Table 1: Header row — Exporter (merged) | PI No. | CI No. -------------
-    #  ┌───────────────────────────────────┬──────────────────┬──────────────────┐
-    #  │ Exporter  (cols 0-1 merged)       │ PI No.           │ CI No.           │
-    #  └───────────────────────────────────┴──────────────────┴──────────────────┘
-    #    45mm (col 0)    45mm (col 1)          45mm (col 2)       45mm (col 3)
     header_tbl = Table(
         [[
             Paragraph("<b>Exporter</b>", style_label),
@@ -375,35 +337,32 @@ def build_ci_story(ci, styles) -> list:
     )
     header_tbl.hAlign = "LEFT"
     header_tbl.setStyle(TableStyle(_GRID + [
-        ("SPAN",       (0, 0), (1, 0)),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("SPAN", (0, 0), (1, 0)),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
     ]))
     story.append(header_tbl)
 
-    # ---- Table 2: Exporter address (4-col with factory, 3-col without) ---------
-    office_cell  = _exp_cell("Corporate Office",   corp_addr)
-    reg_cell     = _exp_cell("Registered Address", reg_addr)
-    factory_cell = _exp_cell("Factory Address",    factory_addr)
+    office_cell = _exp_cell("Corporate Office", corp_addr)
+    reg_cell = _exp_cell("Registered Address", reg_addr)
+    factory_cell = _exp_cell("Factory Address", factory_addr)
 
     if factory_addr:
         exp_tbl = Table(
             [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text),
-              Paragraph(factory_cell, style_text), Paragraph(refs_cell_html, style_text)]],
-            colWidths=[col_4, col_4, col_4, col_4],
+              Paragraph(factory_cell, style_text)]],
+            colWidths=[col_3, col_3, col_3],
         )
     else:
         exp_tbl = Table(
-            [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text),
-              Paragraph(refs_cell_html, style_text)]],
-            colWidths=[col_3, col_3, col_3],
+            [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text)]],
+            colWidths=[col_2, col_2],
         )
     exp_tbl.hAlign = "LEFT"
     exp_tbl.setStyle(TableStyle(_GRID))
     story.append(exp_tbl)
 
-    # ---- Table 3: Parties (3-col with notify party, 2-col without) --------------
-    buyer_cell  = _party_cell_html("Buyer", buyer if buyer else cons)
-    cons_cell   = _party_cell_html("Consignee", cons)
+    buyer_cell = _party_cell_html("Buyer", buyer if buyer else cons)
+    cons_cell = _party_cell_html("Consignee", cons)
 
     if notify_party_org:
         notify_cell = _party_cell_html("Notify Party", notify_party_org)
@@ -421,24 +380,21 @@ def build_ci_story(ci, styles) -> list:
     party_tbl.setStyle(TableStyle(_GRID))
     story.append(party_tbl)
 
-    # ---- Table 4: Shipping (4 cols × 2 rows) ------------------------------------
-    #  Row 0: Pre-carriage | Place of Receipt | Port of Loading | Port of Discharge
-    #  Row 1: Final Dest   | Country Final Dest | Country of Origin | Vessel/Flight No.
-    pre_carriage_obj   = getattr(pl, "pre_carriage_by", None) if pl else None
-    pre_carriage_val   = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
-    place_receipt_obj  = getattr(pl, "place_of_receipt_by_pre_carrier", None) if pl else None
-    place_receipt_val  = safe(getattr(place_receipt_obj, "name", "")) if place_receipt_obj else ""
-    port_loading_obj   = getattr(pl, "port_of_loading", None) if pl else None
-    port_loading_val   = safe(getattr(port_loading_obj, "name", "")) if port_loading_obj else ""
+    pre_carriage_obj = getattr(pl, "pre_carriage_by", None) if pl else None
+    pre_carriage_val = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
+    place_receipt_obj = getattr(pl, "place_of_receipt_by_pre_carrier", None) if pl else None
+    place_receipt_val = safe(getattr(place_receipt_obj, "name", "")) if place_receipt_obj else ""
+    port_loading_obj = getattr(pl, "port_of_loading", None) if pl else None
+    port_loading_val = safe(getattr(port_loading_obj, "name", "")) if port_loading_obj else ""
     port_discharge_obj = getattr(pl, "port_of_discharge", None) if pl else None
     port_discharge_val = safe(getattr(port_discharge_obj, "name", "")) if port_discharge_obj else ""
-    final_dest_obj     = getattr(pl, "final_destination", None) if pl else None
-    final_dest_val     = safe(getattr(final_dest_obj, "name", "")) if final_dest_obj else ""
-    dest_country_obj   = getattr(pl, "country_of_final_destination", None) if pl else None
-    dest_country_val   = safe(getattr(dest_country_obj, "name", "")) if dest_country_obj else ""
+    final_dest_obj = getattr(pl, "final_destination", None) if pl else None
+    final_dest_val = safe(getattr(final_dest_obj, "name", "")) if final_dest_obj else ""
+    dest_country_obj = getattr(pl, "country_of_final_destination", None) if pl else None
+    dest_country_val = safe(getattr(dest_country_obj, "name", "")) if dest_country_obj else ""
     origin_country_obj = getattr(pl, "country_of_origin", None) if pl else None
     origin_country_val = safe(getattr(origin_country_obj, "name", "")) if origin_country_obj else ""
-    vessel_flight_val  = safe(getattr(pl, "vessel_flight_no", "")) if pl else ""
+    vessel_flight_val = safe(getattr(pl, "vessel_flight_no", "")) if pl else ""
 
     shipping_tbl = Table(
         [
@@ -461,24 +417,23 @@ def build_ci_story(ci, styles) -> list:
     shipping_tbl.setStyle(TableStyle(_GRID))
     story.append(shipping_tbl)
 
-    # ---- Table 5: Payment Terms | Incoterms ------------------------------------
-    incoterm_obj     = getattr(pl, "incoterms", None) if pl else None
-    incoterm_str     = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
+    incoterm_obj = getattr(pl, "incoterms", None) if pl else None
+    incoterm_str = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
     payment_term_obj = getattr(pl, "payment_terms", None) if pl else None
     payment_term_str = safe(getattr(payment_term_obj, "name", "")) if payment_term_obj else ""
     terms_tbl = Table(
         [[
             Paragraph(f"<b>Payment Terms</b><br/>{payment_term_str}", style_text),
             Paragraph(f"<b>Incoterms</b><br/>{incoterm_str}", style_text),
+            Paragraph(refs_cell_html, style_text),
         ]],
-        colWidths=[col_2, col_2],
+        colWidths=[col_3, col_3, col_3],
     )
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID))
     story.append(terms_tbl)
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 12))
 
-    # ---- Build packages lookup: item_code → set of packages_kind strings -----
     packages_map: dict = {}
     if pl:
         try:
@@ -495,16 +450,15 @@ def build_ci_story(ci, styles) -> list:
         except Exception:
             pass
 
-    # ---- Line items table ------------------------------------------------------
     li_header = [
-        Paragraph("<b>Sr.</b>", style_label),
-        Paragraph("<b>HSN Code</b>", style_label),
-        Paragraph("<b>No &amp; Kind of Packages</b>", style_label),
-        Paragraph("<b>Item Code</b>", style_label),
-        Paragraph("<b>Description of Goods</b>", style_label),
-        Paragraph("<b>Qty</b>", style_label),
-        Paragraph("<b>Rate (USD)</b>", style_label),
-        Paragraph("<b>Amount (USD)</b>", style_label),
+        Paragraph("<b>Sr.</b>", style_table_header),
+        Paragraph("<b>HSN Code</b>", style_table_header),
+        Paragraph("<b>No &amp; Kind of Packages</b>", style_table_header),
+        Paragraph("<b>Item Code</b>", style_table_header),
+        Paragraph("<b>Description of Goods</b>", style_table_header),
+        Paragraph("<b>Qty</b>", style_table_header),
+        Paragraph("<b>Rate (USD)</b>", style_table_header),
+        Paragraph("<b>Amount (USD)</b>", style_table_header),
     ]
     li_rows = [li_header]
     total_amount_usd = Decimal("0.00")
@@ -543,26 +497,29 @@ def build_ci_story(ci, styles) -> list:
             Paragraph(_fmt_money(amount_val), style_text),
         ])
 
-    # Col widths: 10+22+28+22+52+20+13+13 = 180mm
+    # Sr(10) + HSN(22) + Packages(24) + ItemCode(20) + Desc(46) + Qty(18) + Rate(20) + Amt(20) = 180mm
     li_table = Table(
         li_rows,
-        colWidths=[10 * mm, 22 * mm, 28 * mm, 22 * mm, 52 * mm, 20 * mm, 13 * mm, 13 * mm],
+        colWidths=[10 * mm, 22 * mm, 24 * mm, 20 * mm, 46 * mm, 18 * mm, 20 * mm, 20 * mm],
     )
     li_table.hAlign = "LEFT"
     li_table.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("BACKGROUND",   (0, 0), (-1, 0), colors.lightgrey),
+        ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",    (0, 0), (-1, -1), 0.5, colors.black),
+        ("BACKGROUND",   (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
         ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",        (0, 0), (-1, 0), "CENTER"),
         ("ALIGN",        (6, 1), (7, -1), "RIGHT"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING",   (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING",   (0, 0), (0, 0), 6),
+        ("BOTTOMPADDING",(0, 0), (0, 0), 6),
+        ("TOPPADDING",   (0, 1), (-1, -1), 4),
+        ("BOTTOMPADDING",(0, 1), (-1, -1), 4),
     ]))
     story.append(li_table)
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 12))
 
-    # ---- Weight totals ---------------------------------------------------------
     total_net_val = Decimal("0.000")
     total_gross_val = Decimal("0.000")
     if pl:
@@ -586,12 +543,8 @@ def build_ci_story(ci, styles) -> list:
             pass
 
     lc_details_val = safe(getattr(ci, "lc_details", ""))
-
-    # Only show cost fields relevant to the selected Incoterm.
     visible_fields = _INCOTERM_VISIBLE_FIELDS.get(incoterm_str, _ALL_CI_FIELDS)
 
-    # ---- Cost breakdown --------------------------------------------------------
-    # freight and insurance are absolute USD amounts added on top of the line items total.
     freight_amount = Decimal("0.00")
     insurance_amount = Decimal("0.00")
     if "freight" in visible_fields:
@@ -606,47 +559,74 @@ def build_ci_story(ci, styles) -> list:
             pass
     invoice_total = total_amount_usd + freight_amount + insurance_amount
 
-    # Left column: weights + L/C Details.
-    left_rows = [
-        f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)}",
-        f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)}",
+    # Build left cell: net/gross weight stacked, then optional L/C Details below
+    left_inner_rows = [
+        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} KGS", style_text)],
+        [Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} KGS", style_text)],
     ]
     if lc_details_val:
-        left_rows.append(f"<b>L/C Details:</b> {lc_details_val}")
+        left_inner_rows.append(
+            [Paragraph(f"<b>L/C Details:</b> {lc_details_val}", style_text)]
+        )
+    left_inner = Table(left_inner_rows, colWidths=[78 * mm])
+    left_inner.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    left_cell_content = left_inner
 
-    # Right column: cost breakdown lines.
+    # Build breakdown as a nested table: label col (left) | amount col (right-aligned)
     breakdown_header = f"COST BREAKDOWN ({incoterm_str})" if incoterm_str else "COST BREAKDOWN"
-    right_rows = [
-        f"<b>{breakdown_header}</b>",
-        f"FOB Value (Line Items):  ${_fmt_money(total_amount_usd)}",
+    style_amt = ParagraphStyle("CIAmt", parent=style_text, alignment=TA_RIGHT)
+
+    breakdown_rows = [
+        # Header spans both sub-columns
+        [Paragraph(f"<b>{breakdown_header}</b>", style_text), Paragraph("", style_text)],
+        [Paragraph("FOB Value (Line Items):", style_text),
+         Paragraph(f"USD {_fmt_money(total_amount_usd)}", style_amt)],
     ]
     if "freight" in visible_fields:
-        right_rows.append(f"Freight:  ${_fmt_money(freight_amount)}")
+        breakdown_rows.append([
+            Paragraph("Freight:", style_text),
+            Paragraph(f"USD {_fmt_money(freight_amount)}", style_amt),
+        ])
     if "insurance" in visible_fields:
-        right_rows.append(f"Insurance Amount:  ${_fmt_money(insurance_amount)}")
+        breakdown_rows.append([
+            Paragraph("Insurance Amount:", style_text),
+            Paragraph(f"USD {_fmt_money(insurance_amount)}", style_amt),
+        ])
 
-    n_rows = max(len(left_rows), len(right_rows))
-    charges_table_data = [
-        [
-            Paragraph(left_rows[i] if i < len(left_rows) else "", style_text),
-            Paragraph(right_rows[i] if i < len(right_rows) else "", style_text),
-        ]
-        for i in range(n_rows)
-    ]
+    # Inner widths must fit inside the 90mm outer cell (12mm used by outer padding)
+    breakdown_inner = Table(breakdown_rows, colWidths=[46 * mm, 32 * mm])
+    breakdown_inner.setStyle(TableStyle([
+        ("SPAN",          (0, 0), (1, 0)),   # header spans both sub-columns
+        ("LINEBELOW",     (0, 0), (1, 0), 0.5, colors.black),  # line under header
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
 
-    totals_charges_tbl = Table(charges_table_data, colWidths=[90 * mm, 90 * mm])
+    totals_charges_tbl = Table(
+        [[left_cell_content, breakdown_inner]],
+        colWidths=[90 * mm, 90 * mm],
+    )
     totals_charges_tbl.hAlign = "LEFT"
     totals_charges_tbl.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
+        ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",    (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",       (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",  (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+        ("TOPPADDING",   (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
     ]))
     story.append(totals_charges_tbl)
 
-    # ---- Invoice Total row (full width) ----------------------------------------
     invoice_total_tbl = Table(
         [[
             Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
@@ -656,33 +636,61 @@ def build_ci_story(ci, styles) -> list:
     )
     invoice_total_tbl.hAlign = "LEFT"
     invoice_total_tbl.setStyle(TableStyle([
-        ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+        ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN",         (1, 0), (1, 0), "RIGHT"),
         ("LEFTPADDING",   (0, 0), (-1, -1), 6),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
-        ("TOPPADDING",    (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("BACKGROUND",    (0, 0), (-1, -1), colors.whitesmoke),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
     ]))
     story.append(invoice_total_tbl)
     story.append(Spacer(1, 6))
 
-    # ---- Amount in words -------------------------------------------------------
     amount_in_words_str = _amount_to_words(invoice_total, currency="USD")
     if amount_in_words_str:
-        story.append(Paragraph(f"<b>Amount in Words:</b> {amount_in_words_str}", style_text))
-        story.append(Spacer(1, 6))
+        style_text_center = ParagraphStyle(
+            "CITextCenter", parent=style_text, alignment=TA_CENTER,
+        )
+        words_table = Table(
+            [[Paragraph(f"<b>Amount in Words:</b> {amount_in_words_str}", style_text_center)]],
+            colWidths=[180 * mm],
+        )
+        words_table.setStyle(TableStyle([
+            ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+            ("ALIGN",        (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",   (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
+        ]))
+        words_table.hAlign = "LEFT"
+        story.append(words_table)
 
-    # ---- Declaration -----------------------------------------------------------
-    story.append(Paragraph(
-        "Declaration: We declare that this invoice shows actual price of the goods "
-        "described and that all particulars are true and correct.",
-        style_text,
-    ))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 12))
 
-    # ---- Bank details (same format as PI PDF) ----------------------------------
+    decl_table = Table(
+        [[Paragraph(
+            "<b>Declaration:</b> We declare that this invoice shows actual price of the goods "
+            "described and that all particulars are true and correct.",
+            style_text,
+        )]],
+        colWidths=[180 * mm],
+    )
+    decl_table.setStyle(TableStyle([
+        ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING",   (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
+    ]))
+    decl_table.hAlign = "LEFT"
+    story.append(decl_table)
+    story.append(Spacer(1, 12))
+
     bank = getattr(ci, "bank", None)
     if bank:
         bank_lines = []
@@ -715,13 +723,14 @@ def build_ci_story(ci, styles) -> list:
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
         bank_box = Table(bank_rows, colWidths=[180 * mm])
         bank_box.setStyle(TableStyle([
-            ("BOX",          (0, 0), (-1, -1), 0.5, colors.black),
+            ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
             ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING",   (0, 0), (-1, -1), 1),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 1),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",   (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 2),
         ]))
+        bank_box.hAlign = "LEFT"
         story.append(bank_box)
         story.append(Spacer(1, 10))
 
@@ -729,26 +738,27 @@ def build_ci_story(ci, styles) -> list:
 
 
 def generate_commercial_invoice_pdf_bytes(ci) -> bytes:
-    """
-    Generate a standalone Commercial Invoice PDF.
-    Constraint #20: built entirely in-memory; never written to disk.
-    """
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        topMargin=10 * mm,
-        bottomMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=20 * mm,
     )
 
     def add_footer(canvas, _doc):
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         canvas.drawCentredString(
-            A4[0] / 2, 10 * mm,
-            "This is a computer-generated document. Signature is not required.",
+            A4[0] / 2, 12 * mm,
+            "This is a computer generated document and does not require signature",
+        )
+        canvas.setFont("Helvetica", 7)
+        canvas.drawCentredString(
+            A4[0] / 2, 8 * mm,
+            f"Page {canvas.getPageNumber()}",
         )
         canvas.restoreState()
 
