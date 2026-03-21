@@ -104,8 +104,8 @@ class CurrencyFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Currency
 
-    # Unique 3-letter codes: USD, USe, USf, ... (n=0 → "USD", sequential after)
-    code = factory.Sequence(lambda n: f"C{n:02d}")
+    # Always exactly 3 uppercase letters (AAA → AAB → ... → ZZZ). Never exceeds varchar(3).
+    code = factory.Sequence(lambda n: chr(65 + (n // 676) % 26) + chr(65 + (n // 26) % 26) + chr(65 + n % 26))
     name = factory.Sequence(lambda n: f"Currency {n}")
 
 
