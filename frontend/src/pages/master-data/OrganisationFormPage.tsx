@@ -36,20 +36,15 @@ const addressSchema = z.object({
   contact_name: z.string().min(1, "Contact name is required"),
   phone_country_code: z.string().optional().default(""),
   phone_number: z.string().optional().default(""),
-});
-
-const taxCodeSchema = z.object({
-  id: z.number().optional(),
-  tax_type: z.string().min(1, "Tax type is required"),
-  tax_code: z.string().min(1, "Tax code is required"),
+  iec_code: z.string().max(10).optional().default(""),
+  tax_type: z.string().optional().default(""),
+  tax_code: z.string().optional().default(""),
 });
 
 const formSchema = z.object({
   name: z.string().min(1, "Organisation name is required").max(255),
-  iec_code: z.string().max(10).optional().nullable(),
   tags: z.array(z.string()).min(1, "Select at least one document role tag"),
   addresses: z.array(addressSchema).min(1, "At least one address is required"),
-  tax_codes: z.array(taxCodeSchema).optional().default([]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -206,7 +201,6 @@ export default function OrganisationFormPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      iec_code: null,
       tags: [],
       addresses: [
         {
@@ -214,9 +208,9 @@ export default function OrganisationFormPage() {
           line1: "", line2: "", city: "", state: "", pin: "",
           country: undefined as unknown as number,
           email: "", contact_name: "", phone_country_code: "", phone_number: "",
+          iec_code: "", tax_type: "", tax_code: "",
         },
       ],
-      tax_codes: [],
     },
   });
 
@@ -225,7 +219,6 @@ export default function OrganisationFormPage() {
     if (existingOrg) {
       reset({
         name: existingOrg.name,
-        iec_code: existingOrg.iec_code ?? null,
         tags: existingOrg.tags.map((t) => t.tag),
         addresses: existingOrg.addresses.map((a) => ({
           id: a.id,
@@ -235,9 +228,9 @@ export default function OrganisationFormPage() {
           country: a.country, email: a.email, contact_name: a.contact_name,
           phone_country_code: a.phone_country_code ?? "",
           phone_number: a.phone_number ?? "",
-        })),
-        tax_codes: existingOrg.tax_codes.map((tc) => ({
-          id: tc.id, tax_type: tc.tax_type, tax_code: tc.tax_code,
+          iec_code: a.iec_code ?? "",
+          tax_type: a.tax_type ?? "",
+          tax_code: a.tax_code ?? "",
         })),
       });
     }
@@ -245,9 +238,6 @@ export default function OrganisationFormPage() {
 
   const { fields: addressFields, append: addAddress, remove: removeAddress } =
     useFieldArray({ control, name: "addresses" });
-
-  const { fields: taxCodeFields, append: addTaxCode, remove: removeTaxCode } =
-    useFieldArray({ control, name: "tax_codes" });
 
   const selectedTags = watch("tags");
 
@@ -284,11 +274,8 @@ export default function OrganisationFormPage() {
     mutationFn: (values: FormValues) =>
       createOrganisation({
         name: values.name,
-        // Uppercase before sending so backend regex ([A-Z0-9]{10}) always matches.
-        iec_code: values.iec_code ? values.iec_code.toUpperCase() : null,
         tags: values.tags.map((tag) => ({ tag })),
         addresses: values.addresses,
-        tax_codes: values.tax_codes,
       }),
     onSuccess: () => {
       message.success("Organisation created.");
@@ -304,10 +291,8 @@ export default function OrganisationFormPage() {
     mutationFn: (values: FormValues) =>
       updateOrganisation(Number(id), {
         name: values.name,
-        iec_code: values.iec_code ? values.iec_code.toUpperCase() : null,
         tags: values.tags.map((tag) => ({ tag })),
         addresses: values.addresses,
-        tax_codes: values.tax_codes,
       }),
     onSuccess: () => {
       message.success("Organisation updated.");
@@ -372,24 +357,11 @@ export default function OrganisationFormPage() {
 
         {/* ── Section 1: General Information ────────────────────────────── */}
         <Section title="General Information">
-          <Row2>
-            <Field label="Organisation Name" required error={errors.name?.message}>
-              <Controller name="name" control={control} render={({ field }) =>
-                <input {...field} style={inputStyle(!!errors.name)} placeholder="e.g. Sunrise Exports Pvt Ltd" />
-              } />
-            </Field>
-            <Field label="IEC Code" error={errors.iec_code?.message} hint="Required if tagged as Exporter.">
-              <Controller name="iec_code" control={control} render={({ field }) =>
-                <input
-                  {...field}
-                  value={field.value ?? ""}
-                  style={{ ...inputStyle(!!errors.iec_code), textTransform: "uppercase" }}
-                  placeholder="e.g. AABCD1234E"
-                  maxLength={10}
-                />
-              } />
-            </Field>
-          </Row2>
+          <Field label="Organisation Name" required error={errors.name?.message}>
+            <Controller name="name" control={control} render={({ field }) =>
+              <input {...field} style={inputStyle(!!errors.name)} placeholder="e.g. Sunrise Exports Pvt Ltd" />
+            } />
+          </Field>
         </Section>
 
         {/* ── Section 2: Document Role Tags ─────────────────────────────── */}
@@ -571,6 +543,24 @@ export default function OrganisationFormPage() {
                   } />
                 </Field>
               </Row2>
+
+              <Row3>
+                <Field label="IEC Code" hint="Optional. e.g. AABCD1234E">
+                  <Controller name={`addresses.${index}.iec_code`} control={control} render={({ field: f }) =>
+                    <input {...f} value={f.value ?? ""} style={{ ...inputStyle(), textTransform: "uppercase" }} placeholder="AABCD1234E" maxLength={10} />
+                  } />
+                </Field>
+                <Field label="Tax Type" hint="e.g. GSTIN, PAN, VAT">
+                  <Controller name={`addresses.${index}.tax_type`} control={control} render={({ field: f }) =>
+                    <input {...f} value={f.value ?? ""} style={inputStyle()} placeholder="e.g. GSTIN" />
+                  } />
+                </Field>
+                <Field label="Tax Code">
+                  <Controller name={`addresses.${index}.tax_code`} control={control} render={({ field: f }) =>
+                    <input {...f} value={f.value ?? ""} style={inputStyle()} placeholder="e.g. 22AAAAA0000A1Z5" />
+                  } />
+                </Field>
+              </Row3>
             </div>
           ))}
 
@@ -583,6 +573,7 @@ export default function OrganisationFormPage() {
                 line1: "", line2: "", city: "", state: "", pin: "",
                 country: undefined as unknown as number,
                 email: "", contact_name: "", phone_country_code: "", phone_number: "",
+                iec_code: "", tax_type: "", tax_code: "",
               })
             }
             style={{
@@ -603,68 +594,6 @@ export default function OrganisationFormPage() {
           >
             <Plus size={14} strokeWidth={2} />
             Add Another Address
-          </button>
-        </Section>
-
-        {/* ── Section 4: Tax Codes ──────────────────────────────────────── */}
-        <Section title="Tax Codes (optional)">
-          {taxCodeFields.map((field, index) => (
-            <div key={field.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "flex-start", marginBottom: 8 }}>
-              <Field label={index === 0 ? "Tax Type" : ""} error={errors.tax_codes?.[index]?.tax_type?.message}>
-                <Controller name={`tax_codes.${index}.tax_type`} control={control} render={({ field: f }) =>
-                  <input {...f} style={inputStyle(!!errors.tax_codes?.[index]?.tax_type)} placeholder="e.g. GSTIN, PAN, VAT" />
-                } />
-              </Field>
-              <Field label={index === 0 ? "Tax Code" : ""} error={errors.tax_codes?.[index]?.tax_code?.message}>
-                <Controller name={`tax_codes.${index}.tax_code`} control={control} render={({ field: f }) =>
-                  <input {...f} style={inputStyle(!!errors.tax_codes?.[index]?.tax_code)} />
-                } />
-              </Field>
-              {/* Align remove button with the input (offset by label height on first row) */}
-              <div style={{ paddingTop: index === 0 ? 22 : 0 }}>
-                <button
-                  type="button"
-                  onClick={() => removeTaxCode(index)}
-                  style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    width: 32, height: 36, background: "transparent",
-                    border: "1px solid var(--pastel-pink-text)", borderRadius: 6,
-                    cursor: "pointer", color: "var(--pastel-pink-text)",
-                  }}
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLButtonElement).style.background = "var(--pastel-pink)")
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-                  }
-                >
-                  <Trash2 size={13} strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => addTaxCode({ tax_type: "", tax_code: "" })}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", marginTop: 4,
-              background: "transparent",
-              border: "1px dashed var(--border-medium)",
-              borderRadius: 8, cursor: "pointer",
-              fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500,
-              color: "var(--text-secondary)",
-            }}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-            }
-          >
-            <Plus size={14} strokeWidth={2} />
-            Add Tax Code
           </button>
         </Section>
 

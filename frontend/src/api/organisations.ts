@@ -20,6 +20,9 @@ export interface OrgAddress {
   contact_name: string;
   phone_country_code?: string;
   phone_number?: string;
+  iec_code?: string;
+  tax_type?: string;
+  tax_code?: string;
 }
 
 export interface OrgTag {
@@ -27,31 +30,21 @@ export interface OrgTag {
   tag: string;
 }
 
-export interface OrgTaxCode {
-  id?: number;
-  tax_type: string;
-  tax_code: string;
-}
-
 export interface Organisation {
   id: number;
   name: string;
-  iec_code: string | null;
   is_active: boolean;
   addresses: OrgAddress[];
   tags: OrgTag[];
-  tax_codes: OrgTaxCode[];
   created_at: string;
   updated_at: string;
 }
 
 export interface OrganisationPayload {
   name: string;
-  iec_code?: string | null;
   is_active?: boolean;
   addresses: OrgAddress[];
   tags: OrgTag[];
-  tax_codes?: OrgTaxCode[];
 }
 
 // ---- API functions --------------------------------------------------------

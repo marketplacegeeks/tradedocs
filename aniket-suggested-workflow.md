@@ -72,3 +72,5 @@ The test cases have to be written in plain English because I do not understand t
 Create git branch after every workflow and test is finished, commit it, when I go to next step first comit to git etc.
  by default, we should never push any PDF file to Git
 If you are doing any changes which is not mentioned in requirement.md, first mention the update in requirement.md, then only do the change. 
+
+All models should have exact description of error not random errors.H

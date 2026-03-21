@@ -145,7 +145,7 @@ export default function OrganisationListPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
                 <tr style={{ background: "var(--bg-base)" }}>
-                  {["Name", "IEC Code", "Roles", "Addresses"].map((h) => (
+                  {["Name", "Roles", "Addresses"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -185,9 +185,6 @@ export default function OrganisationListPage() {
                       <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
                         {org.name}
                       </span>
-                    </td>
-                    <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-                      {org.iec_code ?? "—"}
                     </td>
                     <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)" }}>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

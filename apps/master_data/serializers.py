@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
+    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
 )
 
 
@@ -157,28 +157,6 @@ class OrganisationTagSerializer(serializers.ModelSerializer):
         fields = ["id", "tag"]
 
 
-class OrganisationTaxCodeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OrganisationTaxCode
-        fields = ["id", "tax_type", "tax_code"]
-
-    def validate(self, data):
-        """Run the model-level format validation (GSTIN regex, PAN regex)."""
-        tax_type = data.get("tax_type", "").upper().strip()
-        tax_code = data.get("tax_code", "")
-        if tax_type in ("GST", "GSTIN"):
-            if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', tax_code):
-                raise serializers.ValidationError(
-                    {"tax_code": "Invalid GSTIN format (expected 15-character GSTIN string)."}
-                )
-        elif tax_type == "PAN":
-            if not re.match(r'^[A-Z]{3}[PCHFATBLJGE]{1}[A-Z]{1}[0-9]{4}[A-Z]{1}$', tax_code):
-                raise serializers.ValidationError(
-                    {"tax_code": "Invalid PAN format (expected 10-character PAN string)."}
-                )
-        return data
-
-
 class OrganisationAddressSerializer(serializers.ModelSerializer):
     # Read-only country name so the frontend can display it without a second request.
     country_name = serializers.CharField(source="country.name", read_only=True)
@@ -189,6 +167,7 @@ class OrganisationAddressSerializer(serializers.ModelSerializer):
             "id", "address_type", "line1", "line2", "city", "state", "pin",
             "country", "country_name", "email", "contact_name",
             "phone_country_code", "phone_number",
+            "iec_code", "tax_type", "tax_code",
         ]
 
     def validate(self, data):
@@ -241,12 +220,10 @@ class OrganisationAddressSerializer(serializers.ModelSerializer):
 class OrganisationSerializer(serializers.ModelSerializer):
     addresses = OrganisationAddressSerializer(many=True)
     tags = OrganisationTagSerializer(many=True)
-    # Tax codes are optional — an organisation may have zero tax codes.
-    tax_codes = OrganisationTaxCodeSerializer(many=True, required=False, default=list)
 
     class Meta:
         model = Organisation
-        fields = ["id", "name", "iec_code", "is_active", "addresses", "tags", "tax_codes",
+        fields = ["id", "name", "is_active", "addresses", "tags",
                   "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -274,38 +251,12 @@ class OrganisationSerializer(serializers.ModelSerializer):
                     )
                 seen_types.add(atype)
 
-        # Determine the effective tag list: either from the request or from the existing record.
-        if "tags" in data:
-            tag_values = [t["tag"] for t in data["tags"]]
-        elif self.instance:
-            tag_values = list(self.instance.tags.values_list("tag", flat=True))
-        else:
-            tag_values = []
-
-        # Determine the effective IEC code: from the request or from the existing record.
-        iec_code = data.get("iec_code") if "iec_code" in data else (
-            self.instance.iec_code if self.instance else None
-        )
-
-        # EXPORTER tag requires an IEC code.
-        if OrganisationTag.Tag.EXPORTER in tag_values and not iec_code:
-            raise serializers.ValidationError(
-                {"iec_code": "IEC Code is required for organisations tagged as Exporter."}
-            )
-
-        # IEC Code must be exactly 10 uppercase alphanumeric characters.
-        if iec_code and not re.match(r'^[A-Z0-9]{10}$', iec_code):
-            raise serializers.ValidationError(
-                {"iec_code": "IEC Code must be exactly 10 uppercase alphanumeric characters."}
-            )
-
         return data
 
     def create(self, validated_data):
         """Create the organisation and all nested sub-records in one operation."""
         addresses_data = validated_data.pop("addresses")
         tags_data = validated_data.pop("tags")
-        tax_codes_data = validated_data.pop("tax_codes", [])
 
         organisation = Organisation.objects.create(**validated_data)
 
@@ -313,8 +264,6 @@ class OrganisationSerializer(serializers.ModelSerializer):
             OrganisationAddress.objects.create(organisation=organisation, **address_data)
         for tag_data in tags_data:
             OrganisationTag.objects.create(organisation=organisation, **tag_data)
-        for tax_code_data in tax_codes_data:
-            OrganisationTaxCode.objects.create(organisation=organisation, **tax_code_data)
 
         return organisation
 
@@ -323,12 +272,11 @@ class OrganisationSerializer(serializers.ModelSerializer):
         Update the organisation's top-level fields and replace nested sub-records
         wholesale when they are included in the request body.
 
-        A PATCH that omits 'addresses', 'tags', or 'tax_codes' will leave those
-        sub-records untouched. Sending an explicit list (even empty) replaces them.
+        A PATCH that omits 'addresses' or 'tags' will leave those sub-records
+        untouched. Sending an explicit list (even empty) replaces them.
         """
         addresses_data = validated_data.pop("addresses", None)
         tags_data = validated_data.pop("tags", None)
-        tax_codes_data = validated_data.pop("tax_codes", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -343,11 +291,6 @@ class OrganisationSerializer(serializers.ModelSerializer):
             instance.tags.all().delete()
             for tag_data in tags_data:
                 OrganisationTag.objects.create(organisation=instance, **tag_data)
-
-        if tax_codes_data is not None:
-            instance.tax_codes.all().delete()
-            for tax_code_data in tax_codes_data:
-                OrganisationTaxCode.objects.create(organisation=instance, **tax_code_data)
 
         return instance
 

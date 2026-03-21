@@ -532,7 +532,6 @@ def _org_payload(country_id):
     """Minimal valid Organisation payload for POST/PUT tests."""
     return {
         "name": "Sunrise Exports Pvt Ltd",
-        "iec_code": None,
         "tags": [{"tag": "CONSIGNEE"}],
         "addresses": [
             {
@@ -546,7 +545,6 @@ def _org_payload(country_id):
                 "phone_number": "",
             }
         ],
-        "tax_codes": [],
     }
 
 
@@ -604,27 +602,24 @@ class TestOrganisationEndpoints:
         assert response.status_code == 400
         assert "addresses" in response.data
 
-    # Test 15: An Exporter-tagged organisation requires an IEC code — omitting it is rejected.
-    def test_exporter_without_iec_code_returns_validation_error(self):
+    # Test 15: An Exporter-tagged organisation can be created without an IEC code at org level.
+    def test_exporter_org_can_be_created_without_iec_code(self):
         country = CountryFactory()
         payload = _org_payload(country.id)
         payload["tags"] = [{"tag": "EXPORTER"}]
-        payload["iec_code"] = None
-        client = auth_client(CheckerFactory())
-        response = client.post(reverse("organisation-list"), payload, format="json")
-        assert response.status_code == 400
-        assert "iec_code" in response.data
-
-    # Test 16: An Exporter-tagged organisation with a valid IEC code is created successfully.
-    def test_exporter_with_valid_iec_code_succeeds(self):
-        country = CountryFactory()
-        payload = _org_payload(country.id)
-        payload["tags"] = [{"tag": "EXPORTER"}]
-        payload["iec_code"] = "AABCD1234E"
         client = auth_client(CheckerFactory())
         response = client.post(reverse("organisation-list"), payload, format="json")
         assert response.status_code == 201
-        assert response.data["iec_code"] == "AABCD1234E"
+
+    # Test 16: IEC code on an address is stored and returned correctly.
+    def test_address_iec_code_is_stored(self):
+        country = CountryFactory()
+        payload = _org_payload(country.id)
+        payload["addresses"][0]["iec_code"] = "AABCD1234E"
+        client = auth_client(CheckerFactory())
+        response = client.post(reverse("organisation-list"), payload, format="json")
+        assert response.status_code == 201
+        assert response.data["addresses"][0]["iec_code"] == "AABCD1234E"
 
     # Test 17: Calling DELETE on an organisation returns 405 (organisations cannot be deleted).
     def test_delete_organisation_returns_405(self):
@@ -670,41 +665,17 @@ class TestOrganisationEndpoints:
         assert "Export Co" in names_returned
         assert "Consignee Co" not in names_returned
 
-    def test_invalid_iec_code_format_rejected(self):
-        """IEC code must be exactly 10 uppercase alphanumeric chars. Any other format is rejected."""
+    def test_address_tax_type_and_code_are_stored(self):
+        """Tax type and tax code on an address are stored and returned correctly."""
         country = CountryFactory()
         client = auth_client(CheckerFactory())
         payload = _org_payload(country.id)
-        payload["tags"] = [{"tag": "EXPORTER"}]
-        payload["iec_code"] = "abc123"  # too short and lowercase
-        response = client.post(reverse("organisation-list"), payload, format="json")
-        assert response.status_code == 400
-        assert "iec_code" in response.data
-
-    def test_create_with_valid_gstin_tax_code_succeeds(self):
-        country = CountryFactory()
-        client = auth_client(CheckerFactory())
-        payload = _org_payload(country.id)
-        payload["tax_codes"] = [{"tax_type": "GSTIN", "tax_code": "22AAAAA0000A1Z5"}]
+        payload["addresses"][0]["tax_type"] = "GSTIN"
+        payload["addresses"][0]["tax_code"] = "22AAAAA0000A1Z5"
         response = client.post(reverse("organisation-list"), payload, format="json")
         assert response.status_code == 201
-        assert len(response.data["tax_codes"]) == 1
-
-    def test_create_with_invalid_gstin_rejected(self):
-        country = CountryFactory()
-        client = auth_client(CheckerFactory())
-        payload = _org_payload(country.id)
-        payload["tax_codes"] = [{"tax_type": "GSTIN", "tax_code": "BADGSTIN"}]
-        response = client.post(reverse("organisation-list"), payload, format="json")
-        assert response.status_code == 400
-
-    def test_create_with_invalid_pan_rejected(self):
-        country = CountryFactory()
-        client = auth_client(CheckerFactory())
-        payload = _org_payload(country.id)
-        payload["tax_codes"] = [{"tax_type": "PAN", "tax_code": "BADPAN"}]
-        response = client.post(reverse("organisation-list"), payload, format="json")
-        assert response.status_code == 400
+        assert response.data["addresses"][0]["tax_type"] == "GSTIN"
+        assert response.data["addresses"][0]["tax_code"] == "22AAAAA0000A1Z5"
 
     def test_maker_cannot_patch_organisation(self):
         org = OrganisationFactory()
@@ -875,7 +846,6 @@ class TestOrganisationAddressEndpoints:
             reverse("organisation-list"),
             {
                 "name": "Duplicate Addr Org",
-                "iec_code": "",
                 "tags": [{"tag": "CONSIGNEE"}],
                 "addresses": [
                     {
@@ -899,7 +869,6 @@ class TestOrganisationAddressEndpoints:
                         "phone_number": "",
                     },
                 ],
-                "tax_codes": [],
             },
             format="json",
         )

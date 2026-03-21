@@ -288,12 +288,6 @@ class Organisation(models.Model):
     Constraint #8: never hard-deleted; deactivated via is_active=False instead.
     """
     name = models.CharField(max_length=255, unique=True)
-    # IEC Code is required only when the org is tagged as Exporter (enforced in serializer).
-    # null=True so multiple orgs without an IEC code don't conflict on the unique constraint.
-    iec_code = models.CharField(
-        max_length=10, unique=True, null=True, blank=True,
-        help_text="DGFT Importer–Exporter Code; exactly 10 alphanumeric chars"
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -353,34 +347,6 @@ def _validate_pan(value):
         )
 
 
-class OrganisationTaxCode(models.Model):
-    """
-    A tax registration entry for an organisation (e.g. GSTIN, PAN, VAT).
-    Tax type and tax code must always be saved together.
-    """
-    # CASCADE: tax codes belong to the organisation; they go away if the org is removed.
-    organisation = models.ForeignKey(
-        Organisation, on_delete=models.CASCADE, related_name="tax_codes"
-    )
-    tax_type = models.CharField(max_length=50, help_text="e.g. GSTIN, PAN, VAT")
-    tax_code = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = "master_data_organisation_tax_code"
-
-    def __str__(self):
-        return f"{self.tax_type}: {self.tax_code}"
-
-    def clean(self):
-        """Apply format validation depending on the tax type."""
-        tax_type_upper = self.tax_type.upper().strip()
-        if tax_type_upper in ("GST", "GSTIN"):
-            _validate_gstin(self.tax_code)
-        elif tax_type_upper == "PAN":
-            _validate_pan(self.tax_code)
-        # All other types: no format validation; stored as entered.
-
-
 class OrganisationAddress(models.Model):
     """
     A physical address for an organisation. An organisation must have at least one.
@@ -415,6 +381,18 @@ class OrganisationAddress(models.Model):
         help_text="E.164 dial code, e.g. +91"
     )
     phone_number = models.CharField(max_length=20, blank=True)
+    iec_code = models.CharField(
+        max_length=10, blank=True, default='',
+        help_text="DGFT Importer–Exporter Code for this address, e.g. AABCD1234E"
+    )
+    tax_type = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text="Tax registration type for this address, e.g. GSTIN, PAN, VAT"
+    )
+    tax_code = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text="Tax registration number for this address"
+    )
 
     class Meta:
         db_table = "master_data_organisation_address"

@@ -488,7 +488,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     exp_name = safe(getattr(exp, "name", ""))
     exp_address = _org_address_str(exp)
     exp_email = _org_email(exp)
-    exp_iec = safe(getattr(exp, "iec_code", ""))
+    _exp_addr_obj = exp.addresses.first() if exp else None
+    exp_iec = safe(getattr(_exp_addr_obj, "iec_code", ""))
     exp_country = _org_country_name(exp)
 
     exp_detail_parts = []

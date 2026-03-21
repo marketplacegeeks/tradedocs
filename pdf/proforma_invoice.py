@@ -87,7 +87,8 @@ def _make_page_callback(pi, is_draft):
     """Return an onPage callable that draws header, optional watermark, and footer."""
     exporter = pi.exporter
     exporter_addr = _org_address_lines(exporter) if exporter else []
-    iec = getattr(exporter, 'iec_code', None) if exporter else None
+    _exp_addr = exporter.addresses.first() if exporter else None
+    iec = getattr(_exp_addr, 'iec_code', None) or None if _exp_addr else None
 
     def on_page(canvas, doc):
         draw_page_header(

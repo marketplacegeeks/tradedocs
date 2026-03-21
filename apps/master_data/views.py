@@ -146,7 +146,7 @@ class OrganisationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Organisation.objects.prefetch_related(
-            "addresses__country", "tags", "tax_codes"
+            "addresses__country", "tags"
         )
 
         # By default show only active organisations; pass ?is_active=false to see inactive.

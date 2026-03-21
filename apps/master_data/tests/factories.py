@@ -1,7 +1,7 @@
 import factory
 from apps.master_data.models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, OrganisationTaxCode, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
+    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
 )
 
 
@@ -70,7 +70,6 @@ class OrganisationFactory(factory.django.DjangoModelFactory):
         model = Organisation
 
     name = factory.Sequence(lambda n: f"Organisation {n}")
-    iec_code = None
     is_active = True
 
 
@@ -95,15 +94,6 @@ class OrganisationTagFactory(factory.django.DjangoModelFactory):
 
     organisation = factory.SubFactory(OrganisationFactory)
     tag = OrganisationTag.Tag.EXPORTER
-
-
-class OrganisationTaxCodeFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = OrganisationTaxCode
-
-    organisation = factory.SubFactory(OrganisationFactory)
-    tax_type = "GSTIN"
-    tax_code = "22AAAAA0000A1Z5"
 
 
 # ---------------------------------------------------------------------------
