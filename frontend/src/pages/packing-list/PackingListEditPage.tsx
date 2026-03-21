@@ -504,8 +504,12 @@ export default function PackingListEditPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <p style={{ ...SECTION_TITLE, margin: 0 }}>Containers & Items</p>
           <button style={BTN_SECONDARY} onClick={async () => {
-            await createContainer({ packing_list: pl.id, container_ref: "", marks_numbers: "", seal_number: "", tare_weight: "0.000" });
-            queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+            try {
+              await createContainer({ packing_list: pl.id, container_ref: "", marks_numbers: "", seal_number: "", tare_weight: "0.000" });
+              queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+            } catch (err) {
+              message.error(extractApiError(err, "Failed to add container."));
+            }
           }}>
             <Plus size={14} /> Add Container
           </button>
@@ -517,14 +521,22 @@ export default function PackingListEditPage() {
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14 }}>Container {idx + 1}</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button style={{ ...BTN_SECONDARY, padding: "6px 12px", fontSize: 12 }} onClick={async () => {
-                  await copyContainer(c.id);
-                  queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
-                  queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                  try {
+                    await copyContainer(c.id);
+                    queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+                    queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                  } catch (err) {
+                    message.error(extractApiError(err, "Failed to copy container."));
+                  }
                 }}><Copy size={12} /> Copy</button>
                 <button style={{ ...BTN_SECONDARY, padding: "6px 12px", fontSize: 12, color: "var(--pastel-pink-text)" }} onClick={async () => {
-                  await deleteContainer(c.id);
-                  queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
-                  queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                  try {
+                    await deleteContainer(c.id);
+                    queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+                    queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                  } catch (err) {
+                    message.error(extractApiError(err, "Failed to delete container."));
+                  }
                 }}><Trash2 size={12} /></button>
               </div>
             </div>
@@ -559,9 +571,13 @@ export default function PackingListEditPage() {
                       <td style={TD}>{item.net_weight}</td>
                       <td style={TD}>
                         <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--pastel-pink-text)" }} onClick={async () => {
-                          await deleteContainerItem(item.id);
-                          queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
-                          queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                          try {
+                            await deleteContainerItem(item.id);
+                            queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+                            queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
+                          } catch (err) {
+                            message.error(extractApiError(err, "Failed to delete item."));
+                          }
                         }}><Trash2 size={14} /></button>
                       </td>
                     </tr>

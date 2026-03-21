@@ -1,19 +1,33 @@
 /**
- * Converts any Axios/DRF API error into a human-readable string.
+ * Converts any Axios/DRF API error into a human-readable string safe for
+ * business users. Handles four cases:
  *
- * DRF returns errors in several shapes:
- *   { detail: "message" }         — single message (permissions, workflow blocks)
- *   { field: ["msg1", "msg2"] }   — field-level validation errors
- *   { non_field_errors: ["msg"] } — cross-field validation errors
- *   "plain string"                — rare but possible
+ *   500-level errors  — server crash; return a generic "contact admin" message
+ *   HTML response     — Django debug page leaked; hide it, return fallback
+ *   { detail: "…" }  — single message (permissions, workflow blocks)
+ *   { field: […] }   — field-level validation errors from DRF
  */
 export function extractApiError(
   err: unknown,
   fallback = "Something went wrong. Please try again."
 ): string {
-  const data = (err as { response?: { data?: unknown } })?.response?.data;
+  const response = (err as { response?: { status?: number; data?: unknown } })
+    ?.response;
+
+  // 500-level server errors: never show raw crash details to business users.
+  if (response?.status && response.status >= 500) {
+    return "An unexpected server error occurred. Please try again, or contact your administrator if the problem persists.";
+  }
+
+  const data = response?.data;
   if (!data) return fallback;
-  if (typeof data === "string") return data;
+
+  // Raw HTML (e.g. Django debug page): hide it entirely.
+  if (typeof data === "string") {
+    if (data.trimStart().startsWith("<")) return fallback;
+    return data;
+  }
+
   if (typeof data !== "object" || data === null) return fallback;
 
   const obj = data as Record<string, unknown>;
