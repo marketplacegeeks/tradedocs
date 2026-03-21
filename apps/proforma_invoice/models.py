@@ -195,14 +195,14 @@ class ProformaInvoiceLineItem(models.Model):
     One commodity row on a Proforma Invoice (FR-09.5).
     Amount is stored as a computed value (Quantity × Rate) recalculated on save.
     """
-    HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$")
+    HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$")
 
     pi = models.ForeignKey(
         ProformaInvoice,
         on_delete=models.CASCADE,
         related_name="line_items",
     )
-    hsn_code = models.CharField(max_length=8, blank=True, default="")
+    hsn_code = models.CharField(max_length=10, blank=True, default="")
     item_code = models.CharField(max_length=100, blank=True, default="")
     description = models.TextField()  # Required (enforced in serializer)
 

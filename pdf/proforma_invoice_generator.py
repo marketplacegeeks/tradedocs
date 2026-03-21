@@ -246,14 +246,22 @@ def safe(v: Any, default: str = "") -> str:
 
 def fmt_money(v: Any) -> str:
     try:
-        return f"{float(v):,.2f}"
+        # Format to 2dp then strip trailing zeros: 12.00 → "12", 12.50 → "12.5"
+        s = f"{float(v):,.2f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
     except Exception:
         return safe(v)
 
 
 def fmt_qty(v: Any) -> str:
     try:
-        return f"{float(v):,.3f}"
+        # Format to 3dp then strip trailing zeros: 12.000 → "12", 12.500 → "12.5"
+        s = f"{float(v):,.3f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
     except Exception:
         return safe(v)
 
@@ -676,10 +684,10 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             Paragraph(fmt_money(amount), style_text),
         ])
 
-    # Col widths: 10+24+24+50+22+26+24 = 180mm
+    # Col widths: 10+24+24+40+27+31+24 = 180mm
     li_table = Table(
         li_rows,
-        colWidths=[10 * mm, 24 * mm, 24 * mm, 50 * mm, 22 * mm, 26 * mm, 24 * mm],
+        colWidths=[10 * mm, 24 * mm, 24 * mm, 40 * mm, 27 * mm, 31 * mm, 24 * mm],
     )
     li_table.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),

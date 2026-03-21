@@ -101,7 +101,7 @@ class CommercialInvoiceLineItem(models.Model):
     )
     item_code = models.CharField(max_length=100)
     description = models.TextField()
-    hsn_code = models.CharField(max_length=8, blank=True, default="")
+    hsn_code = models.CharField(max_length=10, blank=True, default="")
     # "No & Kind of Packages" — editable snapshot (FR-14M.10 notes this field is editable)
     packages_kind = models.CharField(max_length=255, blank=True, default="")
 

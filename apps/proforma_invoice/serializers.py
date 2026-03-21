@@ -48,9 +48,9 @@ class ProformaInvoiceLineItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "amount_usd"]
 
     def validate_hsn_code(self, value):
-        if value and not re.match(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$", value):
+        if value and not re.match(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$", value):
             raise serializers.ValidationError(
-                "HSN code must be 2, 4, 6, or 8 digits (e.g. 09, 0901, 090111)."
+                "HSN code must be 2, 4, 6, 8, or 10 digits (e.g. 09, 0901, 090111, 0901111100)."
             )
         return value
 

@@ -232,14 +232,14 @@ class ContainerItem(models.Model):
     item_code + uom is the aggregation key used in the Final Rates section (FR-14M.8B).
     """
 
-    HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$")
+    HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$")
 
     container = models.ForeignKey(
         Container,
         on_delete=models.CASCADE,
         related_name="items",
     )
-    hsn_code = models.CharField(max_length=8, blank=True, default="")
+    hsn_code = models.CharField(max_length=10, blank=True, default="")
     # item_code is mandatory — it is the aggregation key for Final Rates and the CI.
     item_code = models.CharField(max_length=100)
     # "No & Kind of Packages" e.g. "10 Boxes", "5 Pallets"

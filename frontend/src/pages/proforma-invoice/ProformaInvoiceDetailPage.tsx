@@ -104,9 +104,10 @@ function LabelValue({ label, value }: { label: string; value?: string | null }) 
 }
 
 function formatMoney(v: string | null | undefined) {
-  if (!v) return "$0.00";
+  if (!v) return "$0";
   const n = parseFloat(v);
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Strip trailing zeros: $12.00 → $12, $12.50 → $12.5, $12.55 → $12.55
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
 // ---- Line item form (inline) -----------------------------------------------
@@ -277,10 +278,10 @@ export default function ProformaInvoiceDetailPage() {
               <col style={{ width: 100 }} />  {/* HSN Code */}
               <col style={{ width: 110 }} />  {/* Item Code */}
               <col />                          {/* Description — takes remaining space */}
-              <col style={{ width: 95 }} />   {/* Qty */}
-              <col style={{ width: 75 }} />   {/* UOM */}
-              <col style={{ width: 115 }} />  {/* Rate (USD) */}
-              <col style={{ width: 125 }} />  {/* Amount (USD) */}
+              <col style={{ width: 115 }} />  {/* Qty */}
+              <col style={{ width: 90 }} />   {/* UOM */}
+              <col style={{ width: 135 }} />  {/* Rate (USD) */}
+              <col style={{ width: 145 }} />  {/* Amount (USD) */}
               {canEdit && <col style={{ width: 72 }} />}  {/* Actions */}
             </colgroup>
             <thead>
@@ -350,7 +351,7 @@ export default function ProformaInvoiceDetailPage() {
                     <td style={TD}>{item.hsn_code || "—"}</td>
                     <td style={TD}>{item.item_code || "—"}</td>
                     <td style={TD}>{item.description}</td>
-                    <td style={{ ...TD, textAlign: "right" }}>{parseFloat(item.quantity).toLocaleString(undefined, { minimumFractionDigits: 3 })}</td>
+                    <td style={{ ...TD, textAlign: "right" }}>{parseFloat(item.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
                     <td style={TD}>{uoms.find(u => u.id === (item.uom as any))?.abbreviation ?? "—"}</td>
                     <td style={{ ...TD, textAlign: "right" }}>{formatMoney(item.rate_usd)}</td>
                     <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(item.amount_usd)}</td>
