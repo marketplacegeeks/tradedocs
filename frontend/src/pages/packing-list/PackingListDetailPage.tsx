@@ -2,6 +2,30 @@
 // Tabbed layout: Document Header | Containers & Items | Final Rates | Bank & Payment
 // Plus workflow action buttons, audit trail drawer.
 
+// Convert a USD amount to words, e.g. 1234.56 → "One Thousand Two Hundred Thirty-Four US Dollars and Fifty-Six Cents Only"
+function amountToWords(amount: number): string {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+    "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  function toWords(n: number): string {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? "-" + ones[n % 10] : "");
+    if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + toWords(n % 100) : "");
+    if (n < 1_000_000) return toWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + toWords(n % 1000) : "");
+    return toWords(Math.floor(n / 1_000_000)) + " Million" + (n % 1_000_000 ? " " + toWords(n % 1_000_000) : "");
+  }
+
+  const rounded = Math.round(amount * 100) / 100;
+  const dollars = Math.floor(rounded);
+  const cents = Math.round((rounded - dollars) * 100);
+  const dollarWords = dollars === 0 ? "Zero" : toWords(dollars);
+  const centsText = cents > 0 ? ` and ${toWords(cents)} Cents` : "";
+  return `${dollarWords} US Dollars${centsText} Only`;
+}
+
 // Strip trailing zeros: 12.000 → "12", 12.500 → "12.5", 12.55 → "12.55"
 function fmtQty(v: string | number | null | undefined) {
   if (v === null || v === undefined || v === "") return "—";
@@ -406,13 +430,57 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
       </div>
 
       <div style={CARD}>
-        <p style={SECTION_TITLE}>Break-up in USD</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          <Field label="FOB Rate" value={ci.fob_rate ?? "—"} />
-          <Field label="Freight" value={ci.freight ?? "—"} />
-          <Field label="Insurance" value={ci.insurance ?? "—"} />
-        </div>
-        {ci.lc_details && <Field label="L/C Details" value={ci.lc_details} />}
+        {(() => {
+          const incotermCode = pl.incoterms_display?.split("–")[0]?.trim() ?? null;
+          const itemTotal = ci.line_items.reduce((sum, li) => sum + (parseFloat(li.amount_usd as any) || 0), 0);
+          const freightAmt = parseFloat(ci.freight as any) || 0;
+          const insuranceAmt = parseFloat(ci.insurance as any) || 0;
+          // Invoice Total = line item amounts only (freight/insurance are reference figures on the CI PDF)
+          const invoiceTotal = itemTotal;
+          const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+          return (
+            <>
+              <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
+                  Cost Breakdown{incotermCode ? ` (${incotermCode})` : ""}
+                </p>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Invoice Value (Line Items)</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+                </div>
+                {ci.freight && (
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(freightAmt)}</span>
+                  </div>
+                )}
+                {ci.insurance && (
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(insuranceAmt)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>${fmt(invoiceTotal)}</span>
+              </div>
+
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: ci.lc_details ? 16 : 0 }}>
+                <strong>Amount in Words:</strong> {amountToWords(invoiceTotal)}
+              </div>
+
+              {ci.lc_details && (
+                <div style={{ marginTop: 16, borderTop: "1px solid var(--border-light)", paddingTop: 12 }}>
+                  <span style={LABEL}>L/C Details</span>
+                  <span style={VALUE}>{ci.lc_details}</span>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </>
   );
