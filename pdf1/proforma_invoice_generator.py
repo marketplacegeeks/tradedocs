@@ -246,7 +246,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     #
     # TABLE STRUCTURE BASICS:
     # ----------------------
-    # A table is defined as a 2D list: [ [row0_col0, row0_col1, ...], [row1_col0, row1_col1, ...], ... ]
+    # A table is defined as PDF download failed. Please try again.a 2D list: [ [row0_col0, row0_col1, ...], [row1_col0, row1_col1, ...], ... ]
     # Each inner list is a ROW, each element in the row is a COLUMN
     #
     # COORDINATE SYSTEM:

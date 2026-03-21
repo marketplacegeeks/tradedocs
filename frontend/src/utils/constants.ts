@@ -48,7 +48,7 @@ export type AddressType = (typeof ADDRESS_TYPES)[keyof typeof ADDRESS_TYPES];
 export const ADDRESS_TYPE_LABELS: Record<AddressType, string> = {
   REGISTERED: "Registered",
   FACTORY: "Factory",
-  OFFICE: "Office",
+  OFFICE: "Corporate Office",
 };
 
 export const ACCOUNT_TYPES = {

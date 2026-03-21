@@ -100,11 +100,14 @@ def _amount_to_words(n: Any, currency: str = "USD") -> str:
 # ---------------------------------------------------------------------------
 
 def _org_address_str(org) -> str:
-    """Return a single comma-joined address string from the Organisation's first address."""
+    """Return address string from the Organisation's OFFICE address, falling back to REGISTERED."""
     if not org:
         return ""
     try:
-        addr = org.addresses.first()
+        addr = (
+            org.addresses.filter(address_type="OFFICE").first()
+            or org.addresses.filter(address_type="REGISTERED").first()
+        )
         if not addr:
             return ""
         parts = []
@@ -125,10 +128,14 @@ def _org_address_str(org) -> str:
 
 
 def _org_email(org) -> str:
+    """Return email from the Organisation's OFFICE address, falling back to REGISTERED."""
     if not org:
         return ""
     try:
-        addr = org.addresses.first()
+        addr = (
+            org.addresses.filter(address_type="OFFICE").first()
+            or org.addresses.filter(address_type="REGISTERED").first()
+        )
         return addr.email if addr else ""
     except Exception:
         return ""
