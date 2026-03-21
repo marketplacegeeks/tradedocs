@@ -151,6 +151,53 @@ def _org_registered_address(org):
         return None
 
 
+def _party_cell_html(label: str, org) -> str:
+    """
+    Build a labelled address block for Buyer, Consignee, or Notify Party.
+    Uses the org's first available address for contact details.
+    Format: name / line1 / line2 / city,pin,state,country / phone / email
+    Pass label="" to omit the bold label prefix (used for the right column of the notify party row).
+    """
+    if not org:
+        return f"<b>{label}</b>" if label else ""
+    parts = []
+    name = safe(getattr(org, "name", ""))
+    if name:
+        parts.append(name)
+    try:
+        addr = org.addresses.first()
+    except Exception:
+        addr = None
+    if addr:
+        if getattr(addr, "line1", ""):
+            parts.append(addr.line1)
+        if getattr(addr, "line2", ""):
+            parts.append(addr.line2)
+        city_parts = []
+        for field in ("city", "pin", "state"):
+            val = getattr(addr, field, "")
+            if val:
+                city_parts.append(val)
+        country = getattr(addr, "country", None)
+        if country:
+            city_parts.append(safe(getattr(country, "name", "")))
+        if city_parts:
+            parts.append(", ".join(city_parts))
+        phone_cc = getattr(addr, "phone_country_code", "")
+        phone_no = getattr(addr, "phone_number", "")
+        if phone_cc and phone_no:
+            parts.append(f"Ph: {phone_cc} {phone_no}")
+        elif phone_no:
+            parts.append(f"Ph: {phone_no}")
+        email = getattr(addr, "email", "")
+        if email:
+            parts.append(email)
+    body = "<br/>".join(p for p in parts if p)
+    if label:
+        return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
+    return body
+
+
 def _make_ci_styles():
     """
     Build and return paragraph styles for the CI section.
@@ -215,58 +262,76 @@ def build_ci_story(ci, styles) -> list:
     story.append(Paragraph("COMMERCIAL INVOICE", style_title))
     story.append(Spacer(1, 8))
 
-    # ---- Exporter details (Corporate address + Registered address columns) ----
-    exp_address = _org_address_str(exp)
-    exp_email = _org_email(exp)
-    iec_code = safe(getattr(exp, "iec_code", ""))
+    # Shared column-width bases (content width = 180mm)
+    col_4 = 180 * mm / 4   # 45mm
+    col_3 = 180 * mm / 3   # 60mm
+    col_2 = 90 * mm        # 90mm
 
-    exp_lines = [safe(getattr(exp, "name", ""))]
-    if iec_code:
-        exp_lines.append(f"IEC Code: {iec_code}")
-    if exp_address:
-        exp_lines.append(exp_address)
-    if exp_email:
-        exp_lines.append(exp_email)
-    exporter_html = "<b>Corporate Office</b><br/>" + "<br/>".join(ln for ln in exp_lines if ln)
+    _GRID = [
+        ("GRID",          (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
 
-    reg = _org_registered_address(exp)
-    reg_html_parts = []
-    if reg:
-        addr_bits = []
-        if getattr(reg, "line1", ""):
-            addr_bits.append(reg.line1)
-        if getattr(reg, "line2", ""):
-            addr_bits.append(reg.line2)
-        city_state = ", ".join(filter(None, [getattr(reg, "city", ""), getattr(reg, "state", "")]))
-        if city_state:
-            addr_bits.append(city_state)
-        if getattr(reg, "country", None):
-            addr_bits.append(reg.country.name)
-        if addr_bits:
-            reg_html_parts.append(", ".join(addr_bits))
-        contact_bits = []
-        if getattr(reg, "phone_country_code", "") and getattr(reg, "phone_number", ""):
-            contact_bits.append(f"Phone: {reg.phone_country_code} {reg.phone_number}")
-        elif getattr(reg, "phone_number", ""):
-            contact_bits.append(f"Phone: {reg.phone_number}")
-        if getattr(reg, "email", ""):
-            contact_bits.append(f"Email: {reg.email}")
-        if contact_bits:
-            reg_html_parts.append(" • ".join(contact_bits))
-    reg_html = "<b>Registered Office</b><br/>" + "<br/>".join(reg_html_parts)
+    # ---- Exporter address lookups -----------------------------------------------
+    # Corporate Office = OFFICE address, falling back to REGISTERED if none exists.
+    corp_addr    = (
+        (exp.addresses.filter(address_type="OFFICE").first()
+         or exp.addresses.filter(address_type="REGISTERED").first())
+        if exp else None
+    )
+    reg_addr     = (exp.addresses.filter(address_type="REGISTERED").first() if exp else None)
+    factory_addr = (exp.addresses.filter(address_type="FACTORY").first()    if exp else None)
+
+    def _exp_cell(label: str, addr) -> str:
+        """Build an exporter address cell: org name + address fields + IEC/tax."""
+        parts = []
+        if exp:
+            parts.append(safe(getattr(exp, "name", "")))
+        if addr:
+            if getattr(addr, "line1", ""):
+                parts.append(addr.line1)
+            if getattr(addr, "line2", ""):
+                parts.append(addr.line2)
+            city_parts = [v for v in (getattr(addr, "city", ""), getattr(addr, "pin", ""),
+                                      getattr(addr, "state", "")) if v]
+            if getattr(addr, "country", None):
+                city_parts.append(addr.country.name)
+            if city_parts:
+                parts.append(", ".join(city_parts))
+            phone_cc = getattr(addr, "phone_country_code", "")
+            phone_no = getattr(addr, "phone_number", "")
+            if phone_cc and phone_no:
+                parts.append(f"Ph: {phone_cc} {phone_no}")
+            elif phone_no:
+                parts.append(f"Ph: {phone_no}")
+            if getattr(addr, "email", ""):
+                parts.append(addr.email)
+            iec = getattr(addr, "iec_code", "")
+            if iec:
+                parts.append(f"IEC: {iec}")
+            tax_type = getattr(addr, "tax_type", "")
+            tax_code_v = getattr(addr, "tax_code", "")
+            if tax_type and tax_code_v:
+                parts.append(f"{tax_type}: {tax_code_v}")
+        body = "<br/>".join(parts)
+        return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
     # ---- Order references (sourced from PL) ------------------------------------
     ref_lines = []
     if pl:
-        po_no = safe(getattr(pl, "po_number", ""))
-        po_date = safe(getattr(pl, "po_date", "")) if getattr(pl, "po_date", None) else ""
-        lc_no = safe(getattr(pl, "lc_number", ""))
-        lc_date = safe(getattr(pl, "lc_date", "")) if getattr(pl, "lc_date", None) else ""
-        bl_no = safe(getattr(pl, "bl_number", ""))
-        bl_date = safe(getattr(pl, "bl_date", "")) if getattr(pl, "bl_date", None) else ""
-        so_no = safe(getattr(pl, "so_number", ""))
-        so_date = safe(getattr(pl, "so_date", "")) if getattr(pl, "so_date", None) else ""
-        other_ref = safe(getattr(pl, "other_references", ""))
+        po_no          = safe(getattr(pl, "po_number", ""))
+        po_date        = safe(getattr(pl, "po_date", "")) if getattr(pl, "po_date", None) else ""
+        lc_no          = safe(getattr(pl, "lc_number", ""))
+        lc_date        = safe(getattr(pl, "lc_date", "")) if getattr(pl, "lc_date", None) else ""
+        bl_no          = safe(getattr(pl, "bl_number", ""))
+        bl_date        = safe(getattr(pl, "bl_date", "")) if getattr(pl, "bl_date", None) else ""
+        so_no          = safe(getattr(pl, "so_number", ""))
+        so_date        = safe(getattr(pl, "so_date", "")) if getattr(pl, "so_date", None) else ""
+        other_ref      = safe(getattr(pl, "other_references", ""))
         other_ref_date = (
             safe(getattr(pl, "other_references_date", ""))
             if getattr(pl, "other_references_date", None) else ""
@@ -276,7 +341,7 @@ def build_ci_story(ci, styles) -> list:
         if lc_no:
             ref_lines.append(f"<b>LC No/Date:</b> {lc_no}{(' / ' + lc_date) if lc_date else ''}")
         if bl_no:
-            ref_lines.append(f"<b>B/L No/Date:</b> {bl_no}{(' / ' + bl_date) if bl_date else ''}")
+            ref_lines.append(f"<b>BL No/Date:</b> {bl_no}{(' / ' + bl_date) if bl_date else ''}")
         if so_no:
             ref_lines.append(f"<b>SO No/Date:</b> {so_no}{(' / ' + so_date) if so_date else ''}")
         if other_ref:
@@ -284,159 +349,133 @@ def build_ci_story(ci, styles) -> list:
                 f"<b>Other Ref/Date:</b> {other_ref}"
                 f"{(' / ' + other_ref_date) if other_ref_date else ''}"
             )
+    refs_cell_html = (
+        "<b>Other References</b><br/>" + "<br/>".join(ref_lines)
+        if ref_lines else "<b>Other References</b>"
+    )
 
+    # ---- Document numbers for header row ----------------------------------------
+    pi_obj    = getattr(pl, "proforma_invoice", None) if pl else None
+    pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
     ci_number = safe(getattr(ci, "ci_number", ""))
-    ci_date = safe(getattr(ci, "ci_date", ""))
 
-    # ---- Summary Top (Exporter | Registered | Invoice Date | Invoice No | Refs) -
-    summary_top_data = [
-        [
-            Paragraph("<b>Exporter:</b>", style_label),  # spans col 0-1
-            "",
-            Paragraph(f"<b>Invoice Date:</b><br/>{ci_date}", style_text),
-            Paragraph(f"<b>Invoice No:</b><br/>{ci_number}", style_text),
-        ],
-        [
-            Paragraph(exporter_html, style_text),
-            Paragraph(reg_html, style_text),
-            Paragraph("<br/>".join(ref_lines), style_text),
-            "",  # merged with col 2
-        ],
-    ]
-    summary_top = Table(summary_top_data, colWidths=[60 * mm, 60 * mm, 30 * mm, 30 * mm])
-    summary_top.hAlign = "LEFT"
-    summary_top.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-        ("SPAN",         (0, 0), (1, 0)),  # "Exporter:" spans col 0-1
-        ("SPAN",         (2, 1), (3, 1)),  # References spans col 2-3
-    ]))
-    story.append(summary_top)
-    story.append(Spacer(1, 0))
-
-    # ---- Consignee + Buyer block ----------------------------------------------
-    cons_lines = [safe(getattr(cons, "name", ""))]
-    cons_address = _org_address_str(cons)
-    cons_email = _org_email(cons)
-    if cons_address:
-        cons_lines.append(cons_address)
-    if cons_email:
-        cons_lines.append(cons_email)
-    cons_html = "<b>Consignee</b><br/>" + "<br/>".join(ln for ln in cons_lines if ln)
-
-    buyer_lines = []
-    if buyer:
-        buyer_lines.append(safe(getattr(buyer, "name", "")))
-        buyer_address = _org_address_str(buyer)
-        buyer_email = _org_email(buyer)
-        if buyer_address:
-            buyer_lines.append(buyer_address)
-        if buyer_email:
-            buyer_lines.append(buyer_email)
-    buyer_html = "<b>Buyer</b><br/>" + "<br/>".join(ln for ln in buyer_lines if ln)
-
-    cons_buyer_tbl = Table(
-        [[Paragraph(cons_html, style_text), Paragraph(buyer_html, style_text)]],
-        colWidths=[90 * mm, 90 * mm],
-    )
-    cons_buyer_tbl.hAlign = "LEFT"
-    cons_buyer_tbl.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-    ]))
-    story.append(cons_buyer_tbl)
-    story.append(Spacer(1, 0))
-
-    # ---- Notify Party + Countries row ----------------------------------------
-    notify_text = safe(getattr(notify_party_org, "name", "")) if notify_party_org else ""
-    origin_country_obj = getattr(pl, "country_of_origin", None) if pl else None
-    dest_country_obj = getattr(pl, "country_of_final_destination", None) if pl else None
-    origin_name = safe(getattr(origin_country_obj, "name", "")) if origin_country_obj else ""
-    dest_name = safe(getattr(dest_country_obj, "name", "")) if dest_country_obj else ""
-
-    notify_countries_tbl = Table(
+    # ---- Table 1: Header row — Exporter (merged) | PI No. | CI No. -------------
+    #  ┌───────────────────────────────────┬──────────────────┬──────────────────┐
+    #  │ Exporter  (cols 0-1 merged)       │ PI No.           │ CI No.           │
+    #  └───────────────────────────────────┴──────────────────┴──────────────────┘
+    #    45mm (col 0)    45mm (col 1)          45mm (col 2)       45mm (col 3)
+    header_tbl = Table(
         [[
-            Paragraph(f"<b>Notify Party</b><br/>{notify_text}", style_text),
-            Paragraph(f"<b>Country of Origin of Goods</b><br/>{origin_name}", style_text),
-            Paragraph(f"<b>Country of Final Destination</b><br/>{dest_name}", style_text),
+            Paragraph("<b>Exporter</b>", style_label),
+            "",
+            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number}", style_text),
+            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number}", style_text),
         ]],
-        colWidths=[90 * mm, 45 * mm, 45 * mm],
+        colWidths=[col_4, col_4, col_4, col_4],
     )
-    notify_countries_tbl.hAlign = "LEFT"
-    notify_countries_tbl.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+    header_tbl.hAlign = "LEFT"
+    header_tbl.setStyle(TableStyle(_GRID + [
+        ("SPAN",       (0, 0), (1, 0)),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
     ]))
-    story.append(notify_countries_tbl)
-    story.append(Spacer(1, 0))
+    story.append(header_tbl)
 
-    # ---- Shipping info (2 rows × 6 cols; last 3 cols merged for terms) --------
-    pre_carriage_obj = getattr(pl, "pre_carriage_by", None) if pl else None
-    pre_carriage_val = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
+    # ---- Table 2: Exporter address (4-col with factory, 3-col without) ---------
+    office_cell  = _exp_cell("Corporate Office",   corp_addr)
+    reg_cell     = _exp_cell("Registered Address", reg_addr)
+    factory_cell = _exp_cell("Factory Address",    factory_addr)
 
-    place_receipt_obj = getattr(pl, "place_of_receipt_by_pre_carrier", None) if pl else None
-    place_receipt_val = safe(getattr(place_receipt_obj, "name", "")) if place_receipt_obj else ""
+    if factory_addr:
+        exp_tbl = Table(
+            [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text),
+              Paragraph(factory_cell, style_text), Paragraph(refs_cell_html, style_text)]],
+            colWidths=[col_4, col_4, col_4, col_4],
+        )
+    else:
+        exp_tbl = Table(
+            [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text),
+              Paragraph(refs_cell_html, style_text)]],
+            colWidths=[col_3, col_3, col_3],
+        )
+    exp_tbl.hAlign = "LEFT"
+    exp_tbl.setStyle(TableStyle(_GRID))
+    story.append(exp_tbl)
 
-    vessel_flight_val = safe(getattr(pl, "vessel_flight_no", "")) if pl else ""
+    # ---- Table 3: Parties (3-col with notify party, 2-col without) --------------
+    buyer_cell  = _party_cell_html("Buyer", buyer if buyer else cons)
+    cons_cell   = _party_cell_html("Consignee", cons)
 
-    port_loading_obj = getattr(pl, "port_of_loading", None) if pl else None
-    port_loading_val = safe(getattr(port_loading_obj, "name", "")) if port_loading_obj else ""
+    if notify_party_org:
+        notify_cell = _party_cell_html("Notify Party", notify_party_org)
+        party_tbl = Table(
+            [[Paragraph(buyer_cell, style_text), Paragraph(cons_cell, style_text),
+              Paragraph(notify_cell, style_text)]],
+            colWidths=[col_3, col_3, col_3],
+        )
+    else:
+        party_tbl = Table(
+            [[Paragraph(buyer_cell, style_text), Paragraph(cons_cell, style_text)]],
+            colWidths=[col_2, col_2],
+        )
+    party_tbl.hAlign = "LEFT"
+    party_tbl.setStyle(TableStyle(_GRID))
+    story.append(party_tbl)
 
+    # ---- Table 4: Shipping (4 cols × 2 rows) ------------------------------------
+    #  Row 0: Pre-carriage | Place of Receipt | Port of Loading | Port of Discharge
+    #  Row 1: Final Dest   | Country Final Dest | Country of Origin | Vessel/Flight No.
+    pre_carriage_obj   = getattr(pl, "pre_carriage_by", None) if pl else None
+    pre_carriage_val   = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
+    place_receipt_obj  = getattr(pl, "place_of_receipt_by_pre_carrier", None) if pl else None
+    place_receipt_val  = safe(getattr(place_receipt_obj, "name", "")) if place_receipt_obj else ""
+    port_loading_obj   = getattr(pl, "port_of_loading", None) if pl else None
+    port_loading_val   = safe(getattr(port_loading_obj, "name", "")) if port_loading_obj else ""
     port_discharge_obj = getattr(pl, "port_of_discharge", None) if pl else None
     port_discharge_val = safe(getattr(port_discharge_obj, "name", "")) if port_discharge_obj else ""
+    final_dest_obj     = getattr(pl, "final_destination", None) if pl else None
+    final_dest_val     = safe(getattr(final_dest_obj, "name", "")) if final_dest_obj else ""
+    dest_country_obj   = getattr(pl, "country_of_final_destination", None) if pl else None
+    dest_country_val   = safe(getattr(dest_country_obj, "name", "")) if dest_country_obj else ""
+    origin_country_obj = getattr(pl, "country_of_origin", None) if pl else None
+    origin_country_val = safe(getattr(origin_country_obj, "name", "")) if origin_country_obj else ""
+    vessel_flight_val  = safe(getattr(pl, "vessel_flight_no", "")) if pl else ""
 
-    final_dest_obj = getattr(pl, "final_destination", None) if pl else None
-    final_destination_val = safe(getattr(final_dest_obj, "name", "")) if final_dest_obj else ""
+    shipping_tbl = Table(
+        [
+            [
+                Paragraph(f"<b>Pre-carriage by</b><br/>{pre_carriage_val}", style_text),
+                Paragraph(f"<b>Place of Receipt by Pre-Carrier</b><br/>{place_receipt_val}", style_text),
+                Paragraph(f"<b>Port of Loading</b><br/>{port_loading_val}", style_text),
+                Paragraph(f"<b>Port of Discharge</b><br/>{port_discharge_val}", style_text),
+            ],
+            [
+                Paragraph(f"<b>Final Destination</b><br/>{final_dest_val}", style_text),
+                Paragraph(f"<b>Country of Final Destination</b><br/>{dest_country_val}", style_text),
+                Paragraph(f"<b>Country of Origin of Goods</b><br/>{origin_country_val}", style_text),
+                Paragraph(f"<b>Vessel / Flight No.</b><br/>{vessel_flight_val}", style_text),
+            ],
+        ],
+        colWidths=[col_4, col_4, col_4, col_4],
+    )
+    shipping_tbl.hAlign = "LEFT"
+    shipping_tbl.setStyle(TableStyle(_GRID))
+    story.append(shipping_tbl)
 
-    incoterm_obj = getattr(pl, "incoterms", None) if pl else None
-    incoterm_str = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
+    # ---- Table 5: Payment Terms | Incoterms ------------------------------------
+    incoterm_obj     = getattr(pl, "incoterms", None) if pl else None
+    incoterm_str     = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
     payment_term_obj = getattr(pl, "payment_terms", None) if pl else None
     payment_term_str = safe(getattr(payment_term_obj, "name", "")) if payment_term_obj else ""
-    terms_merged_html = (
-        "<b>Incoterms:</b> " + incoterm_str
-        + ("<br/>" if incoterm_str or payment_term_str else "")
-        + "<b>Payment Terms:</b> " + payment_term_str
+    terms_tbl = Table(
+        [[
+            Paragraph(f"<b>Payment Terms</b><br/>{payment_term_str}", style_text),
+            Paragraph(f"<b>Incoterms</b><br/>{incoterm_str}", style_text),
+        ]],
+        colWidths=[col_2, col_2],
     )
-
-    shipping_data = [
-        [
-            Paragraph(f"<b>Pre-carriage by</b><br/>{pre_carriage_val}", style_text),
-            Paragraph(f"<b>Place of Receipt by Pre-Carrier</b><br/>{place_receipt_val}", style_text),
-            Paragraph(f"<b>Vessel/Flight No.</b><br/>{vessel_flight_val}", style_text),
-            Paragraph(terms_merged_html, style_text),  # spans (3,0)→(5,1)
-            "", "",
-        ],
-        [
-            Paragraph(f"<b>Port of Loading</b><br/>{port_loading_val}", style_text),
-            Paragraph(f"<b>Port of Discharge</b><br/>{port_discharge_val}", style_text),
-            Paragraph(f"<b>Final Destination</b><br/>{final_destination_val}", style_text),
-            "", "", "",
-        ],
-    ]
-    shipping_tbl = Table(shipping_data, colWidths=[30 * mm] * 6)
-    shipping_tbl.hAlign = "LEFT"
-    shipping_tbl.setStyle(TableStyle([
-        ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
-        ("SPAN",         (3, 0), (5, 1)),  # Incoterms+Payment merged across last 3 cols × 2 rows
-    ]))
-    story.append(shipping_tbl)
+    terms_tbl.hAlign = "LEFT"
+    terms_tbl.setStyle(TableStyle(_GRID))
+    story.append(terms_tbl)
     story.append(Spacer(1, 6))
 
     # ---- Build packages lookup: item_code → set of packages_kind strings -----
