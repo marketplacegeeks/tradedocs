@@ -81,60 +81,91 @@ def _org_address_by_type(org, address_type: str):
         return None
 
 
-def _address_lines_html(addr) -> str:
+def _format_address_html(org, addr) -> str:
     """
-    Build a multi-line HTML string from an OrganisationAddress instance.
-    Returns empty string if addr is None.
+    Build a multi-line HTML string for an organisation + address following the
+    standard packing-list address block format:
+      Line 1 — Organisation name
+      Line 2 — Address line 1
+      Line 3 — Address line 2
+      Line 4 — City, Pin, State, Country (comma-separated)
+      Line 5 — Phone number
+      Line 6 — Email address
+      Line 7 — IEC code  (e.g. IEC: ABCD1234567)
+      Line 8 — Tax code  (e.g. GSTIN: 27ABCDE1234F1Z5)
+    Any field that is absent is simply omitted.
     """
-    if not addr:
-        return ""
     parts = []
-    if getattr(addr, "line1", ""):
-        parts.append(addr.line1)
-    if getattr(addr, "line2", ""):
-        parts.append(addr.line2)
-    city_state = ", ".join(filter(None, [
-        getattr(addr, "city", ""),
-        getattr(addr, "state", ""),
-    ]))
-    if city_state:
-        parts.append(city_state)
-    if getattr(addr, "pin", ""):
-        parts.append(addr.pin)
-    if getattr(addr, "country", None):
-        parts.append(addr.country.name)
-    # Contact details on a single line
-    contact_bits = []
-    if getattr(addr, "phone_country_code", "") and getattr(addr, "phone_number", ""):
-        contact_bits.append(f"Ph: {addr.phone_country_code} {addr.phone_number}")
-    elif getattr(addr, "phone_number", ""):
-        contact_bits.append(f"Ph: {addr.phone_number}")
-    if getattr(addr, "email", ""):
-        contact_bits.append(f"Email: {addr.email}")
-    if contact_bits:
-        parts.append(" • ".join(contact_bits))
+
+    # Line 1: organisation name
+    if org:
+        name = safe(getattr(org, "name", ""))
+        if name:
+            parts.append(name)
+
+    if addr:
+        # Line 2: address line 1
+        if getattr(addr, "line1", ""):
+            parts.append(addr.line1)
+
+        # Line 3: address line 2
+        if getattr(addr, "line2", ""):
+            parts.append(addr.line2)
+
+        # Line 4: City, Pin, State, Country
+        city_parts = []
+        for field in ("city", "pin", "state"):
+            val = getattr(addr, field, "")
+            if val:
+                city_parts.append(val)
+        country = getattr(addr, "country", None)
+        if country:
+            city_parts.append(safe(getattr(country, "name", "")))
+        if city_parts:
+            parts.append(", ".join(city_parts))
+
+        # Line 5: phone
+        phone_cc = getattr(addr, "phone_country_code", "")
+        phone_no = getattr(addr, "phone_number", "")
+        if phone_cc and phone_no:
+            parts.append(f"Ph: {phone_cc} {phone_no}")
+        elif phone_no:
+            parts.append(f"Ph: {phone_no}")
+
+        # Line 6: email
+        email = getattr(addr, "email", "")
+        if email:
+            parts.append(email)
+
+    if addr:
+        # Line 7: IEC code (address-level — only printed if set for this address)
+        iec = getattr(addr, "iec_code", "")
+        if iec:
+            parts.append(f"IEC: {iec}")
+
+        # Line 8: tax code (address-level — only printed if both type and code are set)
+        tax_type = getattr(addr, "tax_type", "")
+        tax_code_val = getattr(addr, "tax_code", "")
+        if tax_type and tax_code_val:
+            parts.append(f"{tax_type}: {tax_code_val}")
+
     return "<br/>".join(parts)
 
 
 def _party_html(label: str, org) -> str:
     """
     Build a labelled party cell (e.g. Buyer, Consignee, Notify Party).
-    Uses the first available address for phone/email.
+    Uses the first available address for contact details.
     """
     if not org:
         return f"<b>{label}</b>"
-    name = safe(getattr(org, "name", ""))
-    # Use first address for contact details
     addr = None
     try:
         addr = org.addresses.first()
     except Exception:
         pass
-    addr_html = _address_lines_html(addr)
-    lines = [f"<b>{label}</b>", name]
-    if addr_html:
-        lines.append(addr_html)
-    return "<br/>".join(ln for ln in lines if ln)
+    body = _format_address_html(org, addr)
+    return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
 
 # ---------------------------------------------------------------------------
@@ -213,8 +244,8 @@ def build_pl_story(packing_list, styles):
 
     story = []
 
-    # Usable page width with 10mm margins on each side: 190mm
-    PAGE_W = 190 * mm
+    # Usable page width (180mm content area) minus 5mm margin each side: 170mm
+    PAGE_W = 170 * mm
 
     # ------------------------------------------------------------------
     # Header: Exporter name + document title
@@ -256,31 +287,15 @@ def build_pl_story(packing_list, styles):
     reg_addr    = _org_address_by_type(exp, "REGISTERED")
     factory_addr = _org_address_by_type(exp, "FACTORY")
 
-    iec_code = safe(getattr(exp, "iec_code", "")) if exp else ""
+    # Build exporter address cells using the standard 8-line format.
+    # IEC and tax codes are included automatically by _format_address_html.
+    def _exp_cell(label: str, addr) -> str:
+        body = _format_address_html(exp, addr)
+        return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
-    # Build Office address cell content
-    office_html = _address_lines_html(office_addr)
-    office_cell_html = (
-        f"<b>Corporate Office</b><br/>{office_html}{'<br/>IEC: ' + iec_code if iec_code else ''}"
-        if office_addr
-        else (f"<b>Corporate Office</b><br/>IEC: {iec_code}" if iec_code else "<b>Corporate Office</b>")
-    )
-
-    # Build Registered address cell content
-    reg_html = _address_lines_html(reg_addr)
-    reg_cell_html = (
-        f"<b>Registered Address</b><br/>{reg_html}"
-        if reg_html
-        else "<b>Registered Address</b>"
-    )
-
-    # Build Factory address cell content (only used in 4-col variant)
-    factory_html = _address_lines_html(factory_addr)
-    factory_cell_html = (
-        f"<b>Factory Address</b><br/>{factory_html}"
-        if factory_html
-        else "<b>Factory Address</b>"
-    )
+    office_cell_html  = _exp_cell("Corporate Office",   office_addr)
+    reg_cell_html     = _exp_cell("Registered Address", reg_addr)
+    factory_cell_html = _exp_cell("Factory Address",    factory_addr)
 
     # Build Other References cell content (PO / LC / BL / SO / Other)
     ref_lines = []
@@ -312,44 +327,47 @@ def build_pl_story(packing_list, styles):
         else "<b>Other References</b>"
     )
 
-    # Row 0: "Exporter" label (col 0) | PL Number (col 1) | CI Number (col 2)
-    # The 4-col variant adds a blank col 3 to match the address row below.
-    row0_exporter = Paragraph("<b>Exporter</b>", style_label)
-    row0_pl       = Paragraph(f"<b>Packing List No.</b><br/>{pl_number}", style_text)
-    row0_ci       = Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number or '—'}", style_text)
+    col_4 = PAGE_W / 4
 
+    # ------------------------------------------------------------------
+    # New header table — 4 equal cols: "Exporter" (cols 0-1 merged) | PL No. | CI No.
+    # ------------------------------------------------------------------
+    header_data = [[
+        Paragraph("<b>Exporter</b>", style_label),
+        "",
+        Paragraph(f"<b>Packing List No.</b><br/>{pl_number}", style_text),
+        Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number or '—'}", style_text),
+    ]]
+    header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
+    header_tbl.setStyle(TableStyle(_GRID_STYLE + [
+        ("SPAN",       (0, 0), (1, 0)),   # merge cols 0-1 for "Exporter"
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+    ]))
+    header_tbl.hAlign = "LEFT"
+    story.append(header_tbl)
+
+    # ------------------------------------------------------------------
+    # Exporter address table — address rows only (header row removed)
+    # ------------------------------------------------------------------
     if factory_addr:
         # 4-column variant
-        col_4 = PAGE_W / 4
-        exp_data = [
-            [row0_exporter, row0_pl, row0_ci, ""],   # col 3 blank; CI spans cols 2-3
-            [
-                Paragraph(office_cell_html, style_text),
-                Paragraph(reg_cell_html, style_text),
-                Paragraph(factory_cell_html, style_text),
-                Paragraph(refs_cell_html, style_text),
-            ],
-        ]
+        exp_data = [[
+            Paragraph(office_cell_html, style_text),
+            Paragraph(reg_cell_html, style_text),
+            Paragraph(factory_cell_html, style_text),
+            Paragraph(refs_cell_html, style_text),
+        ]]
         exp_tbl = Table(exp_data, colWidths=[col_4, col_4, col_4, col_4])
-        exp_tbl.setStyle(TableStyle(_GRID_STYLE + [
-            ("SPAN",       (2, 0), (3, 0)),   # CI number spans cols 2-3 in row 0
-            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-        ]))
     else:
         # 3-column variant
-        exp_data = [
-            [row0_exporter, row0_pl, row0_ci],
-            [
-                Paragraph(office_cell_html, style_text),
-                Paragraph(reg_cell_html, style_text),
-                Paragraph(refs_cell_html, style_text),
-            ],
-        ]
+        exp_data = [[
+            Paragraph(office_cell_html, style_text),
+            Paragraph(reg_cell_html, style_text),
+            Paragraph(refs_cell_html, style_text),
+        ]]
         exp_tbl = Table(exp_data, colWidths=[col_3, col_3, col_3])
-        exp_tbl.setStyle(TableStyle(_GRID_STYLE + [
-            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-        ]))
 
+    exp_tbl.setStyle(TableStyle(_GRID_STYLE))
     exp_tbl.hAlign = "LEFT"
     story.append(exp_tbl)
 
@@ -521,7 +539,7 @@ def build_pl_story(packing_list, styles):
                 Paragraph("<b>Gross Weight</b>", style_label),
                 Paragraph(_fmt_decimal(gross_val, 3) or "-", style_text),
             ]],
-            colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 40 * mm],
+            colWidths=[26 * mm, 26 * mm, 26 * mm, 26 * mm, 26 * mm, 40 * mm],
         )
         weights_table.hAlign = "LEFT"
         weights_table.setStyle(TableStyle([
@@ -567,10 +585,10 @@ def build_pl_story(packing_list, styles):
                 Paragraph(safe(getattr(it, "batch_details", "")) or "-", style_text),
             ])
 
-        # Col widths: Sr(10)+HSN(20)+ItemCode(20)+Packages(28)+Desc(52)+Qty(16)+UOM(10)+Batch(34)=190mm
+        # Col widths: Sr(10)+HSN(18)+ItemCode(18)+Packages(24)+Desc(46)+Qty(14)+UOM(10)+Batch(30)=170mm
         items_table = Table(
             item_rows,
-            colWidths=[10*mm, 20*mm, 20*mm, 28*mm, 52*mm, 16*mm, 10*mm, 34*mm],
+            colWidths=[10*mm, 18*mm, 18*mm, 24*mm, 46*mm, 14*mm, 10*mm, 30*mm],
             repeatRows=1,
         )
         items_table.hAlign = "LEFT"
@@ -599,7 +617,7 @@ def build_pl_story(packing_list, styles):
             Paragraph("<b>Total Gross Weight</b>", style_label),
             Paragraph(_fmt_decimal(total_gross, 3), style_text),
         ]],
-        colWidths=[34*mm, 26*mm, 34*mm, 26*mm, 34*mm, 36*mm],
+        colWidths=[30*mm, 23*mm, 30*mm, 23*mm, 30*mm, 34*mm],
     )
     totals_tbl.hAlign = "LEFT"
     totals_tbl.setStyle(TableStyle([
