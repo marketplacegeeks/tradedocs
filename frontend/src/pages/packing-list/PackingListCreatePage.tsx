@@ -1603,14 +1603,15 @@ function Step4({
           <tbody>
             {ci.line_items.map((li) => {
               const rate = rateForm[li.id] ?? li.rate_usd;
-              const amount = (parseFloat(li.total_quantity) * parseFloat(rate || "0")).toFixed(2);
+              const amountRaw = parseFloat(li.total_quantity) * parseFloat(rate || "0");
+              const amount = amountRaw.toLocaleString("en-US", { maximumFractionDigits: 2 });
               // pkgForm is seeded from li.packages_kind on load; user can edit freely.
               const pkg = pkgForm[li.id] ?? li.packages_kind ?? "";
               return (
                 <tr key={li.id}>
                   <td style={{ ...TD, fontWeight: 600 }}>{li.item_code}</td>
                   <td style={TD}>{li.description}</td>
-                  <td style={TD}>{li.total_quantity}</td>
+                  <td style={TD}>{parseFloat(li.total_quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
                   <td style={TD}>{li.uom_abbr ?? "—"}</td>
                   <td style={TD}>
                     <input

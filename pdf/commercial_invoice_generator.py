@@ -64,14 +64,22 @@ def safe(v: Any, default: str = "") -> str:
 
 def _fmt_money(v: Any) -> str:
     try:
-        return f"{float(v):,.2f}"
+        # Strip trailing zeros: 12.00 → "12", 12.50 → "12.5"
+        s = f"{float(v):,.2f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
     except Exception:
         return safe(v)
 
 
 def _fmt_qty(v: Any) -> str:
     try:
-        return f"{float(v):,.3f}"
+        # Strip trailing zeros: 12.000 → "12", 12.500 → "12.5"
+        s = f"{float(v):,.3f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
     except Exception:
         return safe(v)
 

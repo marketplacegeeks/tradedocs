@@ -2,6 +2,24 @@
 // Tabbed layout: Document Header | Containers & Items | Final Rates | Bank & Payment
 // Plus workflow action buttons, audit trail drawer.
 
+// Strip trailing zeros: 12.000 → "12", 12.500 → "12.5", 12.55 → "12.55"
+function fmtQty(v: string | number | null | undefined) {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = parseFloat(String(v));
+  return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+}
+// Like fmtQty but max 2 decimal places (for money without $ sign)
+function fmtNum(v: string | number | null | undefined) {
+  if (v === null || v === undefined || v === "") return "0";
+  const n = parseFloat(String(v));
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+function fmtMoney(v: string | number | null | undefined) {
+  if (v === null || v === undefined || v === "") return "$0";
+  const n = parseFloat(String(v));
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -339,7 +357,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                       </span>
                     )}
                   </td>
-                  <td style={TD}>{li.total_quantity}</td>
+                  <td style={TD}>{fmtQty(li.total_quantity)}</td>
                   <td style={TD}>{li.uom_abbr ?? "—"}</td>
                   <td style={TD}>
                     {isEditable && editingRate?.id === li.id ? (
@@ -370,7 +388,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                         title={isEditable ? "Click to edit rate" : undefined}
                         onClick={() => isEditable && setEditingRate({ id: li.id, value: li.rate_usd })}
                       >
-                        {li.rate_usd}
+                        {fmtNum(li.rate_usd)}
                         {li.uom_abbr && (
                           <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
                             / {li.uom_abbr}
@@ -379,7 +397,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ ...TD, fontWeight: 600 }}>${li.amount_usd}</td>
+                  <td style={{ ...TD, fontWeight: 600 }}>{fmtMoney(li.amount_usd)}</td>
                 </tr>
               ))}
             </tbody>
