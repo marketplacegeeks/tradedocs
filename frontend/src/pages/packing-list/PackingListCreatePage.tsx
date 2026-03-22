@@ -537,7 +537,7 @@ function Step1({
               style={{ width: "100%" }}
               value={form.exporter}
               onChange={(v) => setForm({ ...form, exporter: v })}
-              options={withFallback(exporters, existingPl?.exporter, existingPl?.exporter_name)}
+              options={[...withFallback(exporters, existingPl?.exporter, existingPl?.exporter_name)].sort((a, b) => String(a.label).localeCompare(String(b.label)))}
               filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
             />
           </div>
@@ -548,7 +548,7 @@ function Step1({
               style={{ width: "100%" }}
               value={form.consignee}
               onChange={(v) => setForm({ ...form, consignee: v })}
-              options={withFallback(consignees, existingPl?.consignee, existingPl?.consignee_name)}
+              options={[...withFallback(consignees, existingPl?.consignee, existingPl?.consignee_name)].sort((a, b) => String(a.label).localeCompare(String(b.label)))}
               filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
             />
           </div>
@@ -558,20 +558,24 @@ function Step1({
             <label style={LABEL}>Buyer (optional)</label>
             <Select
               allowClear
+              showSearch
+              optionFilterProp="label"
               style={{ width: "100%" }}
               value={form.buyer}
               onChange={(v) => setForm({ ...form, buyer: v })}
-              options={withFallback(buyers, existingPl?.buyer, existingPl?.buyer_name)}
+              options={[...withFallback(buyers, existingPl?.buyer, existingPl?.buyer_name)].sort((a, b) => String(a.label).localeCompare(String(b.label)))}
             />
           </div>
           <div>
             <label style={LABEL}>Notify Party (optional)</label>
             <Select
               allowClear
+              showSearch
+              optionFilterProp="label"
               style={{ width: "100%" }}
               value={form.notify_party}
               onChange={(v) => setForm({ ...form, notify_party: v })}
-              options={withFallback(notifyParties, existingPl?.notify_party, existingPl?.notify_party_name)}
+              options={[...withFallback(notifyParties, existingPl?.notify_party, existingPl?.notify_party_name)].sort((a, b) => String(a.label).localeCompare(String(b.label)))}
             />
           </div>
         </div>
@@ -583,23 +587,23 @@ function Step1({
         <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr" }}>
           <div>
             <label style={LABEL}>Pre-Carriage By</label>
-            <Select allowClear style={{ width: "100%" }} value={form.pre_carriage_by}
+            <Select allowClear showSearch optionFilterProp="label" style={{ width: "100%" }} value={form.pre_carriage_by}
               onChange={(v) => setForm({ ...form, pre_carriage_by: v })}
-              options={preCarriage.map((p: any) => ({ value: p.id, label: p.name }))} />
+              options={preCarriage.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Place of Receipt</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt}
               onChange={(v) => setForm({ ...form, place_of_receipt: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Place of Receipt by Pre-Carrier</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.place_of_receipt_by_pre_carrier}
               onChange={(v) => setForm({ ...form, place_of_receipt_by_pre_carrier: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Vessel / Flight No</label>
@@ -610,22 +614,22 @@ function Step1({
             <label style={LABEL}>Port of Loading</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_loading}
               onChange={(v) => setForm({ ...form, port_of_loading: v })}
-              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={ports.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Port of Discharge</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.port_of_discharge}
               onChange={(v) => setForm({ ...form, port_of_discharge: v })}
-              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={ports.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Final Destination</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.final_destination}
               onChange={(v) => setForm({ ...form, final_destination: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
         </div>
       </div>
@@ -638,15 +642,15 @@ function Step1({
             <label style={LABEL}>Country of Origin of Goods</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_origin}
               onChange={(v) => setForm({ ...form, country_of_origin: v })}
-              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Country of Final Destination</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={form.country_of_final_destination}
               onChange={(v) => setForm({ ...form, country_of_final_destination: v })}
-              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
         </div>
       </div>
@@ -663,8 +667,8 @@ function Step1({
             placeholder="Select Bank (Bank Name – Beneficiary Name)"
             value={form.bank}
             onChange={(v) => setForm({ ...form, bank: v })}
-            options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` }))}
-            filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
+            options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
+            optionFilterProp="label"
           />
           <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
             Full bank details (branch, account, IFSC, SWIFT) print on the CI PDF
@@ -1087,6 +1091,7 @@ function Step3({
                   <th style={TH}>Item Code</th>
                   <th style={TH}>No &amp; Kind of Pkgs</th>
                   <th style={TH}>Description</th>
+                  <th style={TH}>Batch No.</th>
                   <th style={TH}>Qty</th>
                   <th style={TH}>UOM</th>
                   <th style={TH}>Net Weight</th>
@@ -1141,6 +1146,14 @@ function Step3({
                     </td>
                     <td style={TD}>
                       <input
+                        key={`batch-${item.id}`}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
+                        defaultValue={item.batch_details || ""}
+                        onBlur={(e) => { if (e.target.value !== (item.batch_details || "")) updateContainerItem(item.id, { batch_details: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <input
                         key={`qty-${item.id}`}
                         type="number"
                         style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }}
@@ -1154,7 +1167,9 @@ function Step3({
                         style={{ width: 80 }}
                         defaultValue={item.uom}
                         onChange={(v) => updateContainerItem(item.id, { uom: v }).then(invalidate)}
-                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation }))}
+                        showSearch
+                        optionFilterProp="label"
+                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation })).sort((a, b) => a.label.localeCompare(b.label))}
                       />
                     </td>
                     <td style={TD}>
@@ -1210,6 +1225,10 @@ function Step3({
                         value={pItem.description || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { description: e.target.value })} />
                     </td>
                     <td style={TD}>
+                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="Batch No."
+                        value={pItem.batch_details || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { batch_details: e.target.value })} />
+                    </td>
+                    <td style={TD}>
                       <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }} placeholder="0"
                         value={pItem.quantity || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { quantity: e.target.value })} />
                     </td>
@@ -1217,7 +1236,9 @@ function Step3({
                       <Select size="small" style={{ width: 80 }} placeholder="UOM *"
                         value={pItem.uom}
                         onChange={(v) => updatePendingItem(c.id, pIdx, { uom: v })}
-                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation }))} />
+                        showSearch
+                        optionFilterProp="label"
+                        options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation })).sort((a, b) => a.label.localeCompare(b.label))} />
                     </td>
                     <td style={TD}>
                       <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000"
@@ -1389,7 +1410,7 @@ function Step3({
                     const next = [...pendingContainers];
                     next[pendingIdx] = { ...data, _item: { ...data._item, uom: v } };
                     setPendingContainers(next);
-                  }} options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` }))} />
+                  }} showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
                 </div>
                 <div>
                   <label style={LABEL}>Net Weight/unit (kg) *</label>
@@ -1609,13 +1630,17 @@ function Step4({
           <Select style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
             onChange={(v) => handleIncotermChange(v)}
             placeholder="Select Incoterms"
-            options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
+            showSearch
+            optionFilterProp="label"
+            options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))} />
         </div>
         <div>
           <label style={LABEL}>Payment Terms</label>
           <Select allowClear style={{ width: "100%" }} value={financials.payment_terms ? Number(financials.payment_terms) : undefined}
             onChange={(v) => setFinancials({ ...financials, payment_terms: v ? String(v) : "" })}
-            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
+            showSearch
+            optionFilterProp="label"
+            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
         </div>
       </div>
 

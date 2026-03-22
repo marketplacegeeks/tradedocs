@@ -67,6 +67,10 @@ def generate_pl_ci_pdf(pl) -> io.BytesIO:
         except ImportError:
             pass
 
+    from apps.workflow.constants import APPROVED as _APPROVED
+    from reportlab.lib.colors import HexColor as _HexColor
+    is_draft = getattr(pl, "status", None) != _APPROVED
+
     class NumberedCanvas(canvas.Canvas):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -85,6 +89,16 @@ def generate_pl_ci_pdf(pl) -> io.BytesIO:
             super().save()
 
         def _draw_footer(self, page_num, total_pages):
+            # DRAFT watermark on all non-Approved documents (FR-08.3)
+            if is_draft:
+                self.saveState()
+                self.setFont("Helvetica-Bold", 80)
+                self.setFillColor(_HexColor('#CC0000'), alpha=0.15)
+                self.translate(A4[0] / 2, A4[1] / 2)
+                self.rotate(45)
+                self.drawCentredString(0, 0, "DRAFT")
+                self.restoreState()
+
             self.saveState()
             self.setFont("Helvetica", 8)
             self.drawCentredString(

@@ -372,8 +372,8 @@ class OrganisationAddress(models.Model):
     country = models.ForeignKey(
         Country, on_delete=models.PROTECT, related_name="organisation_addresses"
     )
-    email = models.EmailField()
-    contact_name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True)
+    contact_name = models.CharField(max_length=150, blank=True)
     # Phone stored as two fields: dial code (e.g. +91) and local number.
     # Both are optional overall, but if one is provided the other must be too (enforced in serializer).
     phone_country_code = models.CharField(

@@ -155,6 +155,11 @@ class ProformaInvoice(models.Model):
     import_duty = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     destination_charges = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
+    # ---- Bank charges declaration flag -------------------------------------
+    # When True, adds "BANK CHARGES: WITHIN INDIA ON ACCOUNT OF BENEFICIARY &
+    # OUTSIDE OF INDIA ON ACCOUNT OF BUYER" to the PDF declaration box.
+    bank_charges_to_buyer = models.BooleanField(default=False)
+
     # ---- Signed copy upload (FR-08.4) ---------------------------------------
     # Authorised users may upload a scanned signed copy once the PI is Approved.
     # Stored in MEDIA_ROOT/signed_copies/pi/; never auto-generated.

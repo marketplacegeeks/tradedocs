@@ -1,9 +1,9 @@
-// Proforma Invoice list page — status-tab filtering, design system table.
+// Proforma Invoice list page — status-tab filtering, search, sortable columns.
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, FileText, Download } from "lucide-react";
+import { Plus, FileText, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 import { listProformaInvoices } from "../../api/proformaInvoices";
 import type { ProformaInvoice } from "../../api/proformaInvoices";
@@ -26,12 +26,40 @@ const STATUS_TABS = [
   { key: DOCUMENT_STATUS.PERMANENTLY_REJECTED, label: "Permanently Rejected" },
 ];
 
+// Columns that can be sorted and the field they map to on a ProformaInvoice
+type SortKey = "pi_number" | "pi_date" | "exporter" | "consignee" | "status" | "created_by";
+
+const COLUMNS: { label: string; key: SortKey | null }[] = [
+  { label: "PI Number",   key: "pi_number" },
+  { label: "Date",        key: "pi_date" },
+  { label: "Exporter",    key: "exporter" },
+  { label: "Consignee",   key: "consignee" },
+  { label: "Status",      key: "status" },
+  { label: "Created By",  key: "created_by" },
+  { label: "",            key: null },
+];
+
+function getSortValue(pi: ProformaInvoice, key: SortKey): string {
+  switch (key) {
+    case "pi_number":   return pi.pi_number ?? "";
+    case "pi_date":     return pi.pi_date ?? "";
+    case "exporter":    return pi.exporter_name ?? "";
+    case "consignee":   return pi.consignee_name ?? "";
+    case "status":      return pi.status ?? "";
+    case "created_by":  return pi.created_by_name ?? "";
+  }
+}
+
 // ---- Page ------------------------------------------------------------------
 
 export default function ProformaInvoiceListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const [activeStatus, setActiveStatus] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("pi_date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN;
 
@@ -40,11 +68,37 @@ export default function ProformaInvoiceListPage() {
     queryFn: () => listProformaInvoices(activeStatus ? { status: activeStatus } : {}),
   });
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const displayed = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? invoices.filter((pi) =>
+          pi.pi_number.toLowerCase().includes(q) ||
+          (pi.exporter_name ?? "").toLowerCase().includes(q) ||
+          (pi.consignee_name ?? "").toLowerCase().includes(q) ||
+          (pi.created_by_name ?? "").toLowerCase().includes(q) ||
+          DOCUMENT_STATUS_LABELS[pi.status]?.toLowerCase().includes(q)
+        )
+      : invoices;
+
+    return [...filtered].sort((a, b) => {
+      const cmp = getSortValue(a, sortKey).localeCompare(getSortValue(b, sortKey));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [invoices, searchQuery, sortKey, sortDir]);
+
   return (
     <div>
       {/* Page header */}
       <div
-        className="page-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -67,7 +121,7 @@ export default function ProformaInvoiceListPage() {
             Proforma Invoices
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+            {displayed.length} of {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
             {activeStatus ? ` · ${DOCUMENT_STATUS_LABELS[activeStatus] ?? activeStatus}` : ""}
           </p>
         </div>
@@ -131,6 +185,40 @@ export default function ProformaInvoiceListPage() {
         })}
       </div>
 
+      {/* Search bar */}
+      <div style={{ marginBottom: 12, position: "relative", maxWidth: 360 }}>
+        <Search
+          size={15}
+          strokeWidth={1.8}
+          style={{
+            position: "absolute",
+            left: 11,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by PI number, exporter, consignee…"
+          style={{
+            width: "100%",
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            padding: "8px 12px 8px 34px",
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "var(--text-primary)",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
       {/* Table */}
       <div
         style={{
@@ -145,23 +233,37 @@ export default function ProformaInvoiceListPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
-                {["PI Number", "Date", "Exporter", "Consignee", "Status", "Created By", ""].map((h) => (
+                {COLUMNS.map((col) => (
                   <th
-                    key={h}
+                    key={col.label}
+                    onClick={col.key ? () => handleSort(col.key!) : undefined}
                     style={{
                       padding: "12px 16px",
                       textAlign: "left",
                       fontFamily: "var(--font-body)",
                       fontSize: 11,
                       fontWeight: 600,
-                      color: "var(--text-muted)",
+                      color: col.key && sortKey === col.key ? "var(--primary)" : "var(--text-muted)",
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
                       borderBottom: "1px solid var(--border-light)",
                       whiteSpace: "nowrap",
+                      cursor: col.key ? "pointer" : "default",
+                      userSelect: "none",
                     }}
                   >
-                    {h}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {col.label}
+                      {col.key && (
+                        sortKey === col.key ? (
+                          sortDir === "asc"
+                            ? <ArrowUp size={11} strokeWidth={2.5} />
+                            : <ArrowDown size={11} strokeWidth={2.5} />
+                        ) : (
+                          <ArrowUpDown size={11} strokeWidth={1.8} style={{ opacity: 0.35 }} />
+                        )
+                      )}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -171,53 +273,29 @@ export default function ProformaInvoiceListPage() {
                 <tr>
                   <td
                     colSpan={7}
-                    style={{
-                      padding: "48px 16px",
-                      textAlign: "center",
-                      fontFamily: "var(--font-body)",
-                      fontSize: 14,
-                      color: "var(--text-muted)",
-                    }}
+                    style={{ padding: "48px 16px", textAlign: "center", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}
                   >
                     Loading…
                   </td>
                 </tr>
-              ) : invoices.length === 0 ? (
+              ) : displayed.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        padding: "48px 16px",
-                        gap: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 12,
-                          background: "var(--pastel-blue)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 16px", gap: 12 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--pastel-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <FileText size={22} color="var(--pastel-blue-text)" strokeWidth={1.5} />
                       </div>
                       <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                         No Proforma Invoices
                       </p>
                       <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-                        {canCreate ? "Create your first invoice to get started." : "No invoices match the current filter."}
+                        {searchQuery ? "No invoices match your search." : canCreate ? "Create your first invoice to get started." : "No invoices match the current filter."}
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                invoices.map((pi) => (
+                displayed.map((pi) => (
                   <PIRow key={pi.id} pi={pi} onClick={() => navigate(`/proforma-invoices/${pi.id}`)} />
                 ))
               )}

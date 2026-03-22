@@ -247,6 +247,7 @@ def build_pl_story(packing_list, styles):
     except Exception:
         pass
 
+    col_2 = PAGE_W / 2
     col_3 = PAGE_W / 3
 
     office_addr = _org_address_by_type(exp, "OFFICE") or _org_address_by_type(exp, "REGISTERED")
@@ -341,7 +342,6 @@ def build_pl_story(packing_list, styles):
         ]]
         party_tbl = Table(party_data, colWidths=[col_3, col_3, col_3])
     else:
-        col_2 = PAGE_W / 2
         party_data = [[
             Paragraph(buyer_cell_html, style_text),
             Paragraph(cons_cell_html, style_text),

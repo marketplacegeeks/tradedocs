@@ -547,14 +547,19 @@ def build_ci_story(ci, styles) -> list:
 
     freight_amount = Decimal("0.00")
     insurance_amount = Decimal("0.00")
-    if "freight" in visible_fields:
+    # Only include freight/insurance if the field was actually filled in (not None)
+    show_freight = False
+    show_insurance = False
+    if "freight" in visible_fields and getattr(ci, "freight", None) is not None:
         try:
-            freight_amount = Decimal(str(getattr(ci, "freight", None) or "0"))
+            freight_amount = Decimal(str(ci.freight))
+            show_freight = True
         except Exception:
             pass
-    if "insurance" in visible_fields:
+    if "insurance" in visible_fields and getattr(ci, "insurance", None) is not None:
         try:
-            insurance_amount = Decimal(str(getattr(ci, "insurance", None) or "0"))
+            insurance_amount = Decimal(str(ci.insurance))
+            show_insurance = True
         except Exception:
             pass
     invoice_total = total_amount_usd + freight_amount + insurance_amount
@@ -588,12 +593,12 @@ def build_ci_story(ci, styles) -> list:
         [Paragraph("FOB Value (Line Items):", style_text),
          Paragraph(f"USD {_fmt_money(total_amount_usd)}", style_amt)],
     ]
-    if "freight" in visible_fields:
+    if show_freight:
         breakdown_rows.append([
             Paragraph("Freight:", style_text),
             Paragraph(f"USD {_fmt_money(freight_amount)}", style_amt),
         ])
-    if "insurance" in visible_fields:
+    if show_insurance:
         breakdown_rows.append([
             Paragraph("Insurance Amount:", style_text),
             Paragraph(f"USD {_fmt_money(insurance_amount)}", style_amt),
@@ -723,7 +728,11 @@ def build_ci_story(ci, styles) -> list:
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
         bank_box = Table(bank_rows, colWidths=[180 * mm])
         bank_box.setStyle(TableStyle([
-            ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+            # Explicit 4-sided line commands so each page-split fragment keeps all borders.
+            ("LINEABOVE",    (0, 0),  (-1, 0),  1.2, colors.black),
+            ("LINEBELOW",    (0, -1), (-1, -1), 1.2, colors.black),
+            ("LINEBEFORE",   (0, 0),  (0, -1),  1.2, colors.black),
+            ("LINEAFTER",    (-1, 0), (-1, -1), 1.2, colors.black),
             ("VALIGN",       (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING",  (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),

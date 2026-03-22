@@ -319,31 +319,31 @@ export default function PackingListEditPage() {
             <label style={LABEL}>Exporter *</label>
             <Select style={{ width: "100%" }} value={headerForm.exporter}
               onChange={(v) => setHeaderForm({ ...headerForm, exporter: v })}
-              options={exporters.map((o: any) => ({ value: o.id, label: o.name }))} />
+              showSearch optionFilterProp="label" options={exporters.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Consignee *</label>
             <Select style={{ width: "100%" }} value={headerForm.consignee}
               onChange={(v) => setHeaderForm({ ...headerForm, consignee: v })}
-              options={consignees.map((o: any) => ({ value: o.id, label: o.name }))} />
+              showSearch optionFilterProp="label" options={consignees.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Buyer</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.buyer}
               onChange={(v) => setHeaderForm({ ...headerForm, buyer: v })}
-              options={buyers.map((o: any) => ({ value: o.id, label: o.name }))} />
+              showSearch optionFilterProp="label" options={buyers.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Notify Party</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.notify_party}
               onChange={(v) => setHeaderForm({ ...headerForm, notify_party: v })}
-              options={notifyParties.map((o: any) => ({ value: o.id, label: o.name }))} />
+              showSearch optionFilterProp="label" options={notifyParties.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Bank (for CI)</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.bank}
               onChange={(v) => setHeaderForm({ ...headerForm, bank: v })}
-              options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` }))} />
+              showSearch optionFilterProp="label" options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>PL Date</label>
@@ -428,21 +428,21 @@ export default function PackingListEditPage() {
             <label style={LABEL}>Pre-Carriage By</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.pre_carriage_by}
               onChange={(v) => setHeaderForm({ ...headerForm, pre_carriage_by: v })}
-              options={preCarriage.map((p: any) => ({ value: p.id, label: p.name }))} />
+              showSearch optionFilterProp="label" options={preCarriage.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
             <label style={LABEL}>Place of Receipt</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.place_of_receipt}
               onChange={(v) => setHeaderForm({ ...headerForm, place_of_receipt: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Place of Receipt by Pre-Carrier</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.place_of_receipt_by_pre_carrier}
               onChange={(v) => setHeaderForm({ ...headerForm, place_of_receipt_by_pre_carrier: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Vessel / Flight No</label>
@@ -452,28 +452,28 @@ export default function PackingListEditPage() {
             <label style={LABEL}>Port of Loading</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.port_of_loading}
               onChange={(v) => setHeaderForm({ ...headerForm, port_of_loading: v })}
-              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={ports.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Port of Discharge</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.port_of_discharge}
               onChange={(v) => setHeaderForm({ ...headerForm, port_of_discharge: v })}
-              options={ports.map((p: any) => ({ value: p.id, label: p.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={ports.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Final Destination</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.final_destination}
               onChange={(v) => setHeaderForm({ ...headerForm, final_destination: v })}
-              options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Incoterms</label>
             <Select allowClear style={{ width: "100%" }} value={headerForm.incoterms}
               onChange={(v) => setHeaderForm({ ...headerForm, incoterms: v ?? null })}
-              options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` }))} />
+              showSearch optionFilterProp="label" options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
         </div>
       </div>
@@ -486,15 +486,15 @@ export default function PackingListEditPage() {
             <label style={LABEL}>Country of Origin of Goods</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.country_of_origin}
               onChange={(v) => setHeaderForm({ ...headerForm, country_of_origin: v ?? null })}
-              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
           <div>
             <label style={LABEL}>Country of Final Destination</label>
             <Select allowClear showSearch style={{ width: "100%" }} value={headerForm.country_of_final_destination}
               onChange={(v) => setHeaderForm({ ...headerForm, country_of_final_destination: v ?? null })}
-              options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
-              filterOption={(i, o) => (o?.label ?? "").toLowerCase().includes(i.toLowerCase())} />
+              options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
           </div>
         </div>
       </div>
@@ -554,7 +554,7 @@ export default function PackingListEditPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
                 <thead>
                   <tr>
-                    {["Item Code", "Desc", "HSN", "Pkgs", "Qty", "UOM", "Net Wt", ""].map((h) => (
+                    {["Item Code", "Desc", "HSN", "Pkgs", "Qty", "UOM", "Net Wt", "Batch No.", ""].map((h) => (
                       <th key={h} style={TH}>{h}</th>
                     ))}
                   </tr>
@@ -569,6 +569,7 @@ export default function PackingListEditPage() {
                       <td style={TD}>{item.quantity}</td>
                       <td style={TD}>{item.uom_abbr ?? "—"}</td>
                       <td style={TD}>{item.net_weight}</td>
+                      <td style={TD}>{item.batch_details || "—"}</td>
                       <td style={TD}>
                         <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--pastel-pink-text)" }} onClick={async () => {
                           try {
@@ -600,7 +601,7 @@ export default function PackingListEditPage() {
           <label style={LABEL}>Payment Terms</label>
           <Select allowClear style={{ width: "100%" }} value={headerForm.payment_terms}
             onChange={(v) => setHeaderForm({ ...headerForm, payment_terms: v ?? null })}
-            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name }))} />
+            showSearch optionFilterProp="label" options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
         </div>
       </div>
 
@@ -701,7 +702,7 @@ export default function PackingListEditPage() {
             ["packages_kind", "No & Kind of Packages *", "text"],
             ["description", "Description *", "text"],
             ["hsn_code", "HSN Code", "text"],
-            ["batch_details", "Batch Details", "text"],
+            ["batch_details", "Batch Number", "text"],
             ["quantity", "Quantity *", "number"],
             ["net_weight", "Net Weight (kg) *", "number"],
             ["inner_packing_weight", "Inner Packing Weight (kg) *", "number"],
@@ -716,7 +717,7 @@ export default function PackingListEditPage() {
             <label style={LABEL}>UOM *</label>
             <Select style={{ width: "100%" }} value={itemForm.uom}
               onChange={(v) => setItemForm({ ...itemForm, uom: v })}
-              options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` }))} />
+              showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
         </div>
       </Modal>

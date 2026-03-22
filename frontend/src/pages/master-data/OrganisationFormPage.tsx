@@ -13,7 +13,7 @@ import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { message } from "antd";
+import { message, Select } from "antd";
 
 import {
   createOrganisation, getOrganisation, updateOrganisation,
@@ -32,8 +32,8 @@ const addressSchema = z.object({
   state: z.string().optional().default(""),
   pin: z.string().optional().default(""),
   country: z.number({ required_error: "Country is required" }),
-  email: z.string().email("Must be a valid email address"),
-  contact_name: z.string().min(1, "Contact name is required"),
+  email: z.string().email("Must be a valid email address").optional().or(z.literal("")).default(""),
+  contact_name: z.string().optional().default(""),
   phone_country_code: z.string().optional().default(""),
   phone_number: z.string().optional().default(""),
   iec_code: z.string().max(10).optional().default(""),
@@ -94,32 +94,6 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
   outline: "none",
   boxSizing: "border-box",
 });
-
-function StyledSelect({
-  value, onChange, options, placeholder, hasError,
-}: {
-  value: string | number | undefined;
-  onChange: (v: number | string) => void;
-  options: { value: string | number; label: string }[];
-  placeholder?: string;
-  hasError?: boolean;
-}) {
-  return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => {
-        const raw = e.target.value;
-        onChange(isNaN(Number(raw)) ? raw : Number(raw));
-      }}
-      style={{ ...inputStyle(hasError), appearance: "auto" }}
-    >
-      <option value="">{placeholder ?? "Select…"}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
 
 // White card section with a labelled header
 function Section({
@@ -315,11 +289,14 @@ export default function OrganisationFormPage() {
 
   const isPending = isSubmitting || createMutation.isPending || updateMutation.isPending;
 
-  const countryOptions = countries.map((c) => ({ value: c.id, label: `${c.name} (${c.iso2})` }));
-  const addressTypeOptions = Object.values(ADDRESS_TYPES).map((type) => ({
+  const sort = (arr: { value: any; label: string }[]) =>
+    [...arr].sort((a, b) => a.label.localeCompare(b.label));
+
+  const countryOptions = sort(countries.map((c) => ({ value: c.id, label: `${c.name} (${c.iso2})` })));
+  const addressTypeOptions = sort(Object.values(ADDRESS_TYPES).map((type) => ({
     value: type,
     label: ADDRESS_TYPE_LABELS[type],
-  }));
+  })));
 
   if (isEditMode && orgLoading) {
     return (
@@ -465,7 +442,7 @@ export default function OrganisationFormPage() {
               <Row2>
                 <Field label="Address Type" required error={errors.addresses?.[index]?.address_type?.message}>
                   <Controller name={`addresses.${index}.address_type`} control={control} render={({ field: f }) =>
-                    <StyledSelect value={f.value} onChange={(v) => f.onChange(v as string)} options={addressTypeOptions} hasError={!!errors.addresses?.[index]?.address_type} />
+                    <Select value={f.value} onChange={(v) => f.onChange(v as string)} options={addressTypeOptions} showSearch optionFilterProp="label" style={{ width: "100%" }} status={errors.addresses?.[index]?.address_type ? "error" : undefined} />
                   } />
                 </Field>
                 <Field label="Address Line 1" required error={errors.addresses?.[index]?.line1?.message}>
@@ -501,7 +478,7 @@ export default function OrganisationFormPage() {
                 </Field>
                 <Field label="Country" required error={errors.addresses?.[index]?.country?.message}>
                   <Controller name={`addresses.${index}.country`} control={control} render={({ field: f }) =>
-                    <StyledSelect
+                    <Select
                       value={f.value}
                       onChange={(v) => {
                         f.onChange(v);
@@ -512,19 +489,22 @@ export default function OrganisationFormPage() {
                       }}
                       options={countryOptions}
                       placeholder="Select country"
-                      hasError={!!errors.addresses?.[index]?.country}
+                      showSearch
+                      optionFilterProp="label"
+                      style={{ width: "100%" }}
+                      status={errors.addresses?.[index]?.country ? "error" : undefined}
                     />
                   } />
                 </Field>
               </Row3>
 
               <Row2>
-                <Field label="Email" required error={errors.addresses?.[index]?.email?.message}>
+                <Field label="Email" error={errors.addresses?.[index]?.email?.message}>
                   <Controller name={`addresses.${index}.email`} control={control} render={({ field: f }) =>
                     <input {...f} type="email" style={inputStyle(!!errors.addresses?.[index]?.email)} />
                   } />
                 </Field>
-                <Field label="Contact Name" required error={errors.addresses?.[index]?.contact_name?.message}>
+                <Field label="Contact Name" error={errors.addresses?.[index]?.contact_name?.message}>
                   <Controller name={`addresses.${index}.contact_name`} control={control} render={({ field: f }) =>
                     <input {...f} style={inputStyle(!!errors.addresses?.[index]?.contact_name)} />
                   } />

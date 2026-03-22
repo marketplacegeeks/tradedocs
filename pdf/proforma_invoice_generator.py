@@ -788,10 +788,12 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ])
         for field in seller_fields:
             val = getattr(invoice, field, None)
-            val_str = f"${fmt_money(val)}" if val is not None else "—"
+            # Skip freight/insurance rows if the user has not filled in a value
+            if val is None:
+                continue
             totals_rows.append([
                 Paragraph(_FIELD_LABELS.get(field, field), style_text),
-                Paragraph(val_str, style_text),
+                Paragraph(f"${fmt_money(val)}", style_text),
             ])
 
     # Invoice Total (Amount Payable) — shown whenever an incoterm is selected
@@ -847,11 +849,16 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     story.append(Spacer(1, 10))
 
     # ---- Declaration -----------------------------------------------------------
-    story.append(Paragraph(
+    decl_text = (
         "<b>Declaration:</b> We declare that this invoice shows the actual price of the "
-        "goods described and that all particulars are true and correct.",
-        style_text,
-    ))
+        "goods described and that all particulars are true and correct."
+    )
+    if getattr(invoice, "bank_charges_to_buyer", False):
+        decl_text += (
+            "<br/><b>BANK CHARGES:</b> WITHIN INDIA ON ACCOUNT OF BENEFICIARY &amp; "
+            "OUTSIDE OF INDIA ON ACCOUNT OF BUYER"
+        )
+    story.append(Paragraph(decl_text, style_text))
     story.append(Spacer(1, 10))
 
     # ---- Bank details ---------------------------------------------------------
@@ -910,17 +917,12 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # each paragraph as a separate Paragraph flowable — matching the original layout.
     tc_content = getattr(invoice, "tc_content", "") or ""
     if tc_content.strip():
-        from pdf.utils import strip_html
         story.append(PageBreak())
         story.append(Paragraph("<b>Additional Terms &amp; Conditions</b>", style_label))
         story.append(Spacer(1, 6))
 
-        plain = strip_html(tc_content)
-        for para in plain.split("\n\n"):
-            para = para.strip()
-            if para:
-                story.append(Paragraph(para, style_small))
-                story.append(Spacer(1, 4))
+        from pdf.utils import html_to_rl_flowables
+        story.extend(html_to_rl_flowables(tc_content, style_small, spacer_pt=4))
 
     # ---- Build the PDF --------------------------------------------------------
     doc.build(story, canvasmaker=NumberedCanvas)

@@ -232,7 +232,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 from reportlab.lib.colors import HexColor as _HexColor
                 self.saveState()
                 self.setFont("Helvetica-Bold", 80)
-                self.setFillColor(_HexColor('#000000'), alpha=0.05)
+                self.setFillColor(_HexColor('#CC0000'), alpha=0.15)
                 self.translate(A4[0] / 2, A4[1] / 2)
                 self.rotate(45)
                 self.drawCentredString(0, 0, "DRAFT")
@@ -586,10 +586,12 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ])
         for field in seller_fields:
             val = getattr(invoice, field, None)
-            val_str = f"${fmt_money(val)}" if val is not None else "—"
+            # Skip freight/insurance rows if the user has not filled in a value
+            if val is None:
+                continue
             totals_rows.append([
                 Paragraph(_FIELD_LABELS.get(field, field), style_text),
-                Paragraph(val_str, style_text),
+                Paragraph(f"${fmt_money(val)}", style_text),
             ])
 
     if incoterm_disp:
@@ -662,12 +664,17 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # SECTION 8: DECLARATION
     # ========================================================================
 
+    decl_text = (
+        "<b>Declaration:</b> We declare that this invoice shows the actual price of the "
+        "goods described and that all particulars are true and correct."
+    )
+    if getattr(invoice, "bank_charges_to_buyer", False):
+        decl_text += (
+            "<br/><b>BANK CHARGES:</b> WITHIN INDIA ON ACCOUNT OF BENEFICIARY &amp; "
+            "OUTSIDE OF INDIA ON ACCOUNT OF BUYER"
+        )
     decl_table = Table(
-        [[Paragraph(
-            "<b>Declaration:</b> We declare that this invoice shows the actual price of the "
-            "goods described and that all particulars are true and correct.",
-            style_text,
-        )]],
+        [[Paragraph(decl_text, style_text)]],
         colWidths=[180 * mm],
     )
     decl_table.setStyle(TableStyle([
@@ -719,7 +726,12 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
         bank_box = Table(bank_rows, colWidths=[180 * mm])
         bank_box.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            # Use all 4 explicit line commands instead of BOX so that when the
+            # table splits across pages every fragment keeps all 4 borders.
+            ("LINEABOVE",  (0, 0),  (-1, 0),  1.2, colors.black),
+            ("LINEBELOW",  (0, -1), (-1, -1), 1.2, colors.black),
+            ("LINEBEFORE", (0, 0),  (0, -1),  1.2, colors.black),
+            ("LINEAFTER",  (-1, 0), (-1, -1), 1.2, colors.black),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -735,7 +747,6 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
 
     tc_content = getattr(invoice, "tc_content", "") or ""
     if tc_content.strip():
-        from pdf.utils import strip_html
         story.append(PageBreak())
 
         tc_header = Table(
@@ -753,12 +764,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         story.append(tc_header)
         story.append(Spacer(1, 8))
 
-        plain = strip_html(tc_content)
-        for para in plain.split("\n\n"):
-            para = para.strip()
-            if para:
-                story.append(Paragraph(para, style_small))
-                story.append(Spacer(1, 5))
+        from pdf.utils import html_to_rl_flowables
+        story.extend(html_to_rl_flowables(tc_content, style_small, spacer_pt=5))
 
     # Build PDF
     doc.build(story, canvasmaker=NumberedCanvas)

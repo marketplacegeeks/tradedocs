@@ -259,6 +259,7 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                   <th style={TH}>Item Code</th>
                   <th style={TH}>HSN</th>
                   <th style={TH}>Description</th>
+                  <th style={TH}>Batch No.</th>
                   <th style={TH}>Pkgs</th>
                   <th style={TH}>Qty</th>
                   <th style={TH}>UOM</th>
@@ -273,6 +274,7 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                     <td style={{ ...TD, fontWeight: 600, color: "var(--text-primary)" }}>{item.item_code}</td>
                     <td style={TD}>{item.hsn_code || "—"}</td>
                     <td style={TD}>{item.description}</td>
+                    <td style={TD}>{item.batch_details || "—"}</td>
                     <td style={TD}>{item.packages_kind}</td>
                     <td style={TD}>{item.quantity}</td>
                     <td style={TD}>{item.uom_abbr ?? item.uom ?? "—"}</td>
@@ -609,9 +611,9 @@ export default function PackingListDetailPage() {
   const isAdmin = user?.role === ROLES.COMPANY_ADMIN;
   const canEdit = isEditable && (isCreator || isAdmin);
   const canDelete = isDraft && (isCreator || isAdmin);
-  // FR-14M.13: Maker/Checker can download only when Approved; Admin can download any state.
   const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;
-  const canDownloadPDF = isApproved || isAdmin;
+  // FR-08.3: PDF available to all roles in all states (DRAFT watermark shown on non-Approved).
+  const canDownloadPDF = true;
 
   return (
     <div style={{ padding: 32, background: "var(--bg-base)", minHeight: "100vh" }}>

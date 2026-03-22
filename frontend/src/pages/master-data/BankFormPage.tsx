@@ -8,6 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowLeft } from "lucide-react";
 
+import { Select } from "antd";
+
 import { createBank, getBank, updateBank } from "../../api/banks";
 import { extractApiError } from "../../utils/apiErrors";
 import { listCountries } from "../../api/countries";
@@ -122,32 +124,6 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
   outline: "none",
   boxSizing: "border-box",
 });
-
-function StyledSelect({
-  value, onChange, options, placeholder, hasError,
-}: {
-  value: string | number | undefined | null;
-  onChange: (v: number | string) => void;
-  options: { value: string | number; label: string }[];
-  placeholder?: string;
-  hasError?: boolean;
-}) {
-  return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => {
-        const raw = e.target.value;
-        onChange(isNaN(Number(raw)) ? raw : Number(raw));
-      }}
-      style={{ ...inputStyle(hasError), appearance: "auto" }}
-    >
-      <option value="">{placeholder ?? "Select…"}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
 
 // ---- Section card ---------------------------------------------------------
 
@@ -283,12 +259,15 @@ export default function BankFormPage() {
     },
   });
 
-  const countryOptions = countries.map((c) => ({ value: c.id, label: `${c.name} (${c.iso2})` }));
-  const currencyOptions = currencies.map((c) => ({ value: c.id, label: `${c.code} – ${c.name}` }));
-  const exporterOptions = exporters.map((o) => ({ value: o.id, label: o.name }));
-  const accountTypeOptions = Object.entries(ACCOUNT_TYPE_LABELS).map(
+  const sort = (arr: { value: any; label: string }[]) =>
+    [...arr].sort((a, b) => a.label.localeCompare(b.label));
+
+  const countryOptions = sort(countries.map((c) => ({ value: c.id, label: `${c.name} (${c.iso2})` })));
+  const currencyOptions = sort(currencies.map((c) => ({ value: c.id, label: `${c.code} – ${c.name}` })));
+  const exporterOptions = sort(exporters.map((o) => ({ value: o.id, label: o.name })));
+  const accountTypeOptions = sort(Object.entries(ACCOUNT_TYPE_LABELS).map(
     ([value, label]) => ({ value: value as AccountType, label })
-  );
+  ));
 
   if (isEditing && isLoading) {
     return (
@@ -333,12 +312,15 @@ export default function BankFormPage() {
           {/* Exporter Organisation — full width */}
           <Field label="Exporter Organisation" required error={errors.organisation?.message}>
             <Controller name="organisation" control={control} render={({ field }) =>
-              <StyledSelect
+              <Select
                 value={field.value}
                 onChange={(v) => field.onChange(v as number)}
                 options={exporterOptions}
                 placeholder="Select exporter…"
-                hasError={!!errors.organisation}
+                showSearch
+                optionFilterProp="label"
+                style={{ width: "100%" }}
+                status={errors.organisation ? "error" : undefined}
               />
             } />
           </Field>
@@ -362,7 +344,7 @@ export default function BankFormPage() {
             </Field>
             <Field label="Bank Country" required error={errors.bank_country?.message}>
               <Controller name="bank_country" control={control} render={({ field }) =>
-                <StyledSelect value={field.value} onChange={field.onChange} options={countryOptions} placeholder="Select country" hasError={!!errors.bank_country} />
+                <Select value={field.value} onChange={field.onChange} options={countryOptions} placeholder="Select country" showSearch optionFilterProp="label" style={{ width: "100%" }} status={errors.bank_country ? "error" : undefined} />
               } />
             </Field>
           </Row2>
@@ -386,12 +368,12 @@ export default function BankFormPage() {
             </Field>
             <Field label="Account Type" required error={errors.account_type?.message}>
               <Controller name="account_type" control={control} render={({ field }) =>
-                <StyledSelect value={field.value} onChange={(v) => field.onChange(v as string)} options={accountTypeOptions} placeholder="Select type" hasError={!!errors.account_type} />
+                <Select value={field.value} onChange={(v) => field.onChange(v as string)} options={accountTypeOptions} placeholder="Select type" showSearch optionFilterProp="label" style={{ width: "100%" }} status={errors.account_type ? "error" : undefined} />
               } />
             </Field>
             <Field label="Currency" required error={errors.currency?.message}>
               <Controller name="currency" control={control} render={({ field }) =>
-                <StyledSelect value={field.value} onChange={field.onChange} options={currencyOptions} placeholder="Select currency" hasError={!!errors.currency} />
+                <Select value={field.value} onChange={field.onChange} options={currencyOptions} placeholder="Select currency" showSearch optionFilterProp="label" style={{ width: "100%" }} status={errors.currency ? "error" : undefined} />
               } />
             </Field>
           </Row3>
@@ -448,12 +430,16 @@ export default function BankFormPage() {
             </Field>
             <Field label="Routing Currency" error={errors.intermediary_currency?.message} hint="Currency for which this intermediary is used.">
               <Controller name="intermediary_currency" control={control} render={({ field }) =>
-                <StyledSelect
+                <Select
                   value={field.value ?? undefined}
-                  onChange={(v) => field.onChange(v === "" ? null : Number(v))}
+                  onChange={(v) => field.onChange(v === undefined ? null : Number(v))}
                   options={currencyOptions}
                   placeholder="Select currency…"
-                  hasError={!!errors.intermediary_currency}
+                  showSearch
+                  optionFilterProp="label"
+                  allowClear
+                  style={{ width: "100%" }}
+                  status={errors.intermediary_currency ? "error" : undefined}
                 />
               } />
             </Field>

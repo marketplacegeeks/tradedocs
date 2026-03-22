@@ -144,6 +144,8 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "partial_shipment", "transshipment",
             # T&C
             "tc_template", "tc_content",
+            # Bank charges declaration
+            "bank_charges_to_buyer",
             # Cost breakdown (FR-09.7)
             "freight", "insurance_amount", "import_duty", "destination_charges",
             # Computed totals (read-only, returned in responses)
@@ -182,6 +184,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
                 "validity_for_acceptance", "validity_for_shipment",
                 "partial_shipment", "transshipment",
                 "tc_template", "tc_content",
+                "bank_charges_to_buyer",
                 "freight", "insurance_amount", "import_duty", "destination_charges",
             ]
             for field_name in content_fields:

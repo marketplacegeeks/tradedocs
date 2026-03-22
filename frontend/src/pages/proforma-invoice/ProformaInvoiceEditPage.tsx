@@ -46,6 +46,7 @@ const schema = z.object({
   payment_terms: z.number({ required_error: "Payment Terms is required" }),
   incoterms: z.number({ required_error: "Incoterms is required" }),
   bank: z.number().nullable().optional(),
+  bank_charges_to_buyer: z.boolean().optional().default(false),
   validity_for_acceptance: z.string().nullable().optional(),
   validity_for_shipment: z.string().nullable().optional(),
   partial_shipment: z.string().optional().default(""),
@@ -163,6 +164,7 @@ export default function ProformaInvoiceEditPage() {
       payment_terms: pi.payment_terms!,
       incoterms: pi.incoterms!,
       bank: pi.bank ?? null,
+      bank_charges_to_buyer: pi.bank_charges_to_buyer ?? false,
       validity_for_acceptance: pi.validity_for_acceptance ?? null,
       validity_for_shipment: pi.validity_for_shipment ?? null,
       partial_shipment: pi.partial_shipment ?? "",
@@ -253,7 +255,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={exporters.map((o: any) => ({ value: o.id, label: o.name }))}
+                    options={exporters.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -271,7 +273,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={consignees.map((o: any) => ({ value: o.id, label: o.name }))}
+                    options={consignees.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -293,7 +295,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={buyers.map((o: any) => ({ value: o.id, label: o.name }))}
+                    options={buyers.map((o: any) => ({ value: o.id, label: o.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -354,7 +356,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+                    options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -372,7 +374,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={countries.map((c: any) => ({ value: c.id, label: c.name }))}
+                    options={countries.map((c: any) => ({ value: c.id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -394,9 +396,11 @@ export default function ProformaInvoiceEditPage() {
                   <Select
                     {...field}
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     placeholder="Select"
                     style={{ width: "100%" }}
-                    options={preCarriageOptions.map((p: any) => ({ value: p.id, label: p.name }))}
+                    options={preCarriageOptions.map((p: any) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -414,7 +418,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+                    options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -432,7 +436,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+                    options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -457,7 +461,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={ports.map((p: any) => ({ value: p.id, label: `${p.name} (${p.code})` }))}
+                    options={ports.map((p: any) => ({ value: p.id, label: `${p.name} (${p.code})` })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -475,7 +479,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={ports.map((p: any) => ({ value: p.id, label: `${p.name} (${p.code})` }))}
+                    options={ports.map((p: any) => ({ value: p.id, label: `${p.name} (${p.code})` })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -493,7 +497,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={locations.map((l: any) => ({ value: l.id, label: l.name }))}
+                    options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -515,8 +519,10 @@ export default function ProformaInvoiceEditPage() {
                   <Select
                     {...field}
                     placeholder="Select payment terms"
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: "100%" }}
-                    options={paymentTerms.map((pt: any) => ({ value: pt.id, label: pt.name }))}
+                    options={paymentTerms.map((pt: any) => ({ value: pt.id, label: pt.name })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -534,7 +540,7 @@ export default function ProformaInvoiceEditPage() {
                     style={{ width: "100%" }}
                     showSearch
                     optionFilterProp="label"
-                    options={incoterms.map((i: any) => ({ value: i.id, label: `${i.code} – ${i.full_name}` }))}
+                    options={incoterms.map((i: any) => ({ value: i.id, label: `${i.code} – ${i.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -555,10 +561,30 @@ export default function ProformaInvoiceEditPage() {
                   style={{ width: "100%" }}
                   showSearch
                   optionFilterProp="label"
-                  options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` }))}
+                  options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
                 />
               )}
             />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+              <Controller
+                name="bank_charges_to_buyer"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    type="checkbox"
+                    checked={!!field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    style={{ marginTop: 2, width: 15, height: 15, flexShrink: 0, cursor: "pointer" }}
+                  />
+                )}
+              />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                Add bank charges to declaration — <strong>BANK CHARGES: WITHIN INDIA ON ACCOUNT OF BENEFICIARY &amp; OUTSIDE OF INDIA ON ACCOUNT OF BUYER</strong>
+              </span>
+            </label>
           </div>
 
           <div style={{ ...GRID2, marginBottom: 16 }}>
@@ -602,9 +628,11 @@ export default function ProformaInvoiceEditPage() {
                   <Select
                     {...field}
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     placeholder="Select"
                     style={{ width: "100%" }}
-                    options={Object.entries(SHIPMENT_OPTION_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                    options={Object.entries(SHIPMENT_OPTION_LABELS).map(([v, l]) => ({ value: v, label: l })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -618,9 +646,11 @@ export default function ProformaInvoiceEditPage() {
                   <Select
                     {...field}
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     placeholder="Select"
                     style={{ width: "100%" }}
-                    options={Object.entries(SHIPMENT_OPTION_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                    options={Object.entries(SHIPMENT_OPTION_LABELS).map(([v, l]) => ({ value: v, label: l })).sort((a, b) => a.label.localeCompare(b.label))}
                   />
                 )}
               />
@@ -640,13 +670,15 @@ export default function ProformaInvoiceEditPage() {
                 <Select
                   {...field}
                   allowClear
+                  showSearch
+                  optionFilterProp="label"
                   placeholder="Select template (optional)"
                   style={{ width: "100%" }}
                   onChange={(val) => {
                     field.onChange(val ?? null);
                     setSelectedTemplateId(val ?? null);
                   }}
-                  options={tcTemplates.map((t: any) => ({ value: t.id, label: t.name }))}
+                  options={tcTemplates.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))}
                 />
               )}
             />

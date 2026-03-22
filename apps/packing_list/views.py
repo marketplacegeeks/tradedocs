@@ -234,26 +234,26 @@ class PackingListViewSet(viewsets.ModelViewSet):
         GET /packing-lists/{id}/pdf/
         Streams the combined PL+CI PDF.
 
-        Access rules (FR-14M.13):
-          Maker / Checker — Approved state only
-          Company Admin   — any state
+        FR-08.3: PDF available in all states for all roles; DRAFT watermark applied
+        to non-Approved documents by the PDF generator.
         Constraint #20: PDF is generated in-memory and streamed; never written to disk.
         """
         from django.http import FileResponse
         from pdf.packing_list import generate_pl_ci_pdf
+
+        from datetime import date
         from apps.workflow.constants import APPROVED
 
         pl = self.get_object()
 
-        # Gate by role + status
-        if request.user.role != UserRole.COMPANY_ADMIN:
-            if pl.status != APPROVED:
-                raise PermissionDenied(
-                    "PDF download is only available for Approved documents."
-                )
-
         buffer = generate_pl_ci_pdf(pl)
-        filename = f"{pl.pl_number}.pdf"
+
+        today = date.today().strftime("%d%m%Y")
+        consignee_name = ""
+        if pl.consignee:
+            consignee_name = "_" + pl.consignee.name.replace(" ", "")
+        draft_part = "" if pl.status == APPROVED else "_draft"
+        filename = f"{today}{draft_part}_PL&CI{consignee_name}.pdf"
         return FileResponse(
             buffer,
             as_attachment=True,
