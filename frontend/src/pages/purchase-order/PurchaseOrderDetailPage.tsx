@@ -336,6 +336,7 @@ export default function PurchaseOrderDetailPage() {
         <h2 style={SECTION_TITLE}>Vendor &amp; Delivery</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
           <LabelValue label="Vendor" value={po.vendor_name} />
+          {po.buyer_name && <LabelValue label="Buyer" value={po.buyer_name} />}
           <LabelValue label="Delivery Address" value={po.delivery_address_detail} />
           <LabelValue label="Customer No" value={po.customer_no} />
           <LabelValue label="Internal Contact" value={po.internal_contact_name} />

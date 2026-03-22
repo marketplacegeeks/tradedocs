@@ -88,6 +88,7 @@ const schema = z.object({
   po_date: z.string().min(1, "PO Date is required"),
   customer_no: z.string().optional().default(""),
   vendor: z.number({ required_error: "Vendor is required" }),
+  buyer: z.number().nullable().optional(),
   internal_contact: z.number({ required_error: "Internal Contact is required" }),
   delivery_address: z.number({ required_error: "Delivery Address is required" }),
   bank: z.number().nullable().optional(),
@@ -235,6 +236,7 @@ export default function PurchaseOrderFormPage() {
   });
 
   const watchedVendor = watch("vendor");
+  const watchedBuyer = watch("buyer");
   const watchedContact = watch("internal_contact");
   const watchedTxType = watch("transaction_type");
 
@@ -242,6 +244,10 @@ export default function PurchaseOrderFormPage() {
   const { data: vendors = [] } = useQuery({
     queryKey: ["organisations", "VENDOR"],
     queryFn: () => listOrganisations("VENDOR"),
+  });
+  const { data: buyers = [] } = useQuery({
+    queryKey: ["organisations", "BUYER"],
+    queryFn: () => listOrganisations("BUYER"),
   });
   const { data: currencies = [] } = useQuery({
     queryKey: ["currencies"],
@@ -286,6 +292,7 @@ export default function PurchaseOrderFormPage() {
       po_date: existingPO.po_date,
       customer_no: existingPO.customer_no,
       vendor: existingPO.vendor,
+      buyer: existingPO.buyer,
       internal_contact: existingPO.internal_contact,
       delivery_address: existingPO.delivery_address,
       bank: existingPO.bank,
@@ -304,28 +311,32 @@ export default function PurchaseOrderFormPage() {
     }
   }, [existingPO, reset]);
 
-  // ---- Reload delivery addresses when vendor changes
+  // ---- Reload delivery addresses when buyer or vendor changes
+  // When a buyer is selected, delivery addresses come from the buyer.
+  // When no buyer is selected, they come from the vendor.
   useEffect(() => {
-    if (!watchedVendor) {
+    const sourceOrgId = watchedBuyer ?? watchedVendor;
+    if (!sourceOrgId) {
       setDeliveryAddresses([]);
+      setValue("delivery_address", undefined as any);
       return;
     }
     setDeliveryLoading(true);
-    getOrganisation(watchedVendor)
+    getOrganisation(sourceOrgId)
       .then((org) => {
         const deliveries = (org.addresses ?? []).filter((a) => a.address_type === "DELIVERY");
         setDeliveryAddresses(deliveries);
         // Auto-select if exactly one delivery address
         if (deliveries.length === 1 && deliveries[0].id) {
           setValue("delivery_address", deliveries[0].id);
-        } else if (deliveries.length !== 1) {
+        } else {
           setValue("delivery_address", undefined as any);
         }
       })
       .catch(() => setDeliveryAddresses([]))
       .finally(() => setDeliveryLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedVendor]);
+  }, [watchedBuyer, watchedVendor]);
 
   // ---- Update contact phone display when contact changes
   useEffect(() => {
@@ -402,6 +413,7 @@ export default function PurchaseOrderFormPage() {
     try {
       const payload = {
         ...values,
+        buyer: values.buyer ?? null,
         bank: values.bank ?? null,
         payment_terms: values.payment_terms ?? null,
         country_of_origin: values.country_of_origin ?? null,
@@ -550,6 +562,31 @@ export default function PurchaseOrderFormPage() {
             </div>
           </div>
 
+          {/* Buyer */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={LABEL}>Buyer</label>
+            <Controller
+              name="buyer"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Select buyer (optional)"
+                  style={{ width: "100%" }}
+                  disabled={!inEditableState}
+                  options={buyers.map((b) => ({ value: b.id, label: b.name })).sort((a, b) => a.label.localeCompare(b.label))}
+                  onChange={(val) => {
+                    field.onChange(val ?? null);
+                    setValue("delivery_address", undefined as any);
+                  }}
+                />
+              )}
+            />
+          </div>
+
           {/* Internal Contact */}
           <div style={{ marginBottom: 16 }}>
             <label style={LABEL}>Internal Contact <span style={{ color: "#e53e3e" }}>*</span></label>
@@ -590,9 +627,9 @@ export default function PurchaseOrderFormPage() {
                 <Select
                   {...field}
                   loading={deliveryLoading}
-                  placeholder={watchedVendor ? "Select delivery address…" : "Select a vendor first"}
+                  placeholder={watchedBuyer ? "Select buyer delivery address…" : watchedVendor ? "Select delivery address…" : "Select a vendor first"}
                   style={{ width: "100%" }}
-                  disabled={!inEditableState || !watchedVendor}
+                  disabled={!inEditableState || (!watchedVendor && !watchedBuyer)}
                   options={deliveryAddresses.map((a) => ({
                     value: a.id!,
                     label: formatAddress(a),
@@ -601,9 +638,9 @@ export default function PurchaseOrderFormPage() {
               )}
             />
             <FieldError msg={errors.delivery_address?.message} />
-            {watchedVendor && !deliveryLoading && deliveryAddresses.length === 0 && (
+            {(watchedBuyer || watchedVendor) && !deliveryLoading && deliveryAddresses.length === 0 && (
               <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-body)", fontSize: 12, color: "#d97706", marginTop: 6 }}>
-                <AlertTriangle size={13} /> This vendor has no delivery addresses. Add one in Organisation master.
+                <AlertTriangle size={13} /> {watchedBuyer ? "This buyer has no delivery addresses." : "This vendor has no delivery addresses."} Add one in Organisation master.
               </p>
             )}
           </div>

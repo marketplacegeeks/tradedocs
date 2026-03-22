@@ -34,6 +34,8 @@ export interface PurchaseOrder {
   customer_no: string;
   vendor: number;
   vendor_name: string;
+  buyer: number | null;
+  buyer_name: string | null;
   internal_contact: number;
   internal_contact_name: string;
   internal_contact_phone: string;
@@ -65,6 +67,7 @@ export interface PurchaseOrderCreatePayload {
   po_date: string;
   customer_no?: string;
   vendor: number;
+  buyer?: number | null;
   internal_contact: number;
   delivery_address: number;
   bank?: number | null;

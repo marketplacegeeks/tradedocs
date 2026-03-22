@@ -103,6 +103,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     # Human-readable name fields for FK display
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    buyer_name = serializers.CharField(source="buyer.name", allow_null=True, read_only=True)
     currency_code = serializers.CharField(source="currency.code", read_only=True)
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
     internal_contact_name = serializers.CharField(source="internal_contact.get_full_name", read_only=True)
@@ -121,6 +122,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "customer_no",
             "vendor",
             "vendor_name",
+            "buyer",
+            "buyer_name",
             "internal_contact",
             "internal_contact_name",
             "internal_contact_phone",
@@ -194,18 +197,23 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
 
-        # Validate delivery_address belongs to the vendor and is of type DELIVERY
+        # Validate delivery_address belongs to the buyer (if set) or the vendor, and is DELIVERY type
         vendor = attrs.get("vendor", getattr(self.instance, "vendor", None))
+        buyer = attrs.get("buyer", getattr(self.instance, "buyer", None))
         delivery_address = attrs.get("delivery_address", getattr(self.instance, "delivery_address", None))
 
-        if delivery_address and vendor:
-            if delivery_address.organisation_id != vendor.pk:
-                raise serializers.ValidationError(
-                    {"delivery_address": "Delivery address must belong to the selected vendor."}
-                )
+        if delivery_address:
             if delivery_address.address_type != "DELIVERY":
                 raise serializers.ValidationError(
                     {"delivery_address": "Selected address must be a Delivery address type."}
+                )
+            # When a buyer is selected, delivery address must belong to the buyer.
+            # Otherwise it must belong to the vendor.
+            owner = buyer if buyer else vendor
+            if owner and delivery_address.organisation_id != owner.pk:
+                owner_label = "buyer" if buyer else "vendor"
+                raise serializers.ValidationError(
+                    {"delivery_address": f"Delivery address must belong to the selected {owner_label}."}
                 )
 
         # Default po_date to today if not provided on creation

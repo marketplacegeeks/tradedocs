@@ -51,7 +51,16 @@ class PurchaseOrder(models.Model):
         related_name="purchase_orders_as_contact",
     )
 
-    # Delivery address — must belong to the vendor and have address_type=DELIVERY
+    # Optional buyer organisation — tagged as BUYER
+    buyer = models.ForeignKey(
+        "master_data.Organisation",
+        on_delete=models.PROTECT,
+        related_name="purchase_orders_as_buyer",
+        null=True,
+        blank=True,
+    )
+
+    # Delivery address — belongs to the buyer (when set) or the vendor
     delivery_address = models.ForeignKey(
         "master_data.OrganisationAddress",
         on_delete=models.PROTECT,
