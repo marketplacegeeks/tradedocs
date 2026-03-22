@@ -1027,9 +1027,10 @@ class TestCurrencyEndpoints:
     # Test 27: A Checker can create a currency.
     def test_checker_can_create_currency(self):
         client = auth_client(CheckerFactory())
-        response = client.post(reverse("currency-list"), {"code": "USD", "name": "US Dollar"})
+        # Use a non-seeded code so there is no conflict with seed data.
+        response = client.post(reverse("currency-list"), {"code": "XTS", "name": "Test Currency"})
         assert response.status_code == 201
-        assert response.data["code"] == "USD"
+        assert response.data["code"] == "XTS"
 
     # Test 28: An unauthenticated request is rejected.
     def test_unauthenticated_cannot_list_currencies(self):
@@ -1039,7 +1040,8 @@ class TestCurrencyEndpoints:
 
     def test_company_admin_can_create_currency(self):
         client = auth_client(CompanyAdminFactory())
-        response = client.post(reverse("currency-list"), {"code": "EUR", "name": "Euro"})
+        # Use a non-seeded code so there is no conflict with seed data.
+        response = client.post(reverse("currency-list"), {"code": "XXX", "name": "No Currency"})
         assert response.status_code == 201
 
     def test_checker_can_patch_currency(self):
@@ -1053,9 +1055,8 @@ class TestCurrencyEndpoints:
         assert response.data["name"] == "United States Dollar"
 
     def test_delete_currency_does_not_hard_delete_record(self):
-        """CurrencyViewSet inherits ReferenceDataViewSet.destroy which sets instance.is_active = False.
-        Currency has no is_active field so the attribute is set in memory but not persisted.
-        The row must NOT be removed from the database — the response is still 204."""
+        """CurrencyViewSet inherits ReferenceDataViewSet.destroy which sets is_active=False (soft-delete).
+        The row must NOT be removed from the database — the response is 204."""
         from apps.master_data.models import Currency as CurrencyModel
         currency = CurrencyFactory()
         currency_id = currency.id

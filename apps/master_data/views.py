@@ -95,10 +95,6 @@ class CurrencyViewSet(ReferenceDataViewSet):
     queryset = Currency.objects.all()
     serializer_class = CurrencySerializer
 
-    def get_queryset(self):
-        # Currency has no is_active field — return all records, bypassing the base filter.
-        return Currency.objects.all()
-
 
 class BankViewSet(viewsets.ModelViewSet):
     """

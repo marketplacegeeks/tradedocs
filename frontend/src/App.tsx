@@ -21,6 +21,12 @@ import PackingListCreatePage from "./pages/packing-list/PackingListCreatePage";
 import PackingListDetailPage from "./pages/packing-list/PackingListDetailPage";
 import PackingListEditPage from "./pages/packing-list/PackingListEditPage";
 
+import PurchaseOrderListPage from "./pages/purchase-order/PurchaseOrderListPage";
+import PurchaseOrderFormPage from "./pages/purchase-order/PurchaseOrderFormPage";
+import PurchaseOrderDetailPage from "./pages/purchase-order/PurchaseOrderDetailPage";
+
+import ReportsPage from "./pages/reports/ReportsPage";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import { ROLES } from "./utils/constants";
@@ -156,12 +162,28 @@ export default function App() {
           }
         />
 
+        {/* Purchase Orders — all roles */}
+        <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
+        <Route path="/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+        <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+        <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
+
         {/* User Management — Company Admin only */}
         <Route
           path="/users"
           element={
             <ProtectedRoute allowedRoles={[ROLES.COMPANY_ADMIN]}>
               <UserListPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Reports — Checker and Company Admin only */}
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+              <ReportsPage />
             </ProtectedRoute>
           }
         />

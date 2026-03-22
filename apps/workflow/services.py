@@ -17,6 +17,7 @@ from .constants import (
     COMMENT_REQUIRED_ACTIONS,
     PI_TRANSITIONS,
     PLCI_TRANSITIONS,
+    PO_TRANSITIONS,
     PERMANENTLY_REJECTED,
     SUBMIT,
 )
@@ -216,6 +217,8 @@ class WorkflowService:
             return PI_TRANSITIONS
         if document_type in ("packing_list", "commercial_invoice"):
             return PLCI_TRANSITIONS
+        if document_type == "purchase_order":
+            return PO_TRANSITIONS
         raise ValueError(f"Unknown document type: '{document_type}'.")
 
     @staticmethod
@@ -227,6 +230,8 @@ class WorkflowService:
             return document.pl_number
         if document_type == "commercial_invoice":
             return document.ci_number
+        if document_type == "purchase_order":
+            return document.po_number
         return str(document.pk)
 
     @staticmethod

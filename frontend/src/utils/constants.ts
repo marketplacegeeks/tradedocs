@@ -41,6 +41,7 @@ export const ADDRESS_TYPES = {
   REGISTERED: "REGISTERED",
   FACTORY: "FACTORY",
   OFFICE: "OFFICE",
+  DELIVERY: "DELIVERY",
 } as const;
 
 export type AddressType = (typeof ADDRESS_TYPES)[keyof typeof ADDRESS_TYPES];
@@ -49,6 +50,7 @@ export const ADDRESS_TYPE_LABELS: Record<AddressType, string> = {
   REGISTERED: "Registered",
   FACTORY: "Factory",
   OFFICE: "Corporate Office",
+  DELIVERY: "Delivery",
 };
 
 export const ACCOUNT_TYPES = {
@@ -143,6 +145,21 @@ export const COUNTRY_DIAL_CODES: Record<string, string> = {
   TT: "+1-868", TN: "+216", TR: "+90", TM: "+993", TV: "+688", UG: "+256",
   UA: "+380", AE: "+971", GB: "+44", US: "+1", UY: "+598", UZ: "+998",
   VU: "+678", VE: "+58", VN: "+84", YE: "+967", ZM: "+260", ZW: "+263",
+};
+
+// Purchase Order transaction types (FR-PO-06)
+export const TRANSACTION_TYPES = {
+  IGST: "IGST",
+  CGST_SGST: "CGST_SGST",
+  ZERO_RATED: "ZERO_RATED",
+} as const;
+
+export type TransactionType = (typeof TRANSACTION_TYPES)[keyof typeof TRANSACTION_TYPES];
+
+export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
+  IGST: "Inter State Transaction (IGST)",
+  CGST_SGST: "Same State Transaction (CGST+SGST)",
+  ZERO_RATED: "Procurement for Export (Zero-Rated)",
 };
 
 // Human-readable labels for PI cost breakdown fields

@@ -1,8 +1,9 @@
 // Bank accounts list page — design system table layout.
 
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { message } from "antd";
 
 import { listBanks, deactivateBank } from "../../api/banks";
@@ -17,16 +18,78 @@ const ACCOUNT_TYPE_CHIP: Record<string, string> = {
   CHECKING: "chip-purple",
 };
 
+type SortKey = "nickname" | "bank_name" | "currency_code";
+type SortDir = "asc" | "desc" | null;
+type SortConfig = { key: SortKey; dir: SortDir } | null;
+
 export default function BankListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+
   const { data: banks = [], isLoading } = useQuery({
     queryKey: ["banks"],
     queryFn: listBanks,
   });
+
+  // Filter by nickname or bank name, then sort
+  const displayed = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = q
+      ? banks.filter(
+          (b: Bank) =>
+            b.nickname.toLowerCase().includes(q) ||
+            b.bank_name.toLowerCase().includes(q)
+        )
+      : banks;
+    if (sortConfig?.dir) {
+      rows = [...rows].sort((a, b) => {
+        const av = String(a[sortConfig.key] ?? "").toLowerCase();
+        const bv = String(b[sortConfig.key] ?? "").toLowerCase();
+        return sortConfig.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    }
+    return rows;
+  }, [banks, searchQuery, sortConfig]);
+
+  // Cycle: null → asc → desc → null
+  function toggleSort(key: SortKey) {
+    setSortConfig((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+  }
+
+  function sortIcon(key: SortKey) {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ChevronsUpDown size={12} strokeWidth={1.5} color="var(--text-muted)" />;
+    }
+    return sortConfig.dir === "asc"
+      ? <ChevronUp size={12} strokeWidth={2} color="var(--primary)" />
+      : <ChevronDown size={12} strokeWidth={2} color="var(--primary)" />;
+  }
+
+  function sortHeaderStyle(key: SortKey): React.CSSProperties {
+    return {
+      padding: "12px 16px",
+      textAlign: "left",
+      fontFamily: "var(--font-body)",
+      fontSize: 11,
+      fontWeight: 600,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      color: sortConfig?.key === key ? "var(--primary)" : "var(--text-muted)",
+      borderBottom: "1px solid var(--border-light)",
+      whiteSpace: "nowrap",
+      cursor: "pointer",
+      userSelect: "none",
+    };
+  }
 
   const deactivateMutation = useMutation({
     mutationFn: (id: number) => deactivateBank(id),
@@ -44,6 +107,10 @@ export default function BankListPage() {
       deactivateMutation.mutate(bank.id);
     }
   }
+
+  const countLabel = searchQuery.trim()
+    ? `${displayed.length} of ${banks.length} account${banks.length !== 1 ? "s" : ""}`
+    : `${banks.length} account${banks.length !== 1 ? "s" : ""} registered`;
 
   return (
     <div>
@@ -72,7 +139,7 @@ export default function BankListPage() {
             Bank Accounts
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {banks.length} account{banks.length !== 1 ? "s" : ""} registered
+            {countLabel}
           </p>
         </div>
         {canWrite && (
@@ -105,6 +172,42 @@ export default function BankListPage() {
         )}
       </div>
 
+      {/* Search bar */}
+      <div style={{ position: "relative", marginBottom: 16 }}>
+        <Search
+          size={15}
+          strokeWidth={1.5}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by nickname or bank name…"
+          style={{
+            width: "100%",
+            padding: "9px 14px 9px 36px",
+            background: "var(--bg-input)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            color: "var(--text-primary)",
+            outline: "none",
+            boxSizing: "border-box",
+            transition: "border-color 0.15s ease",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-medium)")}
+        />
+      </div>
+
       {/* Table card */}
       <div
         style={{
@@ -119,7 +222,7 @@ export default function BankListPage() {
           <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-body)" }}>
             Loading…
           </div>
-        ) : banks.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div
             style={{
               display: "flex",
@@ -130,10 +233,14 @@ export default function BankListPage() {
             }}
           >
             <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-              No bank accounts yet
+              {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : "No bank accounts yet"}
             </p>
             <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-              {canWrite ? "Click \"New Bank Account\" to add one." : "No bank accounts have been added."}
+              {searchQuery.trim()
+                ? "Try a different search term."
+                : canWrite
+                ? 'Click "New Bank Account" to add one.'
+                : "No bank accounts have been added."}
             </p>
           </div>
         ) : (
@@ -141,7 +248,41 @@ export default function BankListPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
               <thead>
                 <tr style={{ background: "var(--bg-base)" }}>
-                  {["Nickname", "Bank Name", "Account Number", "Type", "Currency", "Country", "SWIFT"].map((h) => (
+                  <th onClick={() => toggleSort("nickname")} style={sortHeaderStyle("nickname")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Nickname {sortIcon("nickname")}
+                    </div>
+                  </th>
+                  <th onClick={() => toggleSort("bank_name")} style={sortHeaderStyle("bank_name")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Bank Name {sortIcon("bank_name")}
+                    </div>
+                  </th>
+                  {["Account Number", "Type"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "12px 16px",
+                        textAlign: "left",
+                        fontFamily: "var(--font-body)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "var(--text-muted)",
+                        borderBottom: "1px solid var(--border-light)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                  <th onClick={() => toggleSort("currency_code")} style={sortHeaderStyle("currency_code")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Currency {sortIcon("currency_code")}
+                    </div>
+                  </th>
+                  {["Country", "SWIFT"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -166,7 +307,7 @@ export default function BankListPage() {
                 </tr>
               </thead>
               <tbody>
-                {banks.map((bank: Bank) => (
+                {displayed.map((bank: Bank) => (
                   <tr
                     key={bank.id}
                     style={{ cursor: "default" }}

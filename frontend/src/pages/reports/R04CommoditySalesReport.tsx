@@ -225,14 +225,16 @@ export default function R04CommoditySalesReport({ selectedReport }: Props) {
       title: "Consignee",
       dataIndex: "consignee_name",
       key: "consignee_name",
-      width: 160,
+      width: 180,
+      ellipsis: true,
       render: (val: string | null) => val ?? "—",
     },
     {
       title: "Country of Destination",
       dataIndex: "country_of_destination",
       key: "country_of_destination",
-      width: 175,
+      width: 185,
+      ellipsis: true,
       render: (val: string | null) => val ?? "—",
     },
     {
@@ -314,7 +316,8 @@ export default function R04CommoditySalesReport({ selectedReport }: Props) {
       title: "Port of Loading",
       dataIndex: "port_of_loading_name",
       key: "port_of_loading_name",
-      width: 150,
+      width: 160,
+      ellipsis: true,
       render: (val: string | null) => val ?? "—",
     },
     {

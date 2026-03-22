@@ -641,7 +641,7 @@ class TestPdfDownload:
         assert f"{pi.pi_number}.pdf" in resp["Content-Disposition"]
 
     def test_draft_pdf_contains_watermark(self):
-        """Draft PI → watermark transparency ExtGState (/ca .05) is present
+        """Draft PI → watermark transparency ExtGState (/ca .15) is present
         in the uncompressed page resources dictionary (FR-08.3)."""
         pi = ProformaInvoiceFactory(status=DRAFT)
         resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
@@ -649,7 +649,7 @@ class TestPdfDownload:
         body = b"".join(resp.streaming_content)
         # ReportLab writes the alpha value into the page resource dict as an
         # uncompressed ExtGState entry — reliably detectable in raw PDF bytes.
-        assert b"/ca .05" in body
+        assert b"/ca .15" in body
 
     def test_approved_pdf_has_no_watermark(self):
         """Approved PI → clean PDF; watermark ExtGState must be absent (FR-08.3)."""
@@ -657,7 +657,7 @@ class TestPdfDownload:
         resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
-        assert b"/ca .05" not in body
+        assert b"/ca .15" not in body
 
     def test_pdf_downloadable_for_pending_approval_status(self):
         """PDF is accessible at every workflow stage, not just DRAFT (US-05)."""
@@ -1483,7 +1483,7 @@ class TestPdfContentSpotChecks:
         resp = auth_client(MakerFactory()).get(pi_pdf_url(pi.pk))
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
-        assert b"/ca .05" in body
+        assert b"/ca .15" in body
 
     def test_pending_approval_pdf_has_draft_watermark(self):
         """FR-08.3: PENDING_APPROVAL PDF also carries the DRAFT watermark."""
@@ -1491,7 +1491,7 @@ class TestPdfContentSpotChecks:
         resp = auth_client(CheckerFactory()).get(pi_pdf_url(pi.pk))
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
-        assert b"/ca .05" in body
+        assert b"/ca .15" in body
 
     def test_company_admin_can_download_pdf_at_any_status(self):
         """Company Admin is an authorised role for PDF download at every status."""

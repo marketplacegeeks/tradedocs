@@ -117,6 +117,13 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     # Returns the full URL to the signed copy file, or null if none uploaded.
     signed_copy_url = serializers.SerializerMethodField()
 
+    # Country name helpers (IDs are already returned; names needed for the R-02 report)
+    country_of_origin_name = serializers.SerializerMethodField()
+    country_of_final_destination_name = serializers.SerializerMethodField()
+
+    # PL number linked to this PI (null if no PL has been created from it yet)
+    linked_pl_number = serializers.SerializerMethodField()
+
     class Meta:
         model = ProformaInvoice
         extra_kwargs = {
@@ -156,6 +163,10 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "status", "created_by", "created_by_name", "created_at", "updated_at",
             # Signed copy (FR-08.4)
             "signed_copy_url",
+            # Country names (for R-02 report display)
+            "country_of_origin_name", "country_of_final_destination_name",
+            # Linked PL number (for R-02 report)
+            "linked_pl_number",
         ]
         read_only_fields = [
             "id", "pi_number", "status",
@@ -167,6 +178,8 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "payment_terms_name", "port_of_loading_name", "port_of_discharge_name",
             "place_of_receipt_name", "place_of_receipt_by_pre_carrier_name",
             "signed_copy_url",
+            "country_of_origin_name", "country_of_final_destination_name",
+            "linked_pl_number",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -334,6 +347,18 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
 
     def get_place_of_receipt_by_pre_carrier_name(self, obj):
         return obj.place_of_receipt_by_pre_carrier.name if obj.place_of_receipt_by_pre_carrier else None
+
+    def get_country_of_origin_name(self, obj):
+        return obj.country_of_origin.name if obj.country_of_origin else None
+
+    def get_country_of_final_destination_name(self, obj):
+        return obj.country_of_final_destination.name if obj.country_of_final_destination else None
+
+    def get_linked_pl_number(self, obj):
+        """Return the PL number of the first packing list created from this PI, or None."""
+        from apps.packing_list.models import PackingList
+        pl = PackingList.objects.filter(proforma_invoice=obj).values_list("pl_number", flat=True).first()
+        return pl
 
 
 # ---- Audit log serializer (read-only) -------------------------------------

@@ -64,6 +64,11 @@ export interface ProformaInvoice {
   charges_total: string;
   grand_total: string;
   invoice_total: string;
+  // Country name helpers (for R-02 report)
+  country_of_origin_name: string | null;
+  country_of_final_destination_name: string | null;
+  // Linked PL number (for R-02 report)
+  linked_pl_number: string | null;
   line_items: ProformaInvoiceLineItem[];
   charges: ProformaInvoiceCharge[];
   status: string;

@@ -102,6 +102,10 @@ class PackingListSerializer(serializers.ModelSerializer):
     freight = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
     lc_details = serializers.SerializerMethodField()
+    # R-03 report computed fields
+    ci_total = serializers.SerializerMethodField()
+    fob_value = serializers.SerializerMethodField()
+    incoterms_code = serializers.SerializerMethodField()
 
     # Display labels for FK fields
     exporter_name = serializers.SerializerMethodField()
@@ -154,6 +158,8 @@ class PackingListSerializer(serializers.ModelSerializer):
             "ci_id", "ci_number", "ci_status", "ci_date",
             "bank_id", "bank_display",
             "fob_rate", "freight", "insurance", "lc_details",
+            # R-03 report computed fields
+            "ci_total", "fob_value", "incoterms_code",
             # Shipping display names
             "pre_carriage_by_name",
             "place_of_receipt_name",
@@ -286,6 +292,36 @@ class PackingListSerializer(serializers.ModelSerializer):
 
     def get_country_of_final_destination_name(self, obj):
         return obj.country_of_final_destination.name if obj.country_of_final_destination_id else None
+
+    def get_incoterms_code(self, obj):
+        return obj.incoterms.code if obj.incoterms_id else None
+
+    def get_ci_total(self, obj):
+        """Sum of all CI line item amounts. Used by the R-03 Shipment Register report."""
+        ci = self._get_ci(obj)
+        if not ci:
+            return None
+        total = sum(
+            (item.amount_usd for item in ci.line_items.all()),
+            Decimal("0.00"),
+        )
+        return str(total)
+
+    def get_fob_value(self, obj):
+        """
+        FOB Value = fob_rate × sum of CI line item total_quantity.
+        Returns None if no CI, no fob_rate, or incoterm is EXW (no FOB value applies).
+        """
+        ci = self._get_ci(obj)
+        if not ci or ci.fob_rate is None:
+            return None
+        if obj.incoterms_id and obj.incoterms.code == "EXW":
+            return None
+        total_qty = sum(
+            (item.total_quantity for item in ci.line_items.all()),
+            Decimal("0.000"),
+        )
+        return str((ci.fob_rate * total_qty).quantize(Decimal("0.01")))
 
 
 class PackingListWriteSerializer(serializers.ModelSerializer):

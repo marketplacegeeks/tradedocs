@@ -90,6 +90,10 @@ export interface PackingList {
   freight: string | null;
   insurance: string | null;
   lc_details: string;
+  // R-03 report computed fields
+  ci_total: string | null;
+  fob_value: string | null;
+  incoterms_code: string | null;
   // Meta
   created_by: number;
   created_by_name: string;

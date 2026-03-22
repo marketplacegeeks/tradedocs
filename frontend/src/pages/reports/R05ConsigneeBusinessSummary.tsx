@@ -178,6 +178,7 @@ export default function R05ConsigneeBusinessSummary({ selectedReport }: Props) {
       key: "consignee_name",
       fixed: "left" as const,
       width: 220,
+      ellipsis: true,
       sorter: (a: ConsigneeSummaryRow, b: ConsigneeSummaryRow) =>
         a.consignee_name.localeCompare(b.consignee_name),
       render: (val: string) => (

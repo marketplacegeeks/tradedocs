@@ -6,6 +6,7 @@ Constraint #19: List endpoints support filtering by status and created_by via dj
 Constraint #20: PDF is streamed directly; never written to disk.
 """
 
+import django_filters
 from django.http import FileResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -32,6 +33,30 @@ from .serializers import (
 )
 
 
+# ---- Filterset for the R-02 report -----------------------------------------
+
+class ProformaInvoiceFilterSet(django_filters.FilterSet):
+    """
+    Extends the base status/created_by filters with the full set required by the
+    R-02 Proforma Invoice Register report: date range, exporter, consignee,
+    country of final destination, incoterms, and payment terms.
+    """
+    pi_date_after = django_filters.DateFilter(field_name="pi_date", lookup_expr="gte")
+    pi_date_before = django_filters.DateFilter(field_name="pi_date", lookup_expr="lte")
+
+    class Meta:
+        model = ProformaInvoice
+        fields = [
+            "status",
+            "created_by",
+            "exporter",
+            "consignee",
+            "country_of_final_destination",
+            "incoterms",
+            "payment_terms",
+        ]
+
+
 # ---- Proforma Invoice viewset -----------------------------------------------
 
 class ProformaInvoiceViewSet(viewsets.ModelViewSet):
@@ -47,8 +72,7 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAnyRole]
     serializer_class = ProformaInvoiceSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    # Constraint #19: filter by status and created_by at minimum
-    filterset_fields = ["status", "created_by"]
+    filterset_class = ProformaInvoiceFilterSet
     ordering_fields = ["created_at", "pi_date", "pi_number"]
     ordering = ["-created_at"]
 

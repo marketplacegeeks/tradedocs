@@ -178,3 +178,37 @@ class TestUserDetailView:
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
         response = api_client.patch(reverse("user-detail", kwargs={"pk": admin.pk}), {"is_active": False})
         assert response.status_code == 400
+
+    def test_admin_can_set_phone_on_user(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(
+            reverse("user-detail", kwargs={"pk": maker.pk}),
+            {"phone_country_code": "+91", "phone_number": "9876543210"},
+        )
+        assert response.status_code == 200
+        assert response.data["phone_country_code"] == "+91"
+        assert response.data["phone_number"] == "9876543210"
+
+    def test_phone_requires_both_fields(self, api_client):
+        # Providing only country code without a number should return 400.
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.patch(
+            reverse("user-detail", kwargs={"pk": maker.pk}),
+            {"phone_country_code": "+91"},
+        )
+        assert response.status_code == 400
+
+    def test_me_endpoint_includes_phone_fields(self, api_client):
+        maker = MakerFactory(phone_country_code="+44", phone_number="7911123456")
+        tokens = get_tokens(api_client, maker.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.get(reverse("auth-me"))
+        assert response.status_code == 200
+        assert response.data["phone_country_code"] == "+44"
+        assert response.data["phone_number"] == "7911123456"

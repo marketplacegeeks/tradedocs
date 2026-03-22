@@ -153,12 +153,13 @@ class TCTemplate(models.Model):
 # ---------------------------------------------------------------------------
 
 class Currency(models.Model):
-    """ISO 4217 currency. Referenced by Bank accounts."""
+    """ISO 4217 currency. Referenced by Bank accounts and Purchase Orders."""
     code = models.CharField(
         max_length=3, unique=True,
         help_text="ISO 4217 currency code, e.g. USD, AED, INR"
     )
     name = models.CharField(max_length=100, help_text="e.g. US Dollar")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "master_data_currency"
@@ -357,6 +358,7 @@ class OrganisationAddress(models.Model):
         REGISTERED = "REGISTERED", "Registered"
         FACTORY = "FACTORY", "Factory"
         OFFICE = "OFFICE", "Office"
+        DELIVERY = "DELIVERY", "Delivery"
 
     # CASCADE: addresses belong to the organisation; they go away if the org is removed.
     organisation = models.ForeignKey(
@@ -398,9 +400,12 @@ class OrganisationAddress(models.Model):
         db_table = "master_data_organisation_address"
         ordering = ["address_type"]
         constraints = [
+            # REGISTERED, FACTORY, and OFFICE may only appear once per organisation.
+            # DELIVERY is excluded from this constraint — multiple delivery addresses are allowed.
             models.UniqueConstraint(
                 fields=["organisation", "address_type"],
-                name="unique_address_type_per_organisation",
+                condition=~models.Q(address_type="DELIVERY"),
+                name="unique_non_delivery_address_type_per_organisation",
             )
         ]
 

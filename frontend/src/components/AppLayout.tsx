@@ -8,7 +8,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
   FileText, Package, Database, Users, BarChart2,
-  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft,
+  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag,
 } from "lucide-react";
 
 import { useAuth } from "../store/AuthContext";
@@ -28,6 +28,12 @@ const NAV_ITEMS = [
     key: "/packing-lists",
     icon: Package,
     label: "P.List & C. Invoice",
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+  },
+  {
+    key: "/purchase-orders",
+    icon: ShoppingBag,
+    label: "Purchase Order",
     roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
   },
   {

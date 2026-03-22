@@ -11,6 +11,8 @@ class UserFactory(factory.django.DjangoModelFactory):
     last_name = factory.Faker("last_name")
     role = UserRole.MAKER
     is_active = True
+    phone_country_code = ""
+    phone_number = ""
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):
