@@ -5,6 +5,7 @@ Constraint #10: All views explicitly declare permission_classes.
 Constraint #11 / #12: workflow transitions go through WorkflowService only.
 """
 
+import django_filters
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -28,6 +29,29 @@ from .serializers import (
 )
 
 
+# ---- Filterset for the R-03 report -----------------------------------------
+
+class PackingListFilterSet(django_filters.FilterSet):
+    """
+    Extends the base status/created_by filters with the full set required by the
+    R-03 Shipment Register report.
+    """
+    pl_date_after = django_filters.DateFilter(field_name="pl_date", lookup_expr="gte")
+    pl_date_before = django_filters.DateFilter(field_name="pl_date", lookup_expr="lte")
+
+    class Meta:
+        model = PackingList
+        fields = [
+            "status",
+            "created_by",
+            "consignee",
+            "port_of_loading",
+            "port_of_discharge",
+            "incoterms",
+            "payment_terms",
+        ]
+
+
 # ---- PackingList viewset ----------------------------------------------------
 
 class PackingListViewSet(viewsets.ModelViewSet):
@@ -45,7 +69,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsAnyRole]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ["status", "created_by"]
+    filterset_class = PackingListFilterSet
     ordering_fields = ["created_at", "pl_date", "pl_number"]
     ordering = ["-created_at"]
 
@@ -64,6 +88,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
             )
             .prefetch_related(
                 "containers__items__uom",
+                "commercial_invoice__line_items",
             )
             .all()
         )

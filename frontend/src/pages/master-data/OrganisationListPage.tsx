@@ -1,9 +1,10 @@
 // Organisation list page — design system table layout.
 // Checker and Company Admin can create / deactivate. Makers can only view.
 
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { message } from "antd";
 
 import { listOrganisations, updateOrganisation } from "../../api/organisations";
@@ -21,16 +22,41 @@ const TAG_CHIP: Record<string, string> = {
   VENDOR: "chip-yellow",
 };
 
+type SortDir = "asc" | "desc" | null;
+
 export default function OrganisationListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>(null);
+
   const { data: organisations = [], isLoading } = useQuery({
     queryKey: ["organisations"],
     queryFn: () => listOrganisations(),
   });
+
+  // Filter by name, then sort
+  const displayed = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = q
+      ? organisations.filter((o: Organisation) => o.name.toLowerCase().includes(q))
+      : organisations;
+    if (sortDir) {
+      rows = [...rows].sort((a, b) =>
+        sortDir === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name)
+      );
+    }
+    return rows;
+  }, [organisations, searchQuery, sortDir]);
+
+  function toggleSort() {
+    setSortDir((prev) => (prev === null ? "asc" : prev === "asc" ? "desc" : null));
+  }
 
   const deactivateMutation = useMutation({
     mutationFn: (id: number) => updateOrganisation(id, { is_active: false }),
@@ -48,6 +74,10 @@ export default function OrganisationListPage() {
       deactivateMutation.mutate(org.id);
     }
   }
+
+  const countLabel = searchQuery.trim()
+    ? `${displayed.length} of ${organisations.length} organisation${organisations.length !== 1 ? "s" : ""}`
+    : `${organisations.length} organisation${organisations.length !== 1 ? "s" : ""} registered`;
 
   return (
     <div>
@@ -76,7 +106,7 @@ export default function OrganisationListPage() {
             Organisations
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {organisations.length} organisation{organisations.length !== 1 ? "s" : ""} registered
+            {countLabel}
           </p>
         </div>
         {canWrite && (
@@ -109,6 +139,42 @@ export default function OrganisationListPage() {
         )}
       </div>
 
+      {/* Search bar */}
+      <div style={{ position: "relative", marginBottom: 16 }}>
+        <Search
+          size={15}
+          strokeWidth={1.5}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search organisations…"
+          style={{
+            width: "100%",
+            padding: "9px 14px 9px 36px",
+            background: "var(--bg-input)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            color: "var(--text-primary)",
+            outline: "none",
+            boxSizing: "border-box",
+            transition: "border-color 0.15s ease",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-medium)")}
+        />
+      </div>
+
       {/* Table card */}
       <div
         style={{
@@ -123,7 +189,7 @@ export default function OrganisationListPage() {
           <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-body)" }}>
             Loading…
           </div>
-        ) : organisations.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div
             style={{
               display: "flex",
@@ -134,10 +200,14 @@ export default function OrganisationListPage() {
             }}
           >
             <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-              No organisations yet
+              {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : "No organisations yet"}
             </p>
             <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-              {canWrite ? 'Click "New Organisation" to add one.' : "No organisations have been added."}
+              {searchQuery.trim()
+                ? "Try a different search term."
+                : canWrite
+                ? 'Click "New Organisation" to add one.'
+                : "No organisations have been added."}
             </p>
           </div>
         ) : (
@@ -145,7 +215,36 @@ export default function OrganisationListPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
                 <tr style={{ background: "var(--bg-base)" }}>
-                  {["Name", "Roles", "Addresses"].map((h) => (
+                  {/* Sortable Name column */}
+                  <th
+                    onClick={toggleSort}
+                    style={{
+                      padding: "12px 16px",
+                      textAlign: "left",
+                      fontFamily: "var(--font-body)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: sortDir ? "var(--primary)" : "var(--text-muted)",
+                      borderBottom: "1px solid var(--border-light)",
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Name
+                      {sortDir === "asc" ? (
+                        <ChevronUp size={12} strokeWidth={2} color="var(--primary)" />
+                      ) : sortDir === "desc" ? (
+                        <ChevronDown size={12} strokeWidth={2} color="var(--primary)" />
+                      ) : (
+                        <ChevronsUpDown size={12} strokeWidth={1.5} color="var(--text-muted)" />
+                      )}
+                    </div>
+                  </th>
+                  {["Roles", "Addresses"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -170,7 +269,7 @@ export default function OrganisationListPage() {
                 </tr>
               </thead>
               <tbody>
-                {organisations.map((org: Organisation) => (
+                {displayed.map((org: Organisation) => (
                   <tr
                     key={org.id}
                     style={{ cursor: "default" }}

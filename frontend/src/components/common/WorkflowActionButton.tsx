@@ -13,7 +13,7 @@ interface WorkflowActionButtonProps {
   documentId: number;
   documentStatus: DocumentStatus | string;
   userRole: Role | string;
-  documentType: "proforma_invoice" | "packing_list" | "commercial_invoice";
+  documentType: "proforma_invoice" | "packing_list" | "commercial_invoice" | "purchase_order";
   /** Called after a successful transition with the new status. */
   onSuccess: (newStatus: string) => void;
   /** Must return a promise that posts to the workflow endpoint. */

@@ -35,6 +35,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(max_length=150)
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.MAKER)
 
+    # Phone stored as two fields: dial code (e.g. +91) and local number.
+    # Both are optional overall, but if one is provided the other must be too (enforced in serializer).
+    phone_country_code = models.CharField(
+        max_length=10, blank=True,
+        help_text="E.164 dial code, e.g. +91"
+    )
+    phone_number = models.CharField(max_length=20, blank=True)
+
     # is_active=False is the soft-delete mechanism — never delete user rows
     is_active = models.BooleanField(default=True)
     # is_staff allows access to the Django admin panel

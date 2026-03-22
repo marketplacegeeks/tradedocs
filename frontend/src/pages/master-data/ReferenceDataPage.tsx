@@ -2,10 +2,10 @@
 // Checker and Company Admin can add, edit, and soft-delete records.
 // All authenticated users can view.
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal, Select, message } from "antd";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
 import { useAuth } from "../../store/AuthContext";
 import { extractApiError } from "../../utils/apiErrors";
@@ -28,6 +28,8 @@ import type {
   Location, LocationPayload,
   PreCarriageBy, PreCarriageByPayload,
 } from "../../api/referenceData";
+import { listCurrencies, createCurrency, updateCurrency, deleteCurrency } from "../../api/currencies";
+import type { Currency, CurrencyPayload } from "../../api/currencies";
 
 // ---- Tab definitions --------------------------------------------------------
 
@@ -39,38 +41,95 @@ const TABS = [
   { key: "ports",         label: "Ports" },
   { key: "locations",     label: "Locations" },
   { key: "pre-carriage",  label: "Pre-Carriage By" },
+  { key: "currency",      label: "Currency" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
+type SortDir = "asc" | "desc" | null;
+
+// The primary field to sort by for each tab
+const TAB_SORT_KEY: Record<TabKey, string> = {
+  "countries":     "name",
+  "incoterms":     "code",
+  "uom":           "name",
+  "payment-terms": "name",
+  "ports":         "name",
+  "locations":     "name",
+  "pre-carriage":  "name",
+  "currency":      "code",
+};
+
+// Which fields to search within for each tab
+function matchesSearch(r: Record<string, unknown>, tab: TabKey, q: string): boolean {
+  switch (tab) {
+    case "countries":
+      return ["name", "iso2", "iso3"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    case "incoterms":
+      return ["code", "full_name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    case "uom":
+      return ["name", "abbreviation"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    case "ports":
+      return ["name", "code", "country_name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    case "locations":
+      return ["name", "country_name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    case "currency":
+      return ["code", "name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
+    default:
+      return String(r["name"] ?? "").toLowerCase().includes(q);
+  }
+}
 
 // ---- Shared UI helpers ------------------------------------------------------
 
-function TableHeader({ columns }: { columns: string[] }) {
+const thBaseStyle: React.CSSProperties = {
+  padding: "12px 16px",
+  textAlign: "left",
+  fontFamily: "var(--font-body)",
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: "var(--text-muted)",
+  borderBottom: "1px solid var(--border-light)",
+  whiteSpace: "nowrap",
+};
+
+function StaticTh({ label }: { label: string }) {
+  return <th style={thBaseStyle}>{label}</th>;
+}
+
+function SortableTh({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
   return (
-    <thead>
-      <tr style={{ background: "var(--bg-base)" }}>
-        {columns.map((col) => (
-          <th
-            key={col}
-            style={{
-              padding: "12px 16px",
-              textAlign: "left",
-              fontFamily: "var(--font-body)",
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.06em",
-              color: "var(--text-muted)",
-              borderBottom: "1px solid var(--border-light)",
-              whiteSpace: "nowrap" as const,
-            }}
-          >
-            {col}
-          </th>
-        ))}
-        <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
-      </tr>
-    </thead>
+    <th
+      onClick={onClick}
+      style={{
+        ...thBaseStyle,
+        color: active ? "var(--primary)" : "var(--text-muted)",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        {active && dir === "asc" ? (
+          <ChevronUp size={12} strokeWidth={2} color="var(--primary)" />
+        ) : active && dir === "desc" ? (
+          <ChevronDown size={12} strokeWidth={2} color="var(--primary)" />
+        ) : (
+          <ChevronsUpDown size={12} strokeWidth={1.5} color="var(--text-muted)" />
+        )}
+      </div>
+    </th>
   );
 }
 
@@ -142,7 +201,19 @@ function ActionCell({
   );
 }
 
-function EmptyState({ canWrite, onAdd }: { canWrite: boolean; onAdd: () => void }) {
+function EmptyState({ canWrite, onAdd, searchQuery }: { canWrite: boolean; onAdd: () => void; searchQuery: string }) {
+  if (searchQuery.trim()) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 24px", gap: 12 }}>
+        <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+          No results for "{searchQuery.trim()}"
+        </p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+          Try a different search term.
+        </p>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 24px", gap: 12 }}>
       <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
@@ -222,13 +293,16 @@ export default function ReferenceDataPage() {
   // Generic form state for each tab's add/edit modal
   const [form, setForm] = useState<Record<string, string>>({});
 
+  // Search and sort — both reset when switching tabs
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>(null);
+
   function openAdd() {
     setForm({});
     setModal("add");
   }
 
   function openEdit(record: Record<string, unknown>) {
-    // Seed the form with the record's current values (string-ified for input fields).
     const seed: Record<string, string> = {};
     for (const [k, v] of Object.entries(record)) {
       if (k !== "id" && k !== "is_active" && !k.endsWith("_name")) {
@@ -244,11 +318,22 @@ export default function ReferenceDataPage() {
     setForm({});
   }
 
+  function handleTabChange(tab: TabKey) {
+    setActiveTab(tab);
+    setSearchQuery("");
+    setSortDir(null);
+    closeModal();
+    setDeletingId(null);
+  }
+
+  function toggleSort() {
+    setSortDir((prev) => (prev === null ? "asc" : prev === "asc" ? "desc" : null));
+  }
+
   // ---- Query & mutation helpers (per active tab) ---------------------------
 
   const queryKey = [activeTab];
 
-  // Map tab key → list function
   const listFns: Record<TabKey, () => Promise<unknown[]>> = {
     "countries":     listCountries,
     "incoterms":     listIncoterms,
@@ -257,12 +342,31 @@ export default function ReferenceDataPage() {
     "ports":         listPorts,
     "locations":     listLocations,
     "pre-carriage":  listPreCarriageBy,
+    "currency":      listCurrencies,
   };
 
   const { data: records = [], isLoading } = useQuery({
     queryKey,
     queryFn: listFns[activeTab] as () => Promise<Record<string, unknown>[]>,
   });
+
+  // Filter then sort the fetched records
+  const displayed = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = (records as Record<string, unknown>[]);
+    if (q) {
+      rows = rows.filter((r) => matchesSearch(r, activeTab, q));
+    }
+    if (sortDir) {
+      const key = TAB_SORT_KEY[activeTab];
+      rows = [...rows].sort((a, b) => {
+        const av = String(a[key] ?? "").toLowerCase();
+        const bv = String(b[key] ?? "").toLowerCase();
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    }
+    return rows;
+  }, [records, searchQuery, sortDir, activeTab]);
 
   // Build the payload from form state, parsing country ID to number where needed
   function buildPayload(): Record<string, unknown> {
@@ -275,7 +379,6 @@ export default function ReferenceDataPage() {
     mutationFn: async () => {
       const payload = buildPayload();
       if (modal === "add") {
-        // Create
         if (activeTab === "countries")     return createCountry(payload as CountryPayload);
         if (activeTab === "incoterms")     return createIncoterm(payload as IncotermPayload);
         if (activeTab === "uom")           return createUOM(payload as UOMPayload);
@@ -283,8 +386,8 @@ export default function ReferenceDataPage() {
         if (activeTab === "ports")         return createPort(payload as PortPayload);
         if (activeTab === "locations")     return createLocation(payload as LocationPayload);
         if (activeTab === "pre-carriage")  return createPreCarriageBy(payload as PreCarriageByPayload);
+        if (activeTab === "currency")      return createCurrency(payload as CurrencyPayload);
       } else if (typeof modal === "number") {
-        // Update
         if (activeTab === "countries")     return updateCountry(modal, payload as Partial<CountryPayload>);
         if (activeTab === "incoterms")     return updateIncoterm(modal, payload as Partial<IncotermPayload>);
         if (activeTab === "uom")           return updateUOM(modal, payload as Partial<UOMPayload>);
@@ -292,6 +395,7 @@ export default function ReferenceDataPage() {
         if (activeTab === "ports")         return updatePort(modal, payload as Partial<PortPayload>);
         if (activeTab === "locations")     return updateLocation(modal, payload as Partial<LocationPayload>);
         if (activeTab === "pre-carriage")  return updatePreCarriageBy(modal, payload as Partial<PreCarriageByPayload>);
+        if (activeTab === "currency")      return updateCurrency(modal, payload as Partial<CurrencyPayload>);
       }
     },
     onSuccess: () => {
@@ -313,6 +417,7 @@ export default function ReferenceDataPage() {
       if (activeTab === "ports")         return deletePort(id);
       if (activeTab === "locations")     return deleteLocation(id);
       if (activeTab === "pre-carriage")  return deletePreCarriageBy(id);
+      if (activeTab === "currency")      return deleteCurrency(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -325,7 +430,7 @@ export default function ReferenceDataPage() {
     },
   });
 
-  // ---- Table columns & row renderer per tab --------------------------------
+  // ---- Table renderer per tab -----------------------------------------------
 
   function renderTable() {
     if (isLoading) {
@@ -335,16 +440,26 @@ export default function ReferenceDataPage() {
         </div>
       );
     }
-    if (records.length === 0) return <EmptyState canWrite={canWrite} onAdd={openAdd} />;
 
-    const rows = records as Record<string, unknown>[];
+    if (displayed.length === 0) {
+      return <EmptyState canWrite={canWrite} onAdd={openAdd} searchQuery={searchQuery} />;
+    }
+
+    const rows = displayed;
 
     return (
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 500 }}>
           {activeTab === "countries" && (
             <>
-              <TableHeader columns={["Country", "ISO2", "ISO3"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Country" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="ISO2" />
+                  <StaticTh label="ISO3" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as Country[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -360,7 +475,14 @@ export default function ReferenceDataPage() {
 
           {activeTab === "incoterms" && (
             <>
-              <TableHeader columns={["Code", "Full Name", "Description"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Code" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="Full Name" />
+                  <StaticTh label="Description" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as Incoterm[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -376,7 +498,13 @@ export default function ReferenceDataPage() {
 
           {activeTab === "uom" && (
             <>
-              <TableHeader columns={["Name", "Abbreviation"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Name" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="Abbreviation" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as UOM[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -391,7 +519,13 @@ export default function ReferenceDataPage() {
 
           {activeTab === "payment-terms" && (
             <>
-              <TableHeader columns={["Name", "Description"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Name" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="Description" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as PaymentTerm[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -406,7 +540,14 @@ export default function ReferenceDataPage() {
 
           {activeTab === "ports" && (
             <>
-              <TableHeader columns={["Port Name", "UN/LOCODE", "Country"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Port Name" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="UN/LOCODE" />
+                  <StaticTh label="Country" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as Port[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -422,7 +563,13 @@ export default function ReferenceDataPage() {
 
           {activeTab === "locations" && (
             <>
-              <TableHeader columns={["Location Name", "Country"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Location Name" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="Country" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as Location[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
@@ -437,10 +584,36 @@ export default function ReferenceDataPage() {
 
           {activeTab === "pre-carriage" && (
             <>
-              <TableHeader columns={["Carrier / Mode"]} />
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Carrier / Mode" active={true} dir={sortDir} onClick={toggleSort} />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
               <tbody>
                 {(rows as PreCarriageBy[]).map((r) => (
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
+                    <td style={tdStyle}>{r.name}</td>
+                    <ActionCell canWrite={canWrite} onEdit={() => openEdit(r as unknown as Record<string, unknown>)} onDelete={() => setDeletingId(r.id)} />
+                  </tr>
+                ))}
+              </tbody>
+            </>
+          )}
+
+          {activeTab === "currency" && (
+            <>
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Code" active={true} dir={sortDir} onClick={toggleSort} />
+                  <StaticTh label="Currency Name" />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
+              <tbody>
+                {(rows as Currency[]).map((r) => (
+                  <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
+                    <td style={tdStyle}><span className="chip chip-blue">{r.code}</span></td>
                     <td style={tdStyle}>{r.name}</td>
                     <ActionCell canWrite={canWrite} onEdit={() => openEdit(r as unknown as Record<string, unknown>)} onDelete={() => setDeletingId(r.id)} />
                   </tr>
@@ -455,7 +628,6 @@ export default function ReferenceDataPage() {
 
   // ---- Modal form fields per tab ------------------------------------------
 
-  // Countries available for Port/Location dropdowns
   const { data: allCountries = [] } = useQuery({
     queryKey: ["countries"],
     queryFn: listCountries,
@@ -541,11 +713,22 @@ export default function ReferenceDataPage() {
             <TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Truck, Rail, Feeder Vessel" />
           </div>
         );
+      case "currency":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 8 }}>
+            <div>{fieldLabel("Currency Name")}<TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. US Dollar" /></div>
+            <div>{fieldLabel("Currency Code")}<TextInput value={form.code ?? ""} onChange={(v) => setForm((f) => ({ ...f, code: v.toUpperCase() }))} placeholder="e.g. USD" /></div>
+          </div>
+        );
     }
   }
 
   const tabLabel = TABS.find((t) => t.key === activeTab)?.label ?? "";
   const isAdding = modal === "add";
+  const totalCount = (records as Record<string, unknown>[]).length;
+  const countLabel = searchQuery.trim()
+    ? `${displayed.length} of ${totalCount} record${totalCount !== 1 ? "s" : ""}`
+    : undefined;
 
   return (
     <div>
@@ -565,7 +748,7 @@ export default function ReferenceDataPage() {
             Reference Data
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            Lookup values used across all trade documents
+            {countLabel ?? "Lookup values used across all trade documents"}
           </p>
         </div>
         {canWrite && (
@@ -591,7 +774,7 @@ export default function ReferenceDataPage() {
         style={{
           display: "flex",
           gap: 2,
-          marginBottom: 20,
+          marginBottom: 16,
           borderBottom: "1px solid var(--border-light)",
           overflowX: "auto",
         }}
@@ -599,11 +782,7 @@ export default function ReferenceDataPage() {
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => {
-              setActiveTab(tab.key);
-              closeModal();
-              setDeletingId(null);
-            }}
+            onClick={() => handleTabChange(tab.key)}
             style={{
               padding: "9px 16px",
               border: "none",
@@ -622,6 +801,42 @@ export default function ReferenceDataPage() {
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Search bar — resets on tab switch */}
+      <div style={{ position: "relative", marginBottom: 16 }}>
+        <Search
+          size={15}
+          strokeWidth={1.5}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={`Search ${tabLabel.toLowerCase()}…`}
+          style={{
+            width: "100%",
+            padding: "9px 14px 9px 36px",
+            background: "var(--bg-input)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            color: "var(--text-primary)",
+            outline: "none",
+            boxSizing: "border-box",
+            transition: "border-color 0.15s ease",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-medium)")}
+        />
       </div>
 
       {/* Table card */}

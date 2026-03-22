@@ -182,9 +182,11 @@ class TestCurrencyModel:
         assert str(currency) == "USD – US Dollar"
 
     def test_code_must_be_unique(self):
-        CurrencyFactory(code="USD")
+        # Use objects.create (not the factory) to bypass get_or_create and verify the DB constraint.
+        from apps.master_data.models import Currency as CurrencyModel
+        CurrencyModel.objects.create(code="XTS", name="Test Currency")
         with pytest.raises(IntegrityError):
-            CurrencyFactory(code="USD")
+            CurrencyModel.objects.create(code="XTS", name="Test Currency Duplicate")
 
 
 @pytest.mark.django_db

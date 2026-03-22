@@ -25,7 +25,7 @@ import { ADDRESS_TYPES, ADDRESS_TYPE_LABELS, ORG_TAGS, ORG_TAG_LABELS, COUNTRY_D
 
 const addressSchema = z.object({
   id: z.number().optional(),
-  address_type: z.enum(["REGISTERED", "FACTORY", "OFFICE"]),
+  address_type: z.enum(["REGISTERED", "FACTORY", "OFFICE", "DELIVERY"]),
   line1: z.string().min(1, "Address Line 1 is required"),
   line2: z.string().optional().default(""),
   city: z.string().min(1, "City is required"),
@@ -196,7 +196,7 @@ export default function OrganisationFormPage() {
         tags: existingOrg.tags.map((t) => t.tag),
         addresses: existingOrg.addresses.map((a) => ({
           id: a.id,
-          address_type: a.address_type as "REGISTERED" | "FACTORY" | "OFFICE",
+          address_type: a.address_type as "REGISTERED" | "FACTORY" | "OFFICE" | "DELIVERY",
           line1: a.line1, line2: a.line2 ?? "", city: a.city,
           state: a.state ?? "", pin: a.pin ?? "",
           country: a.country, email: a.email, contact_name: a.contact_name,

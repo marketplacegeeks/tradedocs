@@ -14,6 +14,8 @@ export interface User {
   role: string;
   is_active: boolean;
   date_joined: string;
+  phone_country_code: string;
+  phone_number: string;
 }
 
 export interface UserCreatePayload {
@@ -27,6 +29,8 @@ export interface UserCreatePayload {
 export interface UserUpdatePayload {
   role?: string;
   is_active?: boolean;
+  phone_country_code?: string;
+  phone_number?: string;
 }
 
 // ---- API functions --------------------------------------------------------

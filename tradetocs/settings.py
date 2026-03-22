@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.proforma_invoice",
     "apps.packing_list",
     "apps.commercial_invoice",
+    "apps.purchase_order",
 ]
 
 MIDDLEWARE = [

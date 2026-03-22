@@ -103,10 +103,13 @@ class OrganisationTagFactory(factory.django.DjangoModelFactory):
 class CurrencyFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Currency
+        # If a currency with the same code already exists (e.g. from seed data), return it.
+        django_get_or_create = ("code",)
 
     # Always exactly 3 uppercase letters (AAA → AAB → ... → ZZZ). Never exceeds varchar(3).
     code = factory.Sequence(lambda n: chr(65 + (n // 676) % 26) + chr(65 + (n // 26) % 26) + chr(65 + n % 26))
     name = factory.Sequence(lambda n: f"Currency {n}")
+    is_active = True
 
 
 class BankFactory(factory.django.DjangoModelFactory):

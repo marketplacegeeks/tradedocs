@@ -9,7 +9,15 @@ import { UserPlus, Pencil } from "lucide-react";
 import { listUsers, createUser, updateUser } from "../../api/users";
 import type { User, UserCreatePayload, UserUpdatePayload } from "../../api/users";
 import { useAuth } from "../../store/AuthContext";
-import { ROLES } from "../../utils/constants";
+import { ROLES, COUNTRY_DIAL_CODES } from "../../utils/constants";
+
+// Build a sorted, deduplicated list of dial code options for the phone dropdown.
+// e.g. { value: "+91", label: "+91" }
+const DIAL_CODE_OPTIONS = Array.from(
+  new Set(Object.values(COUNTRY_DIAL_CODES))
+)
+  .sort()
+  .map((code) => ({ value: code, label: code }));
 
 // ---- Role chip styles -------------------------------------------------------
 
@@ -120,6 +128,7 @@ export default function UserListPage() {
   // ---- Edit modal state
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<UserUpdatePayload>({});
+  const [editPhoneError, setEditPhoneError] = useState<string | null>(null);
 
   // ---- Data
   const { data: users = [], isLoading } = useQuery({
@@ -161,11 +170,14 @@ export default function UserListPage() {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       message.success("User updated successfully.");
       setEditingUser(null);
+      setEditPhoneError(null);
     },
     onError: (err: unknown) => {
       const detail = (err as { response?: { data?: Record<string, string[]> } })
         ?.response?.data;
-      if (detail?.role) {
+      if (detail?.phone) {
+        setEditPhoneError(Array.isArray(detail.phone) ? detail.phone[0] : String(detail.phone));
+      } else if (detail?.role) {
         message.error(detail.role[0]);
       } else if (detail?.is_active) {
         message.error(detail.is_active[0]);
@@ -178,7 +190,13 @@ export default function UserListPage() {
   // ---- Open edit modal for a user
   function openEdit(u: User) {
     setEditingUser(u);
-    setEditForm({ role: u.role, is_active: u.is_active });
+    setEditForm({
+      role: u.role,
+      is_active: u.is_active,
+      phone_country_code: u.phone_country_code ?? "",
+      phone_number: u.phone_number ?? "",
+    });
+    setEditPhoneError(null);
   }
 
   // ---- Determine which roles are allowed in the edit dropdown
@@ -522,7 +540,7 @@ export default function UserListPage() {
         onOk={() => {
           if (editingUser) updateMutation.mutate({ id: editingUser.id, payload: editForm });
         }}
-        onCancel={() => setEditingUser(null)}
+        onCancel={() => { setEditingUser(null); setEditPhoneError(null); }}
         okText="Save Changes"
         okButtonProps={{ loading: updateMutation.isPending }}
         cancelText="Cancel"
@@ -563,6 +581,34 @@ export default function UserListPage() {
               {isEditingSelf && (
                 <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
                   You cannot deactivate your own account.
+                </div>
+              )}
+            </div>
+
+            <div>
+              {fieldLabel("Phone Number (optional)")}
+              <div style={{ display: "flex", gap: 8 }}>
+                <Select
+                  value={editForm.phone_country_code || undefined}
+                  onChange={(v) => setEditForm((f) => ({ ...f, phone_country_code: v ?? "" }))}
+                  allowClear
+                  showSearch
+                  placeholder="+91"
+                  style={{ width: 100, flexShrink: 0 }}
+                  options={DIAL_CODE_OPTIONS}
+                  filterOption={(input, option) =>
+                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                />
+                {textInput(
+                  editForm.phone_number ?? "",
+                  (v) => setEditForm((f) => ({ ...f, phone_number: v })),
+                  "Local number"
+                )}
+              </div>
+              {editPhoneError && (
+                <div style={{ color: "var(--error)", fontSize: 12, marginTop: 4 }}>
+                  {editPhoneError}
                 </div>
               )}
             </div>

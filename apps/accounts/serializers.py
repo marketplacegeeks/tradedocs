@@ -1,3 +1,4 @@
+import phonenumbers
 from rest_framework import serializers
 from .models import User, UserRole
 
@@ -8,7 +9,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "full_name", "role", "is_active"]
+        fields = [
+            "id", "email", "first_name", "last_name", "full_name",
+            "role", "is_active", "phone_country_code", "phone_number",
+        ]
         read_only_fields = fields
 
 
@@ -18,7 +22,11 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "full_name", "role", "is_active", "date_joined"]
+        fields = [
+            "id", "email", "first_name", "last_name", "full_name",
+            "role", "is_active", "date_joined",
+            "phone_country_code", "phone_number",
+        ]
         read_only_fields = fields
 
 
@@ -35,11 +43,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
-    """Used by Company Admin to change a user's role or active status."""
+    """Used by Company Admin to change a user's role, active status, or phone number."""
 
     class Meta:
         model = User
-        fields = ["role", "is_active"]
+        fields = ["role", "is_active", "phone_country_code", "phone_number"]
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -68,6 +76,25 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             if "role" in attrs and attrs["role"] != UserRole.COMPANY_ADMIN and active_admin_count <= 1:
                 raise serializers.ValidationError(
                     {"role": "Cannot change the role of the last active Company Admin."}
+                )
+
+        # Phone validation: both fields must be provided together, or neither.
+        code = attrs.get("phone_country_code", "").strip()
+        number = attrs.get("phone_number", "").strip()
+        if code or number:
+            if not code or not number:
+                raise serializers.ValidationError(
+                    {"phone": "Both phone country code and phone number must be provided together."}
+                )
+            try:
+                parsed = phonenumbers.parse(code + number)
+                if not phonenumbers.is_valid_number(parsed):
+                    raise serializers.ValidationError(
+                        {"phone": "The phone number is not valid for the given country code."}
+                    )
+            except phonenumbers.NumberParseException:
+                raise serializers.ValidationError(
+                    {"phone": "Invalid phone number format. Use a dial code like +91 and a local number."}
                 )
 
         return attrs

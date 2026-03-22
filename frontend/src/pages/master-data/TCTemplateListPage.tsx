@@ -1,9 +1,9 @@
 // T&C Template list page — design system table layout (FR-07).
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Modal, message } from "antd";
 
 import { listTCTemplates, deleteTCTemplate } from "../../api/tcTemplates";
@@ -11,24 +11,83 @@ import type { TCTemplate } from "../../api/tcTemplates";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES } from "../../utils/constants";
 
+type SortKey = "name" | "updated_at";
+type SortDir = "asc" | "desc" | null;
+type SortConfig = { key: SortKey; dir: SortDir } | null;
+
 export default function TCTemplateListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
 
-  // Track which template is pending deletion confirmation.
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["tc-templates"],
     queryFn: listTCTemplates,
   });
 
+  // Filter by name, then sort
+  const displayed = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = q
+      ? templates.filter((t: TCTemplate) => t.name.toLowerCase().includes(q))
+      : templates;
+    if (sortConfig?.dir) {
+      rows = [...rows].sort((a, b) => {
+        if (sortConfig.key === "updated_at") {
+          const diff = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+          return sortConfig.dir === "asc" ? diff : -diff;
+        }
+        const av = a.name.toLowerCase();
+        const bv = b.name.toLowerCase();
+        return sortConfig.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    }
+    return rows;
+  }, [templates, searchQuery, sortConfig]);
+
+  // Cycle: null → asc → desc → null
+  function toggleSort(key: SortKey) {
+    setSortConfig((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+  }
+
+  function sortIcon(key: SortKey) {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ChevronsUpDown size={12} strokeWidth={1.5} color="var(--text-muted)" />;
+    }
+    return sortConfig.dir === "asc"
+      ? <ChevronUp size={12} strokeWidth={2} color="var(--primary)" />
+      : <ChevronDown size={12} strokeWidth={2} color="var(--primary)" />;
+  }
+
+  function sortHeaderStyle(key: SortKey): React.CSSProperties {
+    return {
+      padding: "12px 16px",
+      textAlign: "left",
+      fontFamily: "var(--font-body)",
+      fontSize: 11,
+      fontWeight: 600,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      color: sortConfig?.key === key ? "var(--primary)" : "var(--text-muted)",
+      borderBottom: "1px solid var(--border-light)",
+      whiteSpace: "nowrap",
+      cursor: "pointer",
+      userSelect: "none",
+    };
+  }
+
   const deleteMutation = useMutation({
     mutationFn: deleteTCTemplate,
     onSuccess: () => {
-      // Remove from cache so the row disappears immediately.
       queryClient.invalidateQueries({ queryKey: ["tc-templates"] });
       message.success("Template deactivated.");
       setDeletingId(null);
@@ -38,6 +97,10 @@ export default function TCTemplateListPage() {
       setDeletingId(null);
     },
   });
+
+  const countLabel = searchQuery.trim()
+    ? `${displayed.length} of ${templates.length} template${templates.length !== 1 ? "s" : ""}`
+    : `${templates.length} template${templates.length !== 1 ? "s" : ""} available`;
 
   return (
     <div>
@@ -66,7 +129,7 @@ export default function TCTemplateListPage() {
             T&amp;C Templates
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {templates.length} template{templates.length !== 1 ? "s" : ""} available
+            {countLabel}
           </p>
         </div>
         {canWrite && (
@@ -99,6 +162,42 @@ export default function TCTemplateListPage() {
         )}
       </div>
 
+      {/* Search bar */}
+      <div style={{ position: "relative", marginBottom: 16 }}>
+        <Search
+          size={15}
+          strokeWidth={1.5}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search templates…"
+          style={{
+            width: "100%",
+            padding: "9px 14px 9px 36px",
+            background: "var(--bg-input)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            fontFamily: "var(--font-body)",
+            fontSize: 14,
+            color: "var(--text-primary)",
+            outline: "none",
+            boxSizing: "border-box",
+            transition: "border-color 0.15s ease",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-medium)")}
+        />
+      </div>
+
       {/* Table card */}
       <div
         style={{
@@ -120,7 +219,7 @@ export default function TCTemplateListPage() {
           >
             Loading…
           </div>
-        ) : templates.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div
             style={{
               display: "flex",
@@ -139,7 +238,7 @@ export default function TCTemplateListPage() {
                 margin: 0,
               }}
             >
-              No templates yet
+              {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : "No templates yet"}
             </p>
             <p
               style={{
@@ -149,7 +248,9 @@ export default function TCTemplateListPage() {
                 margin: 0,
               }}
             >
-              {canWrite
+              {searchQuery.trim()
+                ? "Try a different search term."
+                : canWrite
                 ? 'Click "New Template" to create one.'
                 : "No T&C templates have been added yet."}
             </p>
@@ -159,25 +260,32 @@ export default function TCTemplateListPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
               <thead>
                 <tr style={{ background: "var(--bg-base)" }}>
-                  {["Template Name", "Organisations", "Last Updated"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "12px 16px",
-                        textAlign: "left",
-                        fontFamily: "var(--font-body)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "var(--text-muted)",
-                        borderBottom: "1px solid var(--border-light)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  <th onClick={() => toggleSort("name")} style={sortHeaderStyle("name")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Template Name {sortIcon("name")}
+                    </div>
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      textAlign: "left",
+                      fontFamily: "var(--font-body)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: "var(--text-muted)",
+                      borderBottom: "1px solid var(--border-light)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Organisations
+                  </th>
+                  <th onClick={() => toggleSort("updated_at")} style={sortHeaderStyle("updated_at")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      Last Updated {sortIcon("updated_at")}
+                    </div>
+                  </th>
                   {canWrite && (
                     <th
                       style={{
@@ -189,7 +297,7 @@ export default function TCTemplateListPage() {
                 </tr>
               </thead>
               <tbody>
-                {templates.map((template: TCTemplate) => (
+                {displayed.map((template: TCTemplate) => (
                   <tr
                     key={template.id}
                     onMouseEnter={(e) => {
@@ -199,7 +307,6 @@ export default function TCTemplateListPage() {
                       (e.currentTarget as HTMLTableRowElement).style.background = "transparent";
                     }}
                   >
-                    {/* Template name */}
                     <td
                       style={{
                         padding: "14px 16px",
@@ -217,8 +324,6 @@ export default function TCTemplateListPage() {
                         {template.name}
                       </span>
                     </td>
-
-                    {/* Organisation chips */}
                     <td
                       style={{
                         padding: "14px 16px",
@@ -233,8 +338,6 @@ export default function TCTemplateListPage() {
                         ))}
                       </div>
                     </td>
-
-                    {/* Last updated date */}
                     <td
                       style={{
                         padding: "14px 16px",
@@ -250,8 +353,6 @@ export default function TCTemplateListPage() {
                         year: "numeric",
                       })}
                     </td>
-
-                    {/* Action buttons — only visible to Checker / Admin */}
                     {canWrite && (
                       <td
                         style={{

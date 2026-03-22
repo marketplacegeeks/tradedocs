@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from apps.accounts.urls import auth_urlpatterns, user_urlpatterns
+from apps.proforma_invoice.report_views import CommoditySalesReportView, ConsigneeBusinessSummaryView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -12,6 +13,10 @@ urlpatterns = [
     path("api/v1/proforma-invoices/", include("apps.proforma_invoice.urls")),
     path("api/v1/", include("apps.packing_list.urls")),
     path("api/v1/", include("apps.commercial_invoice.urls")),
+    path("api/v1/", include("apps.purchase_order.urls")),
+    # Report endpoints
+    path("api/v1/reports/commodity-sales/", CommoditySalesReportView.as_view(), name="report-commodity-sales"),
+    path("api/v1/reports/consignee-business-summary/", ConsigneeBusinessSummaryView.as_view(), name="report-consignee-business-summary"),
 ]
 
 # Serve uploaded files in development (Django handles this; in production use nginx/CDN).

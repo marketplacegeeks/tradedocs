@@ -63,7 +63,7 @@ class PreCarriageBySerializer(serializers.ModelSerializer):
 class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Currency
-        fields = ["id", "code", "name"]
+        fields = ["id", "code", "name", "is_active"]
 
 
 class BankSerializer(serializers.ModelSerializer):
@@ -160,6 +160,9 @@ class OrganisationTagSerializer(serializers.ModelSerializer):
 class OrganisationAddressSerializer(serializers.ModelSerializer):
     # Read-only country name so the frontend can display it without a second request.
     country_name = serializers.CharField(source="country.name", read_only=True)
+    # id is made writable so OrganisationSerializer.update() can identify existing
+    # addresses and update them in-place rather than delete-and-recreate.
+    id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = OrganisationAddress
@@ -196,10 +199,10 @@ class OrganisationAddressSerializer(serializers.ModelSerializer):
                 )
 
         # Duplicate address_type check for the standalone address endpoint.
-        # self.context["view"] carries the organisation_pk from the URL.
+        # DELIVERY is excluded — multiple delivery addresses are allowed per organisation.
         address_type = data.get("address_type")
         view = self.context.get("view")
-        if address_type and view and hasattr(view, "kwargs"):
+        if address_type and address_type != "DELIVERY" and view and hasattr(view, "kwargs"):
             org_pk = view.kwargs.get("organisation_pk")
             if org_pk:
                 qs = OrganisationAddress.objects.filter(
@@ -240,12 +243,13 @@ class OrganisationSerializer(serializers.ModelSerializer):
                 {"addresses": "At least one address is required."}
             )
 
-        # Each address_type must appear at most once in the submitted list.
+        # REGISTERED, FACTORY, and OFFICE may appear at most once per organisation.
+        # DELIVERY is excluded — multiple delivery addresses are allowed.
         if "addresses" in data:
-            seen_types = set()
+            seen_types: set = set()
             for addr in data["addresses"]:
                 atype = addr.get("address_type")
-                if atype in seen_types:
+                if atype != "DELIVERY" and atype in seen_types:
                     raise serializers.ValidationError(
                         {"addresses": f"Duplicate address type: only one {atype.capitalize()} address is allowed per organisation."}
                     )
@@ -269,12 +273,17 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        Update the organisation's top-level fields and replace nested sub-records
-        wholesale when they are included in the request body.
+        Update the organisation's top-level fields and upsert nested sub-records
+        when they are included in the request body.
 
-        A PATCH that omits 'addresses' or 'tags' will leave those sub-records
-        untouched. Sending an explicit list (even empty) replaces them.
+        Addresses: each submitted address with an id is updated in-place; addresses
+        without an id are created; existing addresses absent from the list are deleted
+        (raises a validation error if a Purchase Order references that address).
+
+        A PATCH that omits 'addresses' or 'tags' leaves those sub-records untouched.
         """
+        from django.db.models import ProtectedError
+
         addresses_data = validated_data.pop("addresses", None)
         tags_data = validated_data.pop("tags", None)
 
@@ -283,9 +292,39 @@ class OrganisationSerializer(serializers.ModelSerializer):
         instance.save()
 
         if addresses_data is not None:
-            instance.addresses.all().delete()
+            existing_ids = set(instance.addresses.values_list("id", flat=True))
+            kept_ids = set()
+
             for address_data in addresses_data:
-                OrganisationAddress.objects.create(organisation=instance, **address_data)
+                addr_id = address_data.pop("id", None)
+                if addr_id and addr_id in existing_ids:
+                    # Update the existing address in-place (preserves the PK so
+                    # any FK references from POs remain valid).
+                    addr = OrganisationAddress.objects.get(pk=addr_id)
+                    for field, value in address_data.items():
+                        setattr(addr, field, value)
+                    addr.save()
+                    kept_ids.add(addr_id)
+                else:
+                    # New address — create it.
+                    new_addr = OrganisationAddress.objects.create(
+                        organisation=instance, **address_data
+                    )
+                    kept_ids.add(new_addr.id)
+
+            # Delete addresses that were removed from the list.
+            for addr in instance.addresses.filter(id__in=existing_ids - kept_ids):
+                try:
+                    addr.delete()
+                except ProtectedError:
+                    raise serializers.ValidationError(
+                        {
+                            "addresses": (
+                                f"Address '{addr.address_type}' cannot be removed because "
+                                "it is referenced by an existing Purchase Order."
+                            )
+                        }
+                    )
 
         if tags_data is not None:
             instance.tags.all().delete()
