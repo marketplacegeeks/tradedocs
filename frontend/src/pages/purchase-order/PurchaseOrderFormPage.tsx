@@ -76,6 +76,7 @@ const INPUT: React.CSSProperties = {
 
 const GRID2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
 const GRID3: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
+const GRID4: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 };
 
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
@@ -476,7 +477,7 @@ export default function PurchaseOrderFormPage() {
     !existingPO || existingPO.status === "DRAFT" || existingPO.status === "REWORK";
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div>
       {/* Back */}
       <button
         onClick={() => navigate("/purchase-orders")}
@@ -500,8 +501,8 @@ export default function PurchaseOrderFormPage() {
         <div style={CARD}>
           <h2 style={SECTION_TITLE}>Purchase Order Header</h2>
 
-          {/* PO Number + Date */}
-          <div style={{ ...GRID2, marginBottom: 16 }}>
+          {/* Row 1: PO Number | PO Date | Transaction Type | Time of Delivery */}
+          <div style={{ ...GRID4, marginBottom: 16 }}>
             <div>
               <label style={LABEL}>PO Number</label>
               <div style={{ ...INPUT, background: "var(--bg-base)", color: "var(--text-muted)", cursor: "default" }}>
@@ -524,10 +525,39 @@ export default function PurchaseOrderFormPage() {
               />
               <FieldError msg={errors.po_date?.message} />
             </div>
+            <div>
+              <label style={LABEL}>Transaction Type <span style={{ color: "#e53e3e" }}>*</span></label>
+              <Controller
+                name="transaction_type"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onChange={(val) => {
+                      if (inEditableState) handleTxTypeChange(val);
+                    }}
+                    placeholder="Select transaction type…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={Object.entries(TRANSACTION_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  />
+                )}
+              />
+              <FieldError msg={errors.transaction_type?.message} />
+            </div>
+            <div>
+              <label style={LABEL}>Time of Delivery</label>
+              <input
+                {...register("time_of_delivery")}
+                style={INPUT}
+                placeholder="e.g. prompt / August 2025"
+                disabled={!inEditableState}
+              />
+            </div>
           </div>
 
-          {/* Vendor + Customer No */}
-          <div style={{ ...GRID2, marginBottom: 16 }}>
+          {/* Row 2: Vendor | Buyer | Customer No | Internal Contact */}
+          <div style={{ ...GRID4, marginBottom: 16 }}>
             <div>
               <label style={LABEL}>Vendor <span style={{ color: "#e53e3e" }}>*</span></label>
               <Controller
@@ -552,72 +582,68 @@ export default function PurchaseOrderFormPage() {
               <FieldError msg={errors.vendor?.message} />
             </div>
             <div>
+              <label style={LABEL}>Buyer</label>
+              <Controller
+                name="buyer"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select buyer (optional)"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={buyers.map((b) => ({ value: b.id, label: b.name })).sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => {
+                      field.onChange(val ?? null);
+                      setValue("delivery_address", undefined as any);
+                    }}
+                  />
+                )}
+              />
+            </div>
+            <div>
               <label style={LABEL}>Customer No.</label>
               <input
                 {...register("customer_no")}
                 style={INPUT}
-                placeholder="Vendor's reference number for this buyer"
+                placeholder="Vendor's reference number"
                 disabled={!inEditableState}
               />
             </div>
-          </div>
-
-          {/* Buyer */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={LABEL}>Buyer</label>
-            <Controller
-              name="buyer"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  {...field}
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="Select buyer (optional)"
-                  style={{ width: "100%" }}
-                  disabled={!inEditableState}
-                  options={buyers.map((b) => ({ value: b.id, label: b.name })).sort((a, b) => a.label.localeCompare(b.label))}
-                  onChange={(val) => {
-                    field.onChange(val ?? null);
-                    setValue("delivery_address", undefined as any);
-                  }}
-                />
+            <div>
+              <label style={LABEL}>Internal Contact <span style={{ color: "#e53e3e" }}>*</span></label>
+              <Controller
+                name="internal_contact"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select contact…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={users
+                      .filter((u) => u.is_active)
+                      .map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` }))
+                      .sort((a, b) => a.label.localeCompare(b.label))
+                    }
+                  />
+                )}
+              />
+              <FieldError msg={errors.internal_contact?.message} />
+              {contactPhone && (
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                  📞 {contactPhone}
+                </p>
               )}
-            />
+            </div>
           </div>
 
-          {/* Internal Contact */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={LABEL}>Internal Contact <span style={{ color: "#e53e3e" }}>*</span></label>
-            <Controller
-              name="internal_contact"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  {...field}
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="Select contact…"
-                  style={{ width: "100%" }}
-                  disabled={!inEditableState}
-                  options={users
-                    .filter((u) => u.is_active)
-                    .map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` }))
-                    .sort((a, b) => a.label.localeCompare(b.label))
-                  }
-                />
-              )}
-            />
-            <FieldError msg={errors.internal_contact?.message} />
-            {contactPhone && (
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-                📞 {contactPhone}
-              </p>
-            )}
-          </div>
-
-          {/* Delivery Address */}
+          {/* Row 3: Delivery Address (full width) */}
           <div style={{ marginBottom: 16 }}>
             <label style={LABEL}>Delivery Address <span style={{ color: "#e53e3e" }}>*</span></label>
             <Controller
@@ -645,8 +671,8 @@ export default function PurchaseOrderFormPage() {
             )}
           </div>
 
-          {/* Bank + Currency */}
-          <div style={{ ...GRID2, marginBottom: 16 }}>
+          {/* Row 4: Bank | Currency | Payment Terms | Country of Origin */}
+          <div style={{ ...GRID4 }}>
             <div>
               <label style={LABEL}>Bank</label>
               <Controller
@@ -691,32 +717,6 @@ export default function PurchaseOrderFormPage() {
               />
               <FieldError msg={errors.currency?.message} />
             </div>
-          </div>
-
-          {/* Transaction Type */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={LABEL}>Transaction Type <span style={{ color: "#e53e3e" }}>*</span></label>
-            <Controller
-              name="transaction_type"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onChange={(val) => {
-                    if (inEditableState) handleTxTypeChange(val);
-                  }}
-                  placeholder="Select transaction type…"
-                  style={{ width: "100%" }}
-                  disabled={!inEditableState}
-                  options={Object.entries(TRANSACTION_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
-                />
-              )}
-            />
-            <FieldError msg={errors.transaction_type?.message} />
-          </div>
-
-          {/* Payment Terms + Country of Origin */}
-          <div style={{ ...GRID2, marginBottom: 16 }}>
             <div>
               <label style={LABEL}>Payment Terms</label>
               <Controller
@@ -755,17 +755,6 @@ export default function PurchaseOrderFormPage() {
                 )}
               />
             </div>
-          </div>
-
-          {/* Time of Delivery */}
-          <div>
-            <label style={LABEL}>Time of Delivery</label>
-            <input
-              {...register("time_of_delivery")}
-              style={INPUT}
-              placeholder="e.g. prompt / August 2025"
-              disabled={!inEditableState}
-            />
           </div>
         </div>
 
@@ -1014,7 +1003,7 @@ function LineItemsTable({
 
             <div style={{ padding: "14px" }}>
               {/* Row 1: Description + Item Code + HSN + Manufacturer */}
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div>
                   <label style={LABEL}>Description <span style={{ color: "#e53e3e" }}>*</span></label>
                   <input

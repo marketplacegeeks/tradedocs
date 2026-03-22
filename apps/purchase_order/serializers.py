@@ -186,9 +186,10 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Constraint #18: make content fields read_only when document is not editable
+        # Constraint #18: make content fields read_only when document is not editable.
+        # Guard with isinstance — in list mode DRF passes the full queryset as instance.
         instance = self.instance
-        if instance and instance.status not in EDITABLE_STATES:
+        if isinstance(instance, PurchaseOrder) and instance.status not in EDITABLE_STATES:
             editable_fields = ["po_number", "status", "created_by", "created_at", "updated_at"]
             for field_name in self.fields:
                 if field_name not in editable_fields:
