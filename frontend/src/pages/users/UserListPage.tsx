@@ -122,8 +122,10 @@ export default function UserListPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<UserCreatePayload>({
     email: "", first_name: "", last_name: "", role: ROLES.MAKER, password: "",
+    phone_country_code: "", phone_number: "",
   });
   const [inviteErrors, setInviteErrors] = useState<Partial<UserCreatePayload>>({});
+  const [invitePhoneError, setInvitePhoneError] = useState<string | null>(null);
 
   // ---- Edit modal state
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -143,8 +145,9 @@ export default function UserListPage() {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       message.success("User created successfully.");
       setInviteOpen(false);
-      setInviteForm({ email: "", first_name: "", last_name: "", role: ROLES.MAKER, password: "" });
+      setInviteForm({ email: "", first_name: "", last_name: "", role: ROLES.MAKER, password: "", phone_country_code: "", phone_number: "" });
       setInviteErrors({});
+      setInvitePhoneError(null);
     },
     onError: (err: unknown) => {
       // Map API validation errors back to fields.
@@ -157,6 +160,7 @@ export default function UserListPage() {
           last_name: apiErrors.last_name?.[0],
           password: apiErrors.password?.[0],
         } as Partial<UserCreatePayload>);
+        setInvitePhoneError(apiErrors.phone?.[0] ?? null);
       } else {
         message.error("Failed to create user. Please try again.");
       }
@@ -465,7 +469,8 @@ export default function UserListPage() {
         onCancel={() => {
           setInviteOpen(false);
           setInviteErrors({});
-          setInviteForm({ email: "", first_name: "", last_name: "", role: ROLES.MAKER, password: "" });
+          setInvitePhoneError(null);
+          setInviteForm({ email: "", first_name: "", last_name: "", role: ROLES.MAKER, password: "", phone_country_code: "", phone_number: "" });
         }}
         okText="Create User"
         okButtonProps={{ loading: createMutation.isPending }}
@@ -523,6 +528,34 @@ export default function UserListPage() {
             {inviteErrors.password && (
               <div style={{ color: "var(--error)", fontSize: 12, marginTop: 4 }}>
                 {inviteErrors.password}
+              </div>
+            )}
+          </div>
+
+          <div>
+            {fieldLabel("Phone Number (optional)")}
+            <div style={{ display: "flex", gap: 8 }}>
+              <Select
+                value={inviteForm.phone_country_code || undefined}
+                onChange={(v) => setInviteForm((f) => ({ ...f, phone_country_code: v ?? "" }))}
+                allowClear
+                showSearch
+                placeholder="+91"
+                style={{ width: 100, flexShrink: 0 }}
+                options={DIAL_CODE_OPTIONS}
+                filterOption={(input, option) =>
+                  (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                }
+              />
+              {textInput(
+                inviteForm.phone_number ?? "",
+                (v) => setInviteForm((f) => ({ ...f, phone_number: v })),
+                "Local number"
+              )}
+            </div>
+            {invitePhoneError && (
+              <div style={{ color: "var(--error)", fontSize: 12, marginTop: 4 }}>
+                {invitePhoneError}
               </div>
             )}
           </div>
