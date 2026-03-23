@@ -274,6 +274,37 @@ class TestUserCreateWithPhone:
 
 
 @pytest.mark.django_db
+class TestCompanyAdminInviteRestrictions:
+    """SUPER_ADMIN can invite COMPANY_ADMIN users; COMPANY_ADMIN cannot."""
+
+    def _base_payload(self, role):
+        return {
+            "email": f"invited_{role.lower()}@test.com",
+            "first_name": "Invited",
+            "last_name": "User",
+            "role": role,
+            "password": "securepass123",
+        }
+
+    def test_company_admin_cannot_invite_company_admin(self, api_client):
+        """A COMPANY_ADMIN trying to create another COMPANY_ADMIN must receive 400."""
+        admin = CompanyAdminFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.post(reverse("user-list-create"), self._base_payload("COMPANY_ADMIN"))
+        assert response.status_code == 400
+        assert "role" in response.data
+
+    def test_super_admin_can_invite_company_admin(self, api_client):
+        """A SUPER_ADMIN inviting a COMPANY_ADMIN must succeed with 201."""
+        super_admin = SuperAdminFactory()
+        tokens = get_tokens(api_client, super_admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = api_client.post(reverse("user-list-create"), self._base_payload("COMPANY_ADMIN"))
+        assert response.status_code == 201
+
+
+@pytest.mark.django_db
 class TestResetPasswordView:
     """Tests for POST /api/v1/users/{id}/reset-password/"""
 

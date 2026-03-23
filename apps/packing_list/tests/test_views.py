@@ -197,7 +197,8 @@ class TestPackingListUpdate:
         )
         assert resp.status_code == 200
 
-    def test_non_creator_cannot_patch(self):
+    def test_non_creator_maker_can_patch(self):
+        """Any MAKER can patch a DRAFT Packing List they did NOT create."""
         pl = PackingListFactory(status=DRAFT)
         other_maker = MakerFactory()
         resp = auth_client(other_maker).patch(
@@ -205,7 +206,7 @@ class TestPackingListUpdate:
             {"vessel_flight_no": "MV TITAN"},
             format="json",
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
     def test_cannot_patch_pending_approval(self):
         maker = MakerFactory()

@@ -78,12 +78,13 @@ class TestPurchaseOrderCreate:
         response = api_client.post(reverse("purchase-order-list"), payload)
         assert response.status_code == 401
 
-    def test_checker_can_create_po(self, api_client):
+    def test_checker_cannot_create_po(self, api_client):
+        """CHECKERs are not permitted to create Purchase Orders — must return 403."""
         checker = CheckerFactory()
         auth(api_client, checker)
         payload = make_po_payload()
         response = api_client.post(reverse("purchase-order-list"), payload)
-        assert response.status_code == 201
+        assert response.status_code == 403
 
 
 @pytest.mark.django_db
@@ -198,6 +199,32 @@ class TestPurchaseOrderEditRestrictions:
             {"time_of_delivery": "August 2026"},
         )
         assert response.status_code in (400, 403)
+
+    def test_non_creator_maker_can_edit_draft_po(self, api_client):
+        """Any MAKER can PATCH a DRAFT Purchase Order they did NOT create."""
+        creator = MakerFactory()
+        other_maker = MakerFactory()
+        po = PurchaseOrderFactory(created_by=creator, status="DRAFT")
+
+        auth(api_client, other_maker)
+        response = api_client.patch(
+            reverse("purchase-order-detail", kwargs={"pk": po.pk}),
+            {"time_of_delivery": "September 2026"},
+        )
+        assert response.status_code == 200
+
+    def test_checker_cannot_edit_draft_po(self, api_client):
+        """A CHECKER must always be blocked from editing a Purchase Order."""
+        maker = MakerFactory()
+        checker = CheckerFactory()
+        po = PurchaseOrderFactory(created_by=maker, status="DRAFT")
+
+        auth(api_client, checker)
+        response = api_client.patch(
+            reverse("purchase-order-detail", kwargs={"pk": po.pk}),
+            {"time_of_delivery": "September 2026"},
+        )
+        assert response.status_code == 403
 
     def test_unauthenticated_list_returns_401(self, api_client):
         response = api_client.get(reverse("purchase-order-list"))

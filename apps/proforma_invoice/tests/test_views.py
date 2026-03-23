@@ -155,11 +155,12 @@ class TestProformaInvoiceUpdate:
         assert resp.status_code == 200
         assert resp.data["buyer_order_no"] == "BO-001"
 
-    def test_non_creator_cannot_update(self):
+    def test_non_creator_maker_can_update(self):
+        """Any MAKER can edit a DRAFT PI regardless of who created it."""
         other_maker = MakerFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)
         resp = auth_client(other_maker).patch(pi_detail_url(pi.pk), {"buyer_order_no": "X"}, format="json")
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
     def test_cannot_update_approved_pi(self):
         maker = MakerFactory()
@@ -731,21 +732,21 @@ class TestCompanyAdminPermissions:
         resp = auth_client(admin).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
-    def test_other_maker_cannot_add_line_item(self):
-        """A Maker who did NOT create the PI is blocked from adding line items (views.py:205)."""
+    def test_other_maker_can_add_line_item(self):
+        """Any MAKER can add line items to a DRAFT PI they did NOT create."""
         other_maker = MakerFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)   # created by a different Maker
-        payload = {"description": "Intruder Item", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "Shared Item", "quantity": "1.000", "rate_usd": "10.00"}
         resp = auth_client(other_maker).post(pi_line_item_url(pi.pk), payload, format="json")
-        assert resp.status_code == 403
+        assert resp.status_code == 201
 
-    def test_other_maker_cannot_add_charge(self):
-        """A Maker who did NOT create the PI is blocked from adding charges."""
+    def test_other_maker_can_add_charge(self):
+        """Any MAKER can add charges to a DRAFT PI they did NOT create."""
         other_maker = MakerFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)
-        payload = {"description": "Intruder Charge", "amount_usd": "50.00"}
+        payload = {"description": "Shared Charge", "amount_usd": "50.00"}
         resp = auth_client(other_maker).post(pi_charge_url(pi.pk), payload, format="json")
-        assert resp.status_code == 403
+        assert resp.status_code == 201
 
     def test_admin_can_download_pdf(self):
         pi = ProformaInvoiceFactory()

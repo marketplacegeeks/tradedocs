@@ -79,7 +79,9 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        # Any authenticated user can create a PO (FR-PO-11)
+        # Only Makers (and Company Admins / Super Admins) can create POs. CHECKERs cannot.
+        if self.request.user.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN):
+            raise PermissionDenied("Only Makers can create Purchase Orders.")
         serializer.save()
 
     def perform_update(self, serializer):
@@ -88,9 +90,9 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": f"Cannot edit a Purchase Order with status '{instance.status}'."}
             )
-        if (instance.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can edit this Purchase Order.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can edit regardless of creator.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot edit Purchase Orders.")
         serializer.save()
 
     # ---- Workflow action endpoint -------------------------------------------
@@ -190,8 +192,9 @@ class LineItemListCreateView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify line items when PO status is '{po.status}'."}
             )
-        if po.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify line items.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify line items regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify line items.")
 
     def get(self, request, po_id):
         po = self._get_po(po_id)
@@ -228,8 +231,9 @@ class LineItemDetailView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify line items when PO status is '{po.status}'."}
             )
-        if po.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify line items.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify line items regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify line items.")
         return po, item
 
     def put(self, request, po_id, lid):

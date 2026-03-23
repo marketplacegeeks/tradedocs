@@ -630,8 +630,9 @@ export default function PackingListDetailPage() {
   const isDraft = pl.status === DOCUMENT_STATUS.DRAFT;
   const isCreator = user?.id === pl.created_by;
   const isAdmin = user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
-  const canEdit = isEditable && (isCreator || isAdmin);
-  const canDelete = isDraft && (isCreator || isAdmin);
+  // Any Maker can edit or delete any editable PL — not just the creator.
+  const canEdit = isEditable && (user?.role === ROLES.MAKER || isCreator || isAdmin);
+  const canDelete = isDraft && (user?.role === ROLES.MAKER || isCreator || isAdmin);
   const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;
   // FR-08.3: PDF available to all roles in all states (DRAFT watermark shown on non-Approved).
   const canDownloadPDF = true;

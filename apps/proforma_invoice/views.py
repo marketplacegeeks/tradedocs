@@ -104,10 +104,9 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": f"Cannot edit a Proforma Invoice with status '{instance.status}'."}
             )
-        # Only the Maker who created the document (or Company Admin) can edit it.
-        if (instance.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can edit this Proforma Invoice.")
+        # Checkers are never allowed to edit document content.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot edit Proforma Invoices.")
         serializer.save()
 
     # ---- Workflow action endpoint -------------------------------------------
@@ -245,8 +244,9 @@ class LineItemListCreateView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify line items when PI status is '{pi.status}'."}
             )
-        if pi.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify line items.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify line items regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify line items.")
 
     def get(self, request, pi_id):
         pi = self._get_pi(pi_id)
@@ -284,8 +284,9 @@ class LineItemDetailView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify line items when PI status is '{pi.status}'."}
             )
-        if pi.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify line items.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify line items regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify line items.")
         return pi, item
 
     def put(self, request, pi_id, lid):
@@ -329,8 +330,9 @@ class ChargeListCreateView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify charges when PI status is '{pi.status}'."}
             )
-        if pi.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify charges.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify charges regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify charges.")
 
     def get(self, request, pi_id):
         pi = self._get_pi(pi_id)
@@ -368,8 +370,9 @@ class ChargeDetailView(APIView):
             raise ValidationError(
                 {"detail": f"Cannot modify charges when PI status is '{pi.status}'."}
             )
-        if pi.created_by != user and user.role != UserRole.COMPANY_ADMIN:
-            raise PermissionDenied("Only the document creator can modify charges.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify charges regardless of creator.
+        if user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify charges.")
         return pi, charge
 
     def put(self, request, pi_id, cid):

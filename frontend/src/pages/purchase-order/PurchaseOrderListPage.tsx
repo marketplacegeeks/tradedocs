@@ -1,5 +1,5 @@
 // Purchase Order list page (FR-PO-14).
-// Makers see only their own POs; Checkers and Admins see all.
+// All authenticated roles see all POs.
 // Supports status filter tabs, PO number search, vendor filter, and date range.
 
 import { useState, useMemo } from "react";
@@ -83,16 +83,13 @@ export default function PurchaseOrderListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("po_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const isMaker = user?.role === ROLES.MAKER;
-
-  // Makers see only their own POs via the created_by filter on the API
+  // All roles see all POs — no created_by filter applied
   const apiFilters = useMemo(() => {
     const f: Record<string, unknown> = {};
     if (activeStatus) f.status = activeStatus;
-    if (isMaker && user?.id) f.created_by = user.id;
     if (vendorFilter) f.vendor = vendorFilter;
     return f;
-  }, [activeStatus, isMaker, user?.id, vendorFilter]);
+  }, [activeStatus, vendorFilter]);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["purchase-orders", apiFilters],

@@ -166,9 +166,9 @@ class PackingListViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": f"Cannot edit a Packing List with status '{instance.status}'."}
             )
-        if (instance.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can edit this Packing List.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can edit regardless of creator.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot edit Packing Lists.")
 
         # Pop CI fields and apply them to the linked CI.
         ci_data = {
@@ -215,9 +215,9 @@ class PackingListViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": "Only Draft documents can be deleted."}
             )
-        if (instance.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can delete this Packing List.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can delete a Draft regardless of creator.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot delete Packing Lists.")
         # Cascade: CI will be deleted by the database (CASCADE on packing_list FK is OneToOne).
         # But CommercialInvoice uses PROTECT, so we delete CI explicitly first.
         with transaction.atomic():
@@ -378,9 +378,9 @@ class ContainerViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": f"Cannot modify containers when Packing List status is '{packing_list.status}'."}
             )
-        if (packing_list.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can modify containers.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify containers regardless of creator.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify containers.")
 
     def perform_create(self, serializer):
         pl = serializer.validated_data.get("packing_list")
@@ -464,9 +464,9 @@ class ContainerItemViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": f"Cannot modify items when Packing List status is '{pl.status}'."}
             )
-        if (pl.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
-            raise PermissionDenied("Only the document creator can modify container items.")
+        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can modify container items regardless of creator.
+        if self.request.user.role == UserRole.CHECKER:
+            raise PermissionDenied("Checkers cannot modify container items.")
 
     def perform_create(self, serializer):
         container = serializer.validated_data.get("container")

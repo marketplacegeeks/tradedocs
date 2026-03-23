@@ -150,7 +150,8 @@ export default function PurchaseOrderDetailPage() {
 
   const isEditable = po.status === DOCUMENT_STATUS.DRAFT || po.status === DOCUMENT_STATUS.REWORK;
   const isCreator = po.created_by === user?.id;
-  const canEdit = isEditable && (isCreator || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN);
+  // Any Maker can edit any editable PO — not just the creator.
+  const canEdit = isEditable && (user?.role === ROLES.MAKER || isCreator || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN);
 
   const txType = po.transaction_type;
   const showIGST = txType === "IGST";

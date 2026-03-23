@@ -131,7 +131,9 @@ export default function PackingListEditPage() {
     const isEditable = pl.status === DOCUMENT_STATUS.DRAFT || pl.status === DOCUMENT_STATUS.REWORK;
     const isCreator = user?.id === pl.created_by;
     const isAdmin = user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
-    if (!isEditable || (!isCreator && !isAdmin)) {
+    // Any Maker can access the edit page for any editable PL — not just the creator.
+    const isMaker = user?.role === ROLES.MAKER;
+    if (!isEditable || (!isMaker && !isCreator && !isAdmin)) {
       navigate(`/packing-lists/${id}`);
     }
   }, [pl, user]);

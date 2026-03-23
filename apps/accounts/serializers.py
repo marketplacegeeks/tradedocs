@@ -43,6 +43,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        # Guard: only SUPER_ADMIN may create another COMPANY_ADMIN user.
+        request = self.context.get("request")
+        if attrs.get("role") == UserRole.COMPANY_ADMIN:
+            if not request or request.user.role != UserRole.SUPER_ADMIN:
+                raise serializers.ValidationError(
+                    {"role": "Only a Super Admin can create Company Admin users."}
+                )
+
         # Phone validation: both fields must be provided together, or neither.
         code = attrs.get("phone_country_code", "").strip()
         number = attrs.get("phone_number", "").strip()
