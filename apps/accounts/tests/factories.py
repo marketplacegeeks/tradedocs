@@ -34,3 +34,9 @@ class CheckerFactory(UserFactory):
 class CompanyAdminFactory(UserFactory):
     role = UserRole.COMPANY_ADMIN
     is_staff = True
+
+
+class SuperAdminFactory(UserFactory):
+    role = UserRole.SUPER_ADMIN
+    is_staff = True
+    is_superuser = True

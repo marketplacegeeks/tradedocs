@@ -17,7 +17,7 @@ import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory
+from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory, SuperAdminFactory
 from apps.purchase_order.models import PurchaseOrder
 from .factories import (
     DeliveryAddressFactory,
@@ -202,3 +202,49 @@ class TestPurchaseOrderEditRestrictions:
     def test_unauthenticated_list_returns_401(self, api_client):
         response = api_client.get(reverse("purchase-order-list"))
         assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestSuperAdminPurchaseOrderPermissions:
+    """SUPER_ADMIN must have the same access as COMPANY_ADMIN on all PO endpoints."""
+
+    def test_super_admin_can_list_pos(self, api_client):
+        super_admin = SuperAdminFactory()
+        PurchaseOrderFactory()
+        auth(api_client, super_admin)
+        response = api_client.get(reverse("purchase-order-list"))
+        assert response.status_code == 200
+
+    def test_super_admin_can_create_po(self, api_client):
+        super_admin = SuperAdminFactory()
+        auth(api_client, super_admin)
+        response = api_client.post(reverse("purchase-order-list"), make_po_payload(), format="json")
+        assert response.status_code == 201
+
+    def test_super_admin_can_hard_delete_po(self, api_client):
+        super_admin = SuperAdminFactory()
+        po = PurchaseOrderFactory()
+        auth(api_client, super_admin)
+        response = api_client.delete(
+            reverse("purchase-order-hard-delete", kwargs={"pk": po.pk})
+        )
+        assert response.status_code == 204
+        assert not PurchaseOrder.objects.filter(pk=po.pk).exists()
+
+    def test_maker_cannot_hard_delete_po(self, api_client):
+        maker = MakerFactory()
+        po = PurchaseOrderFactory(created_by=maker)
+        auth(api_client, maker)
+        response = api_client.delete(
+            reverse("purchase-order-hard-delete", kwargs={"pk": po.pk})
+        )
+        assert response.status_code == 403
+
+    def test_company_admin_cannot_hard_delete_po(self, api_client):
+        admin = CompanyAdminFactory()
+        po = PurchaseOrderFactory()
+        auth(api_client, admin)
+        response = api_client.delete(
+            reverse("purchase-order-hard-delete", kwargs={"pk": po.pk})
+        )
+        assert response.status_code == 403

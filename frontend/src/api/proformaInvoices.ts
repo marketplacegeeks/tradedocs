@@ -186,3 +186,8 @@ export async function downloadPiPdf(piId: number, filename: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+// Super Admin only — permanently removes the PI from the database.
+export async function hardDeleteProformaInvoice(id: number): Promise<void> {
+  await axiosInstance.delete(`/proforma-invoices/${id}/hard-delete/`);
+}

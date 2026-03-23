@@ -61,6 +61,7 @@ import {
   downloadPackingListPDF,
   uploadPlSignedCopy,
   uploadCiSignedCopy,
+  hardDeletePackingList,
 } from "../../api/packingLists";
 import type { PackingList, CILineItem } from "../../api/packingLists";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
@@ -579,6 +580,26 @@ export default function PackingListDetailPage() {
     onError: (err: unknown) => message.error(extractApiError(err, "Could not delete this document.")),
   });
 
+  const hardDeleteMutation = useMutation({
+    mutationFn: () => hardDeletePackingList(Number(id)),
+    onSuccess: () => {
+      message.success("Packing List permanently deleted.");
+      navigate("/packing-lists");
+    },
+    onError: () => message.error("Delete failed. Please try again."),
+  });
+
+  function confirmHardDelete() {
+    Modal.confirm({
+      title: "Permanently delete this Packing List?",
+      content: "This action cannot be undone. The PL, its linked Commercial Invoice, and all containers/items will be removed from the database.",
+      okText: "Delete permanently",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: () => hardDeleteMutation.mutate(),
+    });
+  }
+
   const uploadPlSignedCopyMutation = useMutation({
     mutationFn: (file: File) => uploadPlSignedCopy(Number(id), file),
     onSuccess: () => {
@@ -688,6 +709,19 @@ export default function PackingListDetailPage() {
             </button>
           )}
 
+          {user?.role === ROLES.SUPER_ADMIN && (
+            <button
+              onClick={confirmHardDelete}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+                border: "none", borderRadius: 8, padding: "8px 14px",
+                fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              }}
+            >
+              <Trash2 size={14} strokeWidth={1.5} /> Delete
+            </button>
+          )}
           <WorkflowActionButton
             documentId={pl.id}
             documentStatus={pl.status}

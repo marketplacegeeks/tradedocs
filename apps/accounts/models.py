@@ -3,6 +3,7 @@ from django.db import models
 
 
 class UserRole(models.TextChoices):
+    SUPER_ADMIN = "SUPER_ADMIN", "Super Admin"
     COMPANY_ADMIN = "COMPANY_ADMIN", "Company Admin"
     CHECKER = "CHECKER", "Checker"
     MAKER = "MAKER", "Maker"
@@ -64,6 +65,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def is_super_admin(self):
+        return self.role == UserRole.SUPER_ADMIN
 
     @property
     def is_company_admin(self):

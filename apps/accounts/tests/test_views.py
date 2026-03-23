@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
-from .factories import CompanyAdminFactory, MakerFactory, CheckerFactory
+from .factories import CompanyAdminFactory, MakerFactory, CheckerFactory, SuperAdminFactory
 
 
 @pytest.fixture
@@ -271,3 +271,51 @@ class TestUserCreateWithPhone:
         response = api_client.post(reverse("user-list-create"), payload)
         assert response.status_code == 400
         assert "phone" in response.data
+
+
+@pytest.mark.django_db
+class TestSuperAdminPermissions:
+    """
+    Every endpoint guarded by IsCompanyAdmin or IsCheckerOrAdmin must also
+    grant access to SUPER_ADMIN. These tests guard against regressions where
+    a new role is added to the permission classes but missed elsewhere
+    (e.g. route guards, serialiser checks).
+    """
+
+    def _auth(self, client, user):
+        tokens = get_tokens(client, user.email, "testpass123")
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def test_super_admin_can_list_users(self, api_client):
+        super_admin = SuperAdminFactory()
+        MakerFactory()
+        self._auth(api_client, super_admin)
+        response = api_client.get(reverse("user-list-create"))
+        assert response.status_code == 200
+
+    def test_super_admin_can_create_user(self, api_client):
+        super_admin = SuperAdminFactory()
+        self._auth(api_client, super_admin)
+        payload = {
+            "email": "newmakerbysa@test.com",
+            "first_name": "New",
+            "last_name": "Maker",
+            "role": "MAKER",
+            "password": "securepass123",
+        }
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 201
+
+    def test_super_admin_can_deactivate_user(self, api_client):
+        super_admin = SuperAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, super_admin)
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": maker.pk}), {"is_active": False})
+        assert response.status_code == 200
+
+    def test_super_admin_can_change_user_role(self, api_client):
+        super_admin = SuperAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, super_admin)
+        response = api_client.patch(reverse("user-detail", kwargs={"pk": maker.pk}), {"role": "CHECKER"})
+        assert response.status_code == 200

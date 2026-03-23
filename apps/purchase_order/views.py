@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole
+from apps.accounts.permissions import IsAnyRole, IsSuperAdmin
 from apps.workflow.constants import EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
@@ -142,6 +142,19 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             filename=f"{po.po_number}.pdf",
         )
         return response
+
+    # ---- Hard delete endpoint (Super Admin only) ----------------------------
+
+    @action(detail=True, methods=["delete"], url_path="hard-delete", permission_classes=[IsSuperAdmin])
+    def hard_delete(self, request, pk=None):
+        """
+        DELETE /purchase-orders/{id}/hard-delete/
+        Permanently removes the PO and all its line items from the database.
+        Restricted to SUPER_ADMIN only.
+        """
+        po = self.get_object()
+        po.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ---- Audit log endpoint -------------------------------------------------
 

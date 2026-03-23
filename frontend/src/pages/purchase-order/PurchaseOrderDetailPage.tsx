@@ -3,15 +3,16 @@
 
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { message } from "antd";
-import { ArrowLeft, Download, Clock, Edit2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { message, Modal } from "antd";
+import { ArrowLeft, Download, Clock, Edit2, Trash2 } from "lucide-react";
 
 import {
   getPurchaseOrder,
   workflowPurchaseOrder,
   getPurchaseOrderAuditLog,
   downloadPurchaseOrderPdf,
+  hardDeletePurchaseOrder,
 } from "../../api/purchaseOrders";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
 import AuditLogDrawer from "../../components/AuditLogDrawer";
@@ -20,6 +21,7 @@ import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_CHIP,
   DOCUMENT_STATUS_LABELS,
+  ROLES,
   TRANSACTION_TYPE_LABELS,
 } from "../../utils/constants";
 
@@ -117,6 +119,26 @@ export default function PurchaseOrderDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["purchase-order", poId] });
     queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
   };
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: () => hardDeletePurchaseOrder(poId),
+    onSuccess: () => {
+      message.success("Purchase Order permanently deleted.");
+      navigate("/purchase-orders");
+    },
+    onError: () => message.error("Delete failed. Please try again."),
+  });
+
+  function confirmHardDelete() {
+    Modal.confirm({
+      title: "Permanently delete this Purchase Order?",
+      content: "This action cannot be undone. The PO and all its line items will be removed from the database.",
+      okText: "Delete permanently",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: () => hardDeleteMutation.mutate(),
+    });
+  }
 
   if (isLoading || !po) {
     return (
@@ -317,6 +339,20 @@ export default function PurchaseOrderDetailPage() {
           >
             <Download size={14} strokeWidth={1.5} /> Download PDF
           </button>
+
+          {user?.role === ROLES.SUPER_ADMIN && (
+            <button
+              onClick={confirmHardDelete}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+                border: "none", borderRadius: 8, padding: "8px 14px",
+                fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              }}
+            >
+              <Trash2 size={14} strokeWidth={1.5} /> Delete
+            </button>
+          )}
 
           {user && (
             <WorkflowActionButton

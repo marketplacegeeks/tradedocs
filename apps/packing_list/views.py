@@ -14,7 +14,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole
+from apps.accounts.permissions import IsAnyRole, IsSuperAdmin
 from apps.workflow.constants import DRAFT, EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.serializers import AuditLogSerializer
@@ -325,6 +325,19 @@ class PackingListViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(pl)
         return Response({"signed_copy_url": serializer.data["signed_copy_url"]})
+
+    # ---- Hard delete endpoint (Super Admin only) ----------------------------
+
+    @action(detail=True, methods=["delete"], url_path="hard-delete", permission_classes=[IsSuperAdmin])
+    def hard_delete(self, request, pk=None):
+        """
+        DELETE /packing-lists/{id}/hard-delete/
+        Permanently removes the PL and its linked CI (cascade) from the database.
+        Restricted to SUPER_ADMIN only.
+        """
+        pl = self.get_object()
+        pl.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ---- Audit log endpoint -------------------------------------------------
 

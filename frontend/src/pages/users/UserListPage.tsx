@@ -22,6 +22,7 @@ const DIAL_CODE_OPTIONS = Array.from(
 // ---- Role chip styles -------------------------------------------------------
 
 const ROLE_CHIP: Record<string, { bg: string; color: string; label: string }> = {
+  [ROLES.SUPER_ADMIN]:   { bg: "var(--pastel-pink)", color: "var(--pastel-pink-text)", label: "Super Admin" },
   [ROLES.COMPANY_ADMIN]: { bg: "var(--pastel-blue)", color: "var(--pastel-blue-text)", label: "Company Admin" },
   [ROLES.CHECKER]:       { bg: "var(--pastel-orange)", color: "var(--pastel-orange-text)", label: "Checker" },
   [ROLES.MAKER]:         { bg: "var(--pastel-green)", color: "var(--pastel-green-text)", label: "Maker" },
@@ -204,15 +205,16 @@ export default function UserListPage() {
   }
 
   // ---- Determine which roles are allowed in the edit dropdown
-  // Company Admin cannot be assigned to another user via this form —
-  // only Maker and Checker are selectable. (Admins are created manually.)
-  // If editing a Company Admin, their role shows but cannot be changed (self-guard on backend).
-  const editableRoles = editingUser?.role === ROLES.COMPANY_ADMIN
-    ? [{ value: ROLES.COMPANY_ADMIN, label: "Company Admin" }]
-    : [
-        { value: ROLES.MAKER, label: "Maker" },
-        { value: ROLES.CHECKER, label: "Checker" },
-      ];
+  // Super Admin and Company Admin roles are read-only (shown but not changeable via this form).
+  // Only Maker and Checker can be freely assigned.
+  const editableRoles = editingUser?.role === ROLES.SUPER_ADMIN
+    ? [{ value: ROLES.SUPER_ADMIN, label: "Super Admin" }]
+    : editingUser?.role === ROLES.COMPANY_ADMIN
+      ? [{ value: ROLES.COMPANY_ADMIN, label: "Company Admin" }]
+      : [
+          { value: ROLES.MAKER, label: "Maker" },
+          { value: ROLES.CHECKER, label: "Checker" },
+        ];
 
   const isEditingSelf = editingUser?.id === currentUser?.id;
 
@@ -594,10 +596,10 @@ export default function UserListPage() {
                 onChange={(v) => setEditForm((f) => ({ ...f, role: v }))}
                 style={{ width: "100%" }}
                 options={editableRoles}
-                // Company Admins cannot change their own role (enforced on backend too).
-                disabled={isEditingSelf && editingUser.role === ROLES.COMPANY_ADMIN}
+                // Super Admin and Company Admin cannot change their own role.
+                disabled={isEditingSelf && (editingUser.role === ROLES.COMPANY_ADMIN || editingUser.role === ROLES.SUPER_ADMIN)}
               />
-              {isEditingSelf && editingUser.role === ROLES.COMPANY_ADMIN && (
+              {isEditingSelf && (editingUser.role === ROLES.COMPANY_ADMIN || editingUser.role === ROLES.SUPER_ADMIN) && (
                 <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
                   You cannot change your own role.
                 </div>

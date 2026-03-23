@@ -13,7 +13,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory
+from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory, SuperAdminFactory
 from apps.master_data.tests.factories import (
     IncotermFactory, OrganisationFactory, PaymentTermFactory,
 )
@@ -1538,3 +1538,37 @@ class TestSignedCopyReupload:
 
         pi.refresh_from_db()
         assert pi.signed_copy.name is not None
+
+
+@pytest.mark.django_db
+class TestSuperAdminProformaInvoicePermissions:
+    """SUPER_ADMIN must have the same access as COMPANY_ADMIN on all PI endpoints."""
+
+    def test_super_admin_can_list_pis(self):
+        ProformaInvoiceFactory()
+        resp = auth_client(SuperAdminFactory()).get(PI_LIST_URL)
+        assert resp.status_code == 200
+
+    def test_super_admin_can_retrieve_pi(self):
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(SuperAdminFactory()).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+
+    def test_super_admin_can_hard_delete_pi(self):
+        from apps.proforma_invoice.models import ProformaInvoice
+        super_admin = SuperAdminFactory()
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(super_admin).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
+        assert resp.status_code == 204
+        assert not ProformaInvoice.objects.filter(pk=pi.pk).exists()
+
+    def test_maker_cannot_hard_delete_pi(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker)
+        resp = auth_client(maker).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
+        assert resp.status_code == 403
+
+    def test_company_admin_cannot_hard_delete_pi(self):
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(CompanyAdminFactory()).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
+        assert resp.status_code == 403

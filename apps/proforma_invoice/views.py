@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from django.conf import settings
 
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole
+from apps.accounts.permissions import IsAnyRole, IsSuperAdmin
 from apps.workflow.constants import APPROVED, EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
@@ -196,6 +196,19 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(pi)
         return Response({"signed_copy_url": serializer.data["signed_copy_url"]})
+
+    # ---- Hard delete endpoint (Super Admin only) ----------------------------
+
+    @action(detail=True, methods=["delete"], url_path="hard-delete", permission_classes=[IsSuperAdmin])
+    def hard_delete(self, request, pk=None):
+        """
+        DELETE /proforma-invoices/{id}/hard-delete/
+        Permanently removes the PI and all its line items + charges from the database.
+        Restricted to SUPER_ADMIN only.
+        """
+        pi = self.get_object()
+        pi.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ---- Audit log endpoint -------------------------------------------------
 
