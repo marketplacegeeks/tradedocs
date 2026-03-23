@@ -3,18 +3,18 @@
 
 const VIDEOS = [
   {
-    id: "pXGLEN-F794",
-    title: "Getting Started with TradeDocs",
+    id: "K8TPNLrJMJs",
+    title: "User Management",
     description:
-      "A complete walkthrough of the platform — from creating your first Proforma Invoice to submitting it for approval.",
+      "Learn how to create a combined Packing List and Commercial Invoice from an approved PI, and manage the joint approval workflow.",
     chip: "Beginner",
     chipColor: { bg: "var(--pastel-green)", text: "var(--pastel-green-text)" },
   },
   {
-    id: "jP0LvEK1fi4",
-    title: "Packing List & Commercial Invoice",
+    id: "pXGLEN-F794",
+    title: "Master Data",
     description:
-      "Learn how to create a combined Packing List and Commercial Invoice from an approved PI, and manage the joint approval workflow.",
+      "A complete walkthrough of the platform — from creating your first Proforma Invoice to submitting it for approval.",
     chip: "Intermediate",
     chipColor: { bg: "var(--pastel-blue)", text: "var(--pastel-blue-text)" },
   },
