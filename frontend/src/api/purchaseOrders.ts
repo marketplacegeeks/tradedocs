@@ -38,6 +38,7 @@ export interface PurchaseOrder {
   buyer_name: string | null;
   internal_contact: number;
   internal_contact_name: string;
+  internal_contact_email: string;
   internal_contact_phone: string;
   delivery_address: number;
   bank: number | null;
@@ -49,6 +50,7 @@ export interface PurchaseOrder {
   time_of_delivery: string;
   tc_template: number | null;
   tc_content: string;
+  line_item_remarks: string;
   remarks: string;
   status: string;
   created_by: number;
@@ -61,6 +63,14 @@ export interface PurchaseOrder {
   country_of_origin_name: string | null;
   bank_name: string | null;
   delivery_address_detail: string;
+  // Report aggregate fields (R-06)
+  line_item_count: number;
+  total_taxable: string;
+  total_igst: string;
+  total_cgst: string;
+  total_sgst: string;
+  total_tax_amount: string;
+  delivery_city_country: string;
 }
 
 export interface PurchaseOrderCreatePayload {
@@ -78,6 +88,7 @@ export interface PurchaseOrderCreatePayload {
   time_of_delivery?: string;
   tc_template?: number | null;
   tc_content?: string;
+  line_item_remarks?: string;
   remarks?: string;
 }
 
@@ -102,7 +113,14 @@ export interface PurchaseOrderFilters {
   status?: string;
   created_by?: number;
   vendor?: number;
+  buyer?: number;
+  currency?: number;
+  transaction_type?: string;
+  internal_contact?: number;
+  country_of_origin?: number;
   po_number?: string;
+  po_date_after?: string;
+  po_date_before?: string;
 }
 
 // ---- API functions ----------------------------------------------------------
@@ -114,6 +132,22 @@ export async function listPurchaseOrders(filters: PurchaseOrderFilters = {}): Pr
   if (filters.created_by) params.set("created_by", String(filters.created_by));
   if (filters.vendor) params.set("vendor", String(filters.vendor));
   if (filters.po_number) params.set("po_number", filters.po_number);
+  const { data } = await api.get<PurchaseOrder[]>(`/purchase-orders/?${params.toString()}`);
+  return data;
+}
+
+/** Fetch purchase orders for R-06 report with full filter support. */
+export async function listPurchaseOrdersReport(filters: PurchaseOrderFilters = {}): Promise<PurchaseOrder[]> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.vendor) params.set("vendor", String(filters.vendor));
+  if (filters.buyer) params.set("buyer", String(filters.buyer));
+  if (filters.currency) params.set("currency", String(filters.currency));
+  if (filters.transaction_type) params.set("transaction_type", filters.transaction_type);
+  if (filters.internal_contact) params.set("internal_contact", String(filters.internal_contact));
+  if (filters.country_of_origin) params.set("country_of_origin", String(filters.country_of_origin));
+  if (filters.po_date_after) params.set("po_date_after", filters.po_date_after);
+  if (filters.po_date_before) params.set("po_date_before", filters.po_date_before);
   const { data } = await api.get<PurchaseOrder[]>(`/purchase-orders/?${params.toString()}`);
   return data;
 }

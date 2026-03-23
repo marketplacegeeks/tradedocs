@@ -212,3 +212,62 @@ class TestUserDetailView:
         assert response.status_code == 200
         assert response.data["phone_country_code"] == "+44"
         assert response.data["phone_number"] == "7911123456"
+
+
+@pytest.mark.django_db
+class TestUserCreateWithPhone:
+    """Tests for phone number fields on the invite (create) endpoint."""
+
+    def _auth(self, api_client):
+        admin = CompanyAdminFactory()
+        tokens = get_tokens(api_client, admin.email, "testpass123")
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def _base_payload(self):
+        return {
+            "email": "newuser@test.com",
+            "first_name": "New",
+            "last_name": "User",
+            "role": "MAKER",
+            "password": "securepass123",
+        }
+
+    def test_create_user_with_phone_succeeds(self, api_client):
+        self._auth(api_client)
+        payload = {**self._base_payload(), "phone_country_code": "+91", "phone_number": "9876543210"}
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 201
+        assert response.data["phone_country_code"] == "+91"
+        assert response.data["phone_number"] == "9876543210"
+
+    def test_create_user_without_phone_succeeds(self, api_client):
+        # Phone is optional — omitting both fields should still create the user.
+        self._auth(api_client)
+        response = api_client.post(reverse("user-list-create"), self._base_payload())
+        assert response.status_code == 201
+        assert response.data["phone_country_code"] == ""
+        assert response.data["phone_number"] == ""
+
+    def test_create_user_with_only_country_code_fails(self, api_client):
+        # Providing a dial code without a number should be rejected.
+        self._auth(api_client)
+        payload = {**self._base_payload(), "phone_country_code": "+91"}
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 400
+        assert "phone" in response.data
+
+    def test_create_user_with_only_number_fails(self, api_client):
+        # Providing a number without a dial code should be rejected.
+        self._auth(api_client)
+        payload = {**self._base_payload(), "phone_number": "9876543210"}
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 400
+        assert "phone" in response.data
+
+    def test_create_user_with_invalid_phone_fails(self, api_client):
+        # A syntactically valid dial code but nonsense number should be rejected.
+        self._auth(api_client)
+        payload = {**self._base_payload(), "phone_country_code": "+91", "phone_number": "000"}
+        response = api_client.post(reverse("user-list-create"), payload)
+        assert response.status_code == 400
+        assert "phone" in response.data

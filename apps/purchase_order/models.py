@@ -110,6 +110,7 @@ class PurchaseOrder(models.Model):
     )
     tc_content = models.TextField(blank=True, default="")
 
+    line_item_remarks = models.TextField(blank=True, default="")
     remarks = models.TextField(blank=True, default="")
 
     # ---- Workflow ------------------------------------------------------------

@@ -24,6 +24,8 @@ export interface UserCreatePayload {
   last_name: string;
   role: string;
   password: string;
+  phone_country_code?: string;
+  phone_number?: string;
 }
 
 export interface UserUpdatePayload {

@@ -10,18 +10,17 @@ import R02ProformaInvoiceRegister from "./R02ProformaInvoiceRegister";
 import R03ShipmentRegister from "./R03ShipmentRegister";
 import R04CommoditySalesReport from "./R04CommoditySalesReport";
 import R05ConsigneeBusinessSummary from "./R05ConsigneeBusinessSummary";
+import R06PurchaseOrderRegister from "./R06PurchaseOrderRegister";
 
-// Report definitions — R-01, R-08, R-09 are excluded for now (future sprints).
 export const REPORTS = [
-  { value: "R-02", label: "R-02 — Proforma Invoice Register" },
-  { value: "R-03", label: "R-03 — Shipment Register" },
-  { value: "R-04", label: "R-04 — Commodity Sales Report" },
-  { value: "R-05", label: "R-05 — Consignee-wise Business Summary" },
-  { value: "R-06", label: "R-06 — Purchase Order Register" },
-  { value: "R-07", label: "R-07 — Vendor-wise Procurement Summary" },
+  { value: "R-02", label: "Proforma Invoice Register" },
+  { value: "R-03", label: "Shipment Register" },
+  { value: "R-04", label: "Commodity Sales Report" },
+  { value: "R-05", label: "Consignee-wise Business Summary" },
+  { value: "R-06", label: "Purchase Order Register" },
 ];
 
-const IMPLEMENTED = new Set(["R-02", "R-03", "R-04", "R-05"]);
+const IMPLEMENTED = new Set(["R-02", "R-03", "R-04", "R-05", "R-06"]);
 
 const labelStyle: React.CSSProperties = {
   fontFamily: "var(--font-body)",
@@ -113,6 +112,7 @@ export default function ReportsPage() {
       <R03ShipmentRegister selectedReport={selectedReport} />
       <R04CommoditySalesReport selectedReport={selectedReport} />
       <R05ConsigneeBusinessSummary selectedReport={selectedReport} />
+      <R06PurchaseOrderRegister selectedReport={selectedReport} />
 
       {/* Coming soon placeholder */}
       {selectedReport && !IMPLEMENTED.has(selectedReport) && (

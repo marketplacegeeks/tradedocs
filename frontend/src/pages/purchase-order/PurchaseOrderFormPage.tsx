@@ -100,6 +100,7 @@ const schema = z.object({
   time_of_delivery: z.string().optional().default(""),
   tc_template: z.number().nullable().optional(),
   tc_content: z.string().optional().default(""),
+  line_item_remarks: z.string().optional().default(""),
   remarks: z.string().optional().default(""),
 });
 
@@ -304,6 +305,7 @@ export default function PurchaseOrderFormPage() {
       time_of_delivery: existingPO.time_of_delivery,
       tc_template: existingPO.tc_template,
       tc_content: existingPO.tc_content,
+      line_item_remarks: existingPO.line_item_remarks,
       remarks: existingPO.remarks,
     });
     if (existingPO.tc_template) setSelectedTemplateId(existingPO.tc_template);
@@ -816,6 +818,17 @@ export default function PurchaseOrderFormPage() {
           )}
         </div>
 
+        {/* ── Line Item Remarks ─────────────────────────────────────────── */}
+        <div style={CARD}>
+          <h2 style={SECTION_TITLE}>Line Item Remarks</h2>
+          <textarea
+            {...register("line_item_remarks")}
+            style={{ ...INPUT, resize: "vertical", minHeight: 80 }}
+            placeholder="Any notes specific to the line items above…"
+            disabled={!inEditableState}
+          />
+        </div>
+
         {/* ── Section 3: Terms & Conditions ─────────────────────────────── */}
         <div style={CARD}>
           <h2 style={SECTION_TITLE}>Terms &amp; Conditions</h2>
@@ -864,9 +877,9 @@ export default function PurchaseOrderFormPage() {
           )}
         </div>
 
-        {/* ── Section 4: Remarks + Actions ─────────────────────────────── */}
+        {/* ── Section 4: Remarks (Below Total) ─────────────────────────── */}
         <div style={CARD}>
-          <h2 style={SECTION_TITLE}>Remarks</h2>
+          <h2 style={SECTION_TITLE}>Remarks (Below Total)</h2>
           <textarea
             {...register("remarks")}
             style={{ ...INPUT, resize: "vertical", minHeight: 100 }}

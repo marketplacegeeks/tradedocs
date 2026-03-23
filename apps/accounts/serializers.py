@@ -36,7 +36,32 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "role", "password"]
+        fields = ["email", "first_name", "last_name", "role", "password", "phone_country_code", "phone_number"]
+        extra_kwargs = {
+            "phone_country_code": {"required": False, "default": ""},
+            "phone_number": {"required": False, "default": ""},
+        }
+
+    def validate(self, attrs):
+        # Phone validation: both fields must be provided together, or neither.
+        code = attrs.get("phone_country_code", "").strip()
+        number = attrs.get("phone_number", "").strip()
+        if code or number:
+            if not code or not number:
+                raise serializers.ValidationError(
+                    {"phone": "Both phone country code and phone number must be provided together."}
+                )
+            try:
+                parsed = phonenumbers.parse(code + number)
+                if not phonenumbers.is_valid_number(parsed):
+                    raise serializers.ValidationError(
+                        {"phone": "The phone number is not valid for the given country code."}
+                    )
+            except phonenumbers.NumberParseException:
+                raise serializers.ValidationError(
+                    {"phone": "Invalid phone number format. Use a dial code like +91 and a local number."}
+                )
+        return attrs
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
