@@ -26,6 +26,7 @@ import PurchaseOrderFormPage from "./pages/purchase-order/PurchaseOrderFormPage"
 import PurchaseOrderDetailPage from "./pages/purchase-order/PurchaseOrderDetailPage";
 
 import ReportsPage from "./pages/reports/ReportsPage";
+import TrainingPage from "./pages/training/TrainingPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -184,6 +185,16 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <ReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Training — all roles */}
+        <Route
+          path="/training"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
+              <TrainingPage />
             </ProtectedRoute>
           }
         />

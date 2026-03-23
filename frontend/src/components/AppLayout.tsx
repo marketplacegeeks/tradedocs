@@ -8,7 +8,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
   FileText, Package, Database, Users, BarChart2,
-  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard,
+  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard, GraduationCap,
 } from "lucide-react";
 
 import { useAuth } from "../store/AuthContext";
@@ -65,6 +65,12 @@ const NAV_ITEMS = [
     icon: BarChart2,
     label: "Reports",
     roles: [ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    key: "/training",
+    icon: GraduationCap,
+    label: "Training",
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
 ];
 
