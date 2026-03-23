@@ -34,8 +34,8 @@ type ActionDef = {
 function getAllowedActions(status: string, role: string, docType: string): ActionDef[] {
   const actions: ActionDef[] = [];
 
-  const isMakerOrAdmin = role === ROLES.MAKER || role === ROLES.COMPANY_ADMIN;
-  const isCheckerOrAdmin = role === ROLES.CHECKER || role === ROLES.COMPANY_ADMIN;
+  const isMakerOrAdmin = role === ROLES.MAKER || role === ROLES.COMPANY_ADMIN || role === ROLES.SUPER_ADMIN;
+  const isCheckerOrAdmin = role === ROLES.CHECKER || role === ROLES.COMPANY_ADMIN || role === ROLES.SUPER_ADMIN;
 
   if (status === DOCUMENT_STATUS.DRAFT && isMakerOrAdmin) {
     actions.push({
