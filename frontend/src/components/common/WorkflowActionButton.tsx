@@ -35,7 +35,8 @@ function getAllowedActions(status: string, role: string, docType: string): Actio
   const actions: ActionDef[] = [];
 
   const isMakerOrAdmin = role === ROLES.MAKER || role === ROLES.COMPANY_ADMIN || role === ROLES.SUPER_ADMIN;
-  const isCheckerOrAdmin = role === ROLES.CHECKER || role === ROLES.COMPANY_ADMIN || role === ROLES.SUPER_ADMIN;
+  // Maker, Company Admin, and Super Admin can all approve documents.
+  const isCheckerOrAdmin = role === ROLES.MAKER || role === ROLES.CHECKER || role === ROLES.COMPANY_ADMIN || role === ROLES.SUPER_ADMIN;
 
   if (status === DOCUMENT_STATUS.DRAFT && isMakerOrAdmin) {
     actions.push({
