@@ -107,11 +107,21 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     currency_code = serializers.CharField(source="currency.code", read_only=True)
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
     internal_contact_name = serializers.CharField(source="internal_contact.get_full_name", read_only=True)
+    internal_contact_email = serializers.EmailField(source="internal_contact.email", read_only=True)
     internal_contact_phone = serializers.SerializerMethodField()
     payment_terms_name = serializers.CharField(source="payment_terms.name", allow_null=True, read_only=True)
     country_of_origin_name = serializers.CharField(source="country_of_origin.name", allow_null=True, read_only=True)
     bank_name = serializers.SerializerMethodField()
     delivery_address_detail = serializers.SerializerMethodField()
+
+    # Report aggregate fields (R-06)
+    line_item_count = serializers.SerializerMethodField()
+    total_taxable = serializers.SerializerMethodField()
+    total_igst = serializers.SerializerMethodField()
+    total_cgst = serializers.SerializerMethodField()
+    total_sgst = serializers.SerializerMethodField()
+    total_tax_amount = serializers.SerializerMethodField()
+    delivery_city_country = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrder
@@ -126,6 +136,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "buyer_name",
             "internal_contact",
             "internal_contact_name",
+            "internal_contact_email",
             "internal_contact_phone",
             "delivery_address",
             "bank",
@@ -137,6 +148,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "time_of_delivery",
             "tc_template",
             "tc_content",
+            "line_item_remarks",
             "remarks",
             "status",
             "created_by",
@@ -149,13 +161,46 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "country_of_origin_name",
             "bank_name",
             "delivery_address_detail",
+            # Report aggregate fields
+            "line_item_count",
+            "total_taxable",
+            "total_igst",
+            "total_cgst",
+            "total_sgst",
+            "total_tax_amount",
+            "delivery_city_country",
         ]
         read_only_fields = ["id", "po_number", "status", "created_by", "created_at", "updated_at"]
 
     def get_total(self, obj):
         """Sum of all line item totals."""
-        result = sum(item.total for item in obj.line_items.all())
-        return result
+        return sum(item.total for item in obj.line_items.all())
+
+    def get_line_item_count(self, obj):
+        return obj.line_items.count()
+
+    def get_total_taxable(self, obj):
+        return sum(item.taxable_amount for item in obj.line_items.all())
+
+    def get_total_igst(self, obj):
+        return sum(item.igst_amount or Decimal("0") for item in obj.line_items.all())
+
+    def get_total_cgst(self, obj):
+        return sum(item.cgst_amount or Decimal("0") for item in obj.line_items.all())
+
+    def get_total_sgst(self, obj):
+        return sum(item.sgst_amount or Decimal("0") for item in obj.line_items.all())
+
+    def get_total_tax_amount(self, obj):
+        return sum(item.total_tax for item in obj.line_items.all())
+
+    def get_delivery_city_country(self, obj):
+        """Short form delivery address: 'Mumbai, India'."""
+        addr = obj.delivery_address
+        if not addr:
+            return ""
+        parts = filter(None, [addr.city, getattr(addr.country, "name", None)])
+        return ", ".join(parts)
 
     def get_bank_name(self, obj):
         if not obj.bank:
@@ -186,9 +231,10 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Constraint #18: make content fields read_only when document is not editable
+        # Constraint #18: make content fields read_only when document is not editable.
+        # Guard with isinstance — in list mode DRF passes the full queryset as instance.
         instance = self.instance
-        if instance and instance.status not in EDITABLE_STATES:
+        if isinstance(instance, PurchaseOrder) and instance.status not in EDITABLE_STATES:
             editable_fields = ["po_number", "status", "created_by", "created_at", "updated_at"]
             for field_name in self.fields:
                 if field_name not in editable_fields:

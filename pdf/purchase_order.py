@@ -6,6 +6,7 @@ Constraint #9: Returns bytes in-memory — never writes to disk.
 """
 from decimal import Decimal
 from io import BytesIO
+from num2words import num2words
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -32,12 +33,16 @@ def _safe(v, default="") -> str:
 
 
 def _fmt_money(v) -> str:
-    """Format number with comma separators, strip trailing zeros."""
+    """Format number with comma separators, two decimal places."""
     try:
-        s = f"{float(v):,.2f}".rstrip("0").rstrip(".")
-        return s
+        return f"{float(v):,.2f}"
     except Exception:
         return _safe(v)
+
+
+def _fmt_cur(v, sym: str) -> str:
+    """Format a monetary value with currency code prefix, e.g. 'USD 1,250.00'."""
+    return f"{sym} {_fmt_money(v)}" if sym else _fmt_money(v)
 
 
 def _fmt_qty(v) -> str:
@@ -46,6 +51,25 @@ def _fmt_qty(v) -> str:
         return s
     except Exception:
         return _safe(v)
+
+
+def _amount_in_words(amount, currency_name: str) -> str:
+    """Convert a Decimal amount to title-cased words with the currency name prepended."""
+    try:
+        words = num2words(amount, to="currency", lang="en").replace(" euro,", "").replace(",", "")
+        # num2words returns lowercase; capitalise each word for a formal look.
+        words = words.title()
+        return f"{currency_name} {words} Only"
+    except Exception:
+        return ""
+
+
+def _w(total_remaining, n_cols, idx) -> float:
+    """Distribute total_remaining width evenly; last column absorbs rounding."""
+    base = total_remaining / n_cols
+    if idx == n_cols - 1:
+        return total_remaining - base * (n_cols - 1)
+    return base
 
 
 def _addr_lines(addr_obj) -> list[str]:
@@ -197,10 +221,55 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             self.drawCentredString(A4[0] / 2, 8 * mm, f"Page {page_num} of {total_pages}")
             self.restoreState()
 
+    style_company_name = ParagraphStyle(
+        "POCompanyName",
+        parent=styles["Normal"],
+        fontSize=13,
+        leading=17,
+        fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+    )
+    style_company_addr = ParagraphStyle(
+        "POCompanyAddr",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=13,
+        alignment=TA_CENTER,
+    )
+
     story = []
 
     # ========================================================================
-    # SECTION 1: DOCUMENT TITLE
+    # SECTION 1: BUYER LETTERHEAD (shown only when a buyer org is set)
+    # ========================================================================
+
+    buyer_org = getattr(po, "buyer", None)
+    if buyer_org:
+        buyer_org_name = _safe(getattr(buyer_org, "name", "")).strip()
+        if buyer_org_name:
+            story.append(Paragraph(buyer_org_name, style_company_name))
+
+        # Use the REGISTERED address specifically, not just the first on file.
+        try:
+            buyer_reg_addr = buyer_org.addresses.filter(address_type="REGISTERED").first()
+        except Exception:
+            buyer_reg_addr = None
+
+        if buyer_reg_addr:
+            addr_parts = list(filter(None, [
+                _safe(buyer_reg_addr.line1).strip(),
+                _safe(buyer_reg_addr.line2).strip(),
+                _safe(buyer_reg_addr.city).strip(),
+                _safe(buyer_reg_addr.pin).strip(),
+                _safe(getattr(buyer_reg_addr.country, "name", "")).strip() if getattr(buyer_reg_addr, "country", None) else "",
+            ]))
+            if addr_parts:
+                story.append(Paragraph(" | ".join(addr_parts), style_company_addr))
+
+        story.append(Spacer(1, 6))
+
+    # ========================================================================
+    # SECTION 2: DOCUMENT TITLE
     # ========================================================================
 
     story.append(Paragraph("PURCHASE ORDER", style_title))
@@ -221,11 +290,14 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     vendor_name = _safe(getattr(vendor, "name", ""))
     vendor_addr = _org_first_address(vendor)
     vendor_addr_lines = _addr_lines(vendor_addr)
-    vendor_detail_html = "<br/>".join([vendor_name] + vendor_addr_lines) if vendor_name else "—"
-
-    delivery_addr = getattr(po, "delivery_address", None)
-    delivery_lines = _addr_lines(delivery_addr)
-    delivery_html = "<br/>".join(delivery_lines) if delivery_lines else "—"
+    vendor_tax_parts = []
+    if vendor_addr:
+        tax_type = _safe(getattr(vendor_addr, "tax_type", "")).strip()
+        tax_code = _safe(getattr(vendor_addr, "tax_code", "")).strip()
+        if tax_code:
+            label = f"{tax_type}: " if tax_type else ""
+            vendor_tax_parts.append(f"{label}{tax_code}")
+    vendor_detail_html = "<br/>".join([vendor_name] + vendor_addr_lines + vendor_tax_parts) if vendor_name else "—"
 
     currency_obj = getattr(po, "currency", None)
     currency_code = _safe(getattr(currency_obj, "code", ""))
@@ -238,6 +310,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
 
     internal_contact = getattr(po, "internal_contact", None)
     contact_name = _safe(getattr(internal_contact, "get_full_name", lambda: "")()) if internal_contact else "—"
+    contact_email = _safe(getattr(internal_contact, "email", "")) if internal_contact else ""
     contact_phone = ""
     if internal_contact:
         cc = _safe(getattr(internal_contact, "phone_country_code", ""))
@@ -245,22 +318,46 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         if cc and ph:
             contact_phone = f"{cc} {ph}"
 
+    # Build buyer contact block: Name + Email + Phone
+    buyer_contact_parts = [f"<b>Buyer Contact:</b> {contact_name}"]
+    if contact_email:
+        buyer_contact_parts.append(f"<b>Email:</b> {contact_email}")
+    if contact_phone:
+        buyer_contact_parts.append(f"<b>Phone:</b> {contact_phone}")
+    buyer_contact_html = "<br/>".join(buyer_contact_parts)
+
+    # Delivery address: prepend organisation name if available
+    delivery_addr = getattr(po, "delivery_address", None)
+    delivery_org_name = ""
+    if delivery_addr:
+        delivery_org = getattr(delivery_addr, "organisation", None)
+        if delivery_org:
+            delivery_org_name = _safe(getattr(delivery_org, "name", ""))
+    delivery_lines = _addr_lines(delivery_addr)
+    if delivery_org_name:
+        delivery_lines = [delivery_org_name] + delivery_lines
+    if delivery_addr:
+        d_tax_type = _safe(getattr(delivery_addr, "tax_type", "")).strip()
+        d_tax_code = _safe(getattr(delivery_addr, "tax_code", "")).strip()
+        if d_tax_code:
+            d_label = f"{d_tax_type}: " if d_tax_type else ""
+            delivery_lines.append(f"{d_label}{d_tax_code}")
+    delivery_html = "<br/>".join(delivery_lines) if delivery_lines else "—"
+
     header_data = [
         [
+            Paragraph(f"<b>Delivery Address:</b><br/>{delivery_html}", style_text),
             Paragraph(f"<b>Vendor / Supplier:</b><br/>{vendor_detail_html}", style_text),
+        ],
+        [
             Paragraph(
                 f"<b>PO No:</b> {_safe(po.po_number)}<br/>"
                 f"<b>Date:</b> {_safe(po.po_date)}<br/>"
                 f"<b>Customer No:</b> {_safe(po.customer_no) or '—'}",
                 style_text,
             ),
-        ],
-        [
-            Paragraph(f"<b>Delivery Address:</b><br/>{delivery_html}", style_text),
             Paragraph(
-                f"<b>Internal Contact:</b> {contact_name}<br/>"
-                + (f"<b>Phone:</b> {contact_phone}<br/>" if contact_phone else "")
-                + f"<b>Currency:</b> {currency_code or '—'}",
+                buyer_contact_html + f"<br/><b>Currency:</b> {currency_code or '—'}",
                 style_text,
             ),
         ],
@@ -316,13 +413,21 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
 
     line_items = list(po.line_items.all().order_by("sort_order", "id"))
 
-    # Build dynamic column headers and data based on transaction_type
+    # Determine which optional columns have at least one non-empty value across all items
+    has_item_code = any(_safe(i.item_code).strip() for i in line_items)
+    has_hsn      = any(_safe(i.hsn_code).strip() for i in line_items)
+    has_mfr      = any(_safe(i.manufacturer).strip() for i in line_items)
+
+    # Build dynamic column headers and data based on transaction_type.
+    # Optional columns (item_code, hsn, manufacturer) are omitted when all items are blank.
     if tx_type == "IGST":
-        headers = [
-            Paragraph("<b>#</b>", style_th),
-            Paragraph("<b>Description</b>", style_th),
-            Paragraph("<b>HSN Code</b>", style_th),
-            Paragraph("<b>Mfr</b>", style_th),
+        headers = [Paragraph("<b>#</b>", style_th), Paragraph("<b>Description</b>", style_th)]
+        col_widths = [8*mm, 48*mm]
+        if has_hsn:
+            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(18*mm)
+        if has_mfr:
+            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(16*mm)
+        headers += [
             Paragraph("<b>Qty</b>", style_th),
             Paragraph("<b>Unit Price</b>", style_th),
             Paragraph("<b>Taxable Amt</b>", style_th),
@@ -330,14 +435,21 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             Paragraph("<b>IGST Amt</b>", style_th),
             Paragraph("<b>Total</b>", style_th),
         ]
-        col_widths = [8*mm, 42*mm, 18*mm, 18*mm, 14*mm, 18*mm, 18*mm, 12*mm, 15*mm, 17*mm]
-        right_cols = {4, 5, 6, 7, 8, 9}
+        # Remaining width is distributed among numeric columns
+        used = sum(col_widths)
+        remaining = 180*mm - used
+        col_widths += [_w(remaining, 6, i) for i in range(6)]
+        opt_start = 2 + int(has_hsn) + int(has_mfr)  # index where numeric cols start
+        right_cols = set(range(opt_start, len(headers)))
+
     elif tx_type == "CGST_SGST":
-        headers = [
-            Paragraph("<b>#</b>", style_th),
-            Paragraph("<b>Description</b>", style_th),
-            Paragraph("<b>HSN Code</b>", style_th),
-            Paragraph("<b>Mfr</b>", style_th),
+        headers = [Paragraph("<b>#</b>", style_th), Paragraph("<b>Description</b>", style_th)]
+        col_widths = [7*mm, 38*mm]
+        if has_hsn:
+            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(15*mm)
+        if has_mfr:
+            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(13*mm)
+        headers += [
             Paragraph("<b>Qty</b>", style_th),
             Paragraph("<b>Unit Price</b>", style_th),
             Paragraph("<b>Taxable Amt</b>", style_th),
@@ -347,25 +459,42 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             Paragraph("<b>SGST Amt</b>", style_th),
             Paragraph("<b>Total</b>", style_th),
         ]
-        col_widths = [7*mm, 35*mm, 15*mm, 14*mm, 12*mm, 16*mm, 16*mm, 10*mm, 12*mm, 10*mm, 12*mm, 15*mm]
-        right_cols = {4, 5, 6, 7, 8, 9, 10, 11}
+        used = sum(col_widths)
+        remaining = 180*mm - used
+        col_widths += [_w(remaining, 8, i) for i in range(8)]
+        opt_start = 2 + int(has_hsn) + int(has_mfr)
+        right_cols = set(range(opt_start, len(headers)))
+
     else:
         # ZERO_RATED — no tax columns
-        headers = [
-            Paragraph("<b>#</b>", style_th),
-            Paragraph("<b>Description</b>", style_th),
-            Paragraph("<b>Item Code</b>", style_th),
-            Paragraph("<b>HSN Code</b>", style_th),
-            Paragraph("<b>Mfr</b>", style_th),
+        headers = [Paragraph("<b>#</b>", style_th), Paragraph("<b>Description</b>", style_th)]
+        col_widths = [8*mm, 52*mm]
+        if has_item_code:
+            headers.append(Paragraph("<b>Item Code</b>", style_th)); col_widths.append(22*mm)
+        if has_hsn:
+            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(18*mm)
+        if has_mfr:
+            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(18*mm)
+        headers += [
             Paragraph("<b>Qty</b>", style_th),
             Paragraph("<b>Unit Price</b>", style_th),
             Paragraph("<b>Total</b>", style_th),
         ]
-        col_widths = [8*mm, 50*mm, 22*mm, 18*mm, 18*mm, 16*mm, 22*mm, 26*mm]
-        right_cols = {5, 6, 7}
+        used = sum(col_widths)
+        remaining = 180*mm - used
+        col_widths += [_w(remaining, 3, i) for i in range(3)]
+        opt_start = 2 + int(has_item_code) + int(has_hsn) + int(has_mfr)
+        right_cols = set(range(opt_start, len(headers)))
+
+    # Currency code used as prefix on all monetary values (no symbol field on model).
+    cur_sym = currency_code
 
     li_rows = [headers]
-    grand_total = Decimal("0.00")
+    grand_total    = Decimal("0.00")
+    total_taxable  = Decimal("0.00")
+    total_igst     = Decimal("0.00")
+    total_cgst     = Decimal("0.00")
+    total_sgst     = Decimal("0.00")
 
     for idx, item in enumerate(line_items, start=1):
         uom_obj = getattr(item, "uom", None)
@@ -373,56 +502,81 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         qty_str = f"{_fmt_qty(item.quantity)} {uom_display}".strip()
         item_total = item.total or Decimal("0.00")
         try:
-            grand_total += Decimal(str(item_total))
+            grand_total   += Decimal(str(item_total))
+            total_taxable += Decimal(str(item.taxable_amount or 0))
+            if tx_type == "IGST":
+                total_igst += Decimal(str(item.igst_amount or 0))
+            elif tx_type == "CGST_SGST":
+                total_cgst += Decimal(str(item.cgst_amount or 0))
+                total_sgst += Decimal(str(item.sgst_amount or 0))
         except Exception:
             pass
 
         if tx_type == "IGST":
-            row = [
-                Paragraph(str(idx), style_text),
-                Paragraph(_safe(item.description), style_text),
-                Paragraph(_safe(item.hsn_code), style_text),
-                Paragraph(_safe(item.manufacturer), style_text),
+            row = [Paragraph(str(idx), style_text), Paragraph(_safe(item.description), style_text)]
+            if has_hsn:
+                row.append(Paragraph(_safe(item.hsn_code), style_text))
+            if has_mfr:
+                row.append(Paragraph(_safe(item.manufacturer), style_text))
+            row += [
                 Paragraph(qty_str, style_right),
-                Paragraph(_fmt_money(item.unit_price), style_right),
-                Paragraph(_fmt_money(item.taxable_amount), style_right),
+                Paragraph(_fmt_cur(item.unit_price, cur_sym), style_right),
+                Paragraph(_fmt_cur(item.taxable_amount, cur_sym), style_right),
                 Paragraph(_safe(item.igst_percent) or "—", style_right),
-                Paragraph(_fmt_money(item.igst_amount) if item.igst_amount else "—", style_right),
-                Paragraph(_fmt_money(item_total), style_right_bold),
+                Paragraph(_fmt_cur(item.igst_amount, cur_sym) if item.igst_amount else "—", style_right),
+                Paragraph(_fmt_cur(item_total, cur_sym), style_right_bold),
             ]
         elif tx_type == "CGST_SGST":
-            row = [
-                Paragraph(str(idx), style_text),
-                Paragraph(_safe(item.description), style_text),
-                Paragraph(_safe(item.hsn_code), style_text),
-                Paragraph(_safe(item.manufacturer), style_text),
+            row = [Paragraph(str(idx), style_text), Paragraph(_safe(item.description), style_text)]
+            if has_hsn:
+                row.append(Paragraph(_safe(item.hsn_code), style_text))
+            if has_mfr:
+                row.append(Paragraph(_safe(item.manufacturer), style_text))
+            row += [
                 Paragraph(qty_str, style_right),
-                Paragraph(_fmt_money(item.unit_price), style_right),
-                Paragraph(_fmt_money(item.taxable_amount), style_right),
+                Paragraph(_fmt_cur(item.unit_price, cur_sym), style_right),
+                Paragraph(_fmt_cur(item.taxable_amount, cur_sym), style_right),
                 Paragraph(_safe(item.cgst_percent) or "—", style_right),
-                Paragraph(_fmt_money(item.cgst_amount) if item.cgst_amount else "—", style_right),
+                Paragraph(_fmt_cur(item.cgst_amount, cur_sym) if item.cgst_amount else "—", style_right),
                 Paragraph(_safe(item.sgst_percent) or "—", style_right),
-                Paragraph(_fmt_money(item.sgst_amount) if item.sgst_amount else "—", style_right),
-                Paragraph(_fmt_money(item_total), style_right_bold),
+                Paragraph(_fmt_cur(item.sgst_amount, cur_sym) if item.sgst_amount else "—", style_right),
+                Paragraph(_fmt_cur(item_total, cur_sym), style_right_bold),
             ]
         else:
-            row = [
-                Paragraph(str(idx), style_text),
-                Paragraph(_safe(item.description), style_text),
-                Paragraph(_safe(item.item_code), style_text),
-                Paragraph(_safe(item.hsn_code), style_text),
-                Paragraph(_safe(item.manufacturer), style_text),
+            row = [Paragraph(str(idx), style_text), Paragraph(_safe(item.description), style_text)]
+            if has_item_code:
+                row.append(Paragraph(_safe(item.item_code), style_text))
+            if has_hsn:
+                row.append(Paragraph(_safe(item.hsn_code), style_text))
+            if has_mfr:
+                row.append(Paragraph(_safe(item.manufacturer), style_text))
+            row += [
                 Paragraph(qty_str, style_right),
-                Paragraph(_fmt_money(item.unit_price), style_right),
-                Paragraph(_fmt_money(item_total), style_right_bold),
+                Paragraph(_fmt_cur(item.unit_price, cur_sym), style_right),
+                Paragraph(_fmt_cur(item_total, cur_sym), style_right_bold),
             ]
         li_rows.append(row)
 
-    # Totals row spanning all columns except the last two (label + amount)
+    # Single totals row: label in Description column, column totals in every amount column.
     n_cols = len(headers)
-    totals_row = [""] * n_cols
-    totals_row[n_cols - 2] = Paragraph("<b>Grand Total</b>", style_label)
-    totals_row[n_cols - 1] = Paragraph(f"<b>{_fmt_money(grand_total)}</b>", style_right_bold)
+    totals_row = [Paragraph("", style_text)] * n_cols
+    totals_row[1] = Paragraph("<b>Grand Total</b>", style_label)
+
+    if tx_type == "IGST":
+        # Columns from opt_start: Qty | UnitPrice | TaxableAmt | IGST% | IGSTAmt | Total
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_igst, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 5] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+    elif tx_type == "CGST_SGST":
+        # Columns from opt_start: Qty | UnitPrice | TaxableAmt | CGST% | CGSTAmt | SGST% | SGSTAmt | Total
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_cgst, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 6] = Paragraph(f"<b>{_fmt_cur(total_sgst, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 7] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+    else:
+        # ZERO_RATED — Columns from opt_start: Qty | UnitPrice | Total
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+
     li_rows.append(totals_row)
 
     cmds = [
@@ -437,9 +591,8 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        # Totals row style
+        # Totals row background
         ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8E8E8")),
-        ("SPAN", (0, -1), (n_cols - 3, -1)),
     ]
     for c in right_cols:
         cmds.append(("ALIGN", (c, 1), (c, -1), "RIGHT"))
@@ -447,10 +600,53 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     li_table = Table(li_rows, colWidths=col_widths, repeatRows=1)
     li_table.setStyle(TableStyle(cmds))
     story.append(li_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 4))
 
     # ========================================================================
-    # SECTION 5: BANK DETAILS (optional)
+    # SECTION 5: AMOUNT IN WORDS
+    # ========================================================================
+
+    currency_name = _safe(getattr(currency_obj, "name", "")).strip() or currency_code
+    words_str = _amount_in_words(grand_total, currency_name)
+    if words_str:
+        words_box = Table(
+            [[Paragraph(f"<b>Amount in Words:</b> {words_str}", style_text)]],
+            colWidths=[180 * mm],
+        )
+        words_box.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(words_box)
+    story.append(Spacer(1, 6))
+
+    # ========================================================================
+    # SECTION 6: LINE ITEM REMARKS (optional)
+    # ========================================================================
+
+    line_item_remarks = _safe(getattr(po, "line_item_remarks", "")).strip()
+    if line_item_remarks:
+        li_remarks_box = Table(
+            [[Paragraph(line_item_remarks, style_text)]],
+            colWidths=[180 * mm],
+        )
+        li_remarks_box.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(li_remarks_box)
+        story.append(Spacer(1, 8))
+    else:
+        story.append(Spacer(1, 6))
+
+    # ========================================================================
+    # SECTION 7: BANK DETAILS (optional)
     # ========================================================================
 
     bank = getattr(po, "bank", None)
@@ -486,13 +682,13 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         story.append(Spacer(1, 8))
 
     # ========================================================================
-    # SECTION 6: REMARKS (optional)
+    # SECTION 8: REMARKS BELOW TOTAL (optional)
     # ========================================================================
 
     remarks = _safe(getattr(po, "remarks", "")).strip()
     if remarks:
         remarks_box = Table(
-            [[Paragraph(f"<b>Remarks:</b> {remarks}", style_text)]],
+            [[Paragraph(remarks, style_text)]],
             colWidths=[180 * mm],
         )
         remarks_box.setStyle(TableStyle([
@@ -506,7 +702,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         story.append(Spacer(1, 8))
 
     # ========================================================================
-    # SECTION 7: TERMS & CONDITIONS (optional, new page)
+    # SECTION 9: TERMS & CONDITIONS (optional, new page)
     # ========================================================================
 
     tc_content = _safe(getattr(po, "tc_content", "")).strip()

@@ -339,7 +339,10 @@ export default function PurchaseOrderDetailPage() {
           {po.buyer_name && <LabelValue label="Buyer" value={po.buyer_name} />}
           <LabelValue label="Delivery Address" value={po.delivery_address_detail} />
           <LabelValue label="Customer No" value={po.customer_no} />
-          <LabelValue label="Internal Contact" value={po.internal_contact_name} />
+          <LabelValue label="Buyer Contact" value={po.internal_contact_name} />
+          {po.internal_contact_email && (
+            <LabelValue label="Contact Email" value={po.internal_contact_email} />
+          )}
           {po.internal_contact_phone && (
             <LabelValue label="Contact Phone" value={po.internal_contact_phone} />
           )}
@@ -365,6 +368,16 @@ export default function PurchaseOrderDetailPage() {
       {/* Line items */}
       {renderLineItems()}
 
+      {/* Line Item Remarks */}
+      {po.line_item_remarks && (
+        <div style={CARD}>
+          <h2 style={SECTION_TITLE}>Line Item Remarks</h2>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.6 }}>
+            {po.line_item_remarks}
+          </p>
+        </div>
+      )}
+
       {/* T&C */}
       {po.tc_content && (
         <div style={CARD}>
@@ -376,10 +389,10 @@ export default function PurchaseOrderDetailPage() {
         </div>
       )}
 
-      {/* Remarks */}
+      {/* Remarks (Below Total) */}
       {po.remarks && (
         <div style={CARD}>
-          <h2 style={SECTION_TITLE}>Remarks</h2>
+          <h2 style={SECTION_TITLE}>Remarks (Below Total)</h2>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.6 }}>
             {po.remarks}
           </p>

@@ -571,7 +571,13 @@ export default function UserListPage() {
         }
         open={editingUser !== null}
         onOk={() => {
-          if (editingUser) updateMutation.mutate({ id: editingUser.id, payload: editForm });
+          if (!editingUser) return;
+          // Strip role and is_active when editing self — backend rejects those
+          // fields even if unchanged, and the UI disables them anyway.
+          const payload = isEditingSelf
+            ? { phone_country_code: editForm.phone_country_code, phone_number: editForm.phone_number }
+            : editForm;
+          updateMutation.mutate({ id: editingUser.id, payload });
         }}
         onCancel={() => { setEditingUser(null); setEditPhoneError(null); }}
         okText="Save Changes"
