@@ -104,3 +104,8 @@ export async function updateAddress(
 export async function deleteAddress(orgId: number, addressId: number): Promise<void> {
   await api.delete(`/master-data/organisations/${orgId}/addresses/${addressId}/`);
 }
+
+/** Permanently delete an organisation. SUPER_ADMIN only. Blocked if documents reference it. */
+export async function deleteOrganisation(id: number): Promise<void> {
+  await api.delete(`/master-data/organisations/${id}/`);
+}

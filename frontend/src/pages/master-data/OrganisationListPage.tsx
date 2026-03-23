@@ -7,8 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { message } from "antd";
 
-import { listOrganisations, updateOrganisation } from "../../api/organisations";
+import { listOrganisations, updateOrganisation, deleteOrganisation } from "../../api/organisations";
 import type { Organisation } from "../../api/organisations";
+import { extractApiError } from "../../utils/apiErrors";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES, ORG_TAG_LABELS } from "../../utils/constants";
 import type { OrgTag } from "../../utils/constants";
@@ -72,6 +73,23 @@ export default function OrganisationListPage() {
   function handleDeactivate(org: Organisation) {
     if (window.confirm(`Deactivate "${org.name}"? It will no longer appear in document dropdowns.`)) {
       deactivateMutation.mutate(org.id);
+    }
+  }
+
+  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: (id: number) => deleteOrganisation(id),
+    onSuccess: () => {
+      message.success("Organisation permanently deleted.");
+      queryClient.invalidateQueries({ queryKey: ["organisations"] });
+    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Delete failed. Please try again.")),
+  });
+
+  function handleHardDelete(org: Organisation) {
+    if (window.confirm(`Permanently delete "${org.name}"? This cannot be undone.`)) {
+      hardDeleteMutation.mutate(org.id);
     }
   }
 
@@ -352,6 +370,34 @@ export default function OrganisationListPage() {
                             <Trash2 size={12} strokeWidth={1.5} />
                             Deactivate
                           </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleHardDelete(org)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "5px 10px",
+                                background: "transparent",
+                                border: "1px solid var(--error)",
+                                borderRadius: 6,
+                                fontFamily: "var(--font-body)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                color: "var(--error)",
+                                cursor: "pointer",
+                              }}
+                              onMouseEnter={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.background = "#fff0f0")
+                              }
+                              onMouseLeave={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                              }
+                            >
+                              <Trash2 size={12} strokeWidth={1.5} />
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}

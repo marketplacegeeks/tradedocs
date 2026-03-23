@@ -6,8 +6,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { message } from "antd";
 
-import { listBanks, deactivateBank } from "../../api/banks";
+import { listBanks, deactivateBank, deleteBank } from "../../api/banks";
 import type { Bank } from "../../api/banks";
+import { extractApiError } from "../../utils/apiErrors";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES, ACCOUNT_TYPE_LABELS } from "../../utils/constants";
 import type { AccountType } from "../../utils/constants";
@@ -105,6 +106,23 @@ export default function BankListPage() {
   function handleDeactivate(bank: Bank) {
     if (window.confirm(`Deactivate "${bank.nickname}"? It will no longer appear in document dropdowns.`)) {
       deactivateMutation.mutate(bank.id);
+    }
+  }
+
+  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: (id: number) => deleteBank(id),
+    onSuccess: () => {
+      message.success("Bank account permanently deleted.");
+      queryClient.invalidateQueries({ queryKey: ["banks"] });
+    },
+    onError: (err: unknown) => message.error(extractApiError(err, "Delete failed. Please try again.")),
+  });
+
+  function handleHardDelete(bank: Bank) {
+    if (window.confirm(`Permanently delete "${bank.nickname}"? This cannot be undone.`)) {
+      hardDeleteMutation.mutate(bank.id);
     }
   }
 
@@ -398,6 +416,34 @@ export default function BankListPage() {
                             <Trash2 size={12} strokeWidth={1.5} />
                             Deactivate
                           </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleHardDelete(bank)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "5px 10px",
+                                background: "transparent",
+                                border: "1px solid var(--error)",
+                                borderRadius: 6,
+                                fontFamily: "var(--font-body)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                color: "var(--error)",
+                                cursor: "pointer",
+                              }}
+                              onMouseEnter={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.background = "#fff0f0")
+                              }
+                              onMouseLeave={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                              }
+                            >
+                              <Trash2 size={12} strokeWidth={1.5} />
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}

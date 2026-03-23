@@ -1573,3 +1573,24 @@ class TestSuperAdminProformaInvoicePermissions:
         pi = ProformaInvoiceFactory()
         resp = auth_client(CompanyAdminFactory()).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
         assert resp.status_code == 403
+
+    def test_super_admin_can_create_pi(self):
+        """SUPER_ADMIN must be allowed by perform_create (same as Maker / Company Admin)."""
+        super_admin = SuperAdminFactory()
+        payload = {
+            "exporter": OrganisationFactory().pk,
+            "consignee": OrganisationFactory().pk,
+        }
+        resp = auth_client(super_admin).post(PI_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
+        assert resp.data["pi_number"].startswith("PI-")
+
+    def test_super_admin_hard_delete_pi_blocked_when_pl_exists(self):
+        """Hard delete returns 400 when a Packing List references the PI (PROTECT constraint)."""
+        from apps.packing_list.tests.factories import PackingListFactory
+        super_admin = SuperAdminFactory()
+        pi = ProformaInvoiceFactory()
+        PackingListFactory(proforma_invoice=pi)
+        resp = auth_client(super_admin).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
+        assert resp.status_code == 400
+        assert "Packing List" in str(resp.data)

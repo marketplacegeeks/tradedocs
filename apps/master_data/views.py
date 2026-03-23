@@ -1,8 +1,11 @@
+from django.db.models.deletion import ProtectedError
+
 from rest_framework import serializers, status, viewsets
 from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 
+from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsAnyRole, IsCheckerOrAdmin
 from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM
 from .serializers import (
@@ -120,6 +123,25 @@ class BankViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=True)
         return queryset
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # SUPER_ADMIN: hard-delete if no documents reference this bank.
+        if request.user.role == UserRole.SUPER_ADMIN:
+            try:
+                instance.delete()
+            except ProtectedError:
+                raise ValidationError({
+                    "detail": (
+                        "This bank is referenced by existing documents (Proforma Invoices, "
+                        "Commercial Invoices, or Purchase Orders) and cannot be deleted."
+                    )
+                })
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        # All other roles: soft-delete (deactivate).
+        instance.is_active = False
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 # ---------------------------------------------------------------------------
 # Organisation views (FR-04)
@@ -160,7 +182,20 @@ class OrganisationViewSet(viewsets.ModelViewSet):
         return queryset
 
     def destroy(self, request, *args, **kwargs):
-        # Constraint #8: organisations must never be hard-deleted.
+        # SUPER_ADMIN can hard-delete an organisation only if no documents reference it.
+        # All other roles are blocked (Constraint #8: never hard-delete organisations).
+        if request.user.role == UserRole.SUPER_ADMIN:
+            instance = self.get_object()
+            try:
+                instance.delete()
+            except ProtectedError:
+                raise ValidationError({
+                    "detail": (
+                        "This organisation is referenced by existing documents (Proforma Invoices, "
+                        "Packing Lists, or Purchase Orders) and cannot be deleted."
+                    )
+                })
+            return Response(status=status.HTTP_204_NO_CONTENT)
         raise MethodNotAllowed(
             "DELETE",
             detail="Organisations cannot be deleted. Set is_active=false to deactivate."
@@ -233,9 +268,20 @@ class TCTemplateViewSet(viewsets.ModelViewSet):
         return queryset
 
     def destroy(self, request, *args, **kwargs):
-        # Soft delete: mark as inactive instead of removing from the database.
-        # This preserves templates that may already be referenced by existing documents.
         template = self.get_object()
+        # SUPER_ADMIN: hard-delete if no documents reference this template.
+        if request.user.role == UserRole.SUPER_ADMIN:
+            try:
+                template.delete()
+            except ProtectedError:
+                raise ValidationError({
+                    "detail": (
+                        "This template is referenced by existing documents (Proforma Invoices or "
+                        "Purchase Orders) and cannot be deleted."
+                    )
+                })
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        # All other roles: soft-delete so templates on existing documents are preserved.
         template.is_active = False
         template.save()
         return Response(status=status.HTTP_204_NO_CONTENT)

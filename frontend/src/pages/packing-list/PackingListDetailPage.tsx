@@ -586,7 +586,7 @@ export default function PackingListDetailPage() {
       message.success("Packing List permanently deleted.");
       navigate("/packing-lists");
     },
-    onError: () => message.error("Delete failed. Please try again."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Delete failed. Please try again.")),
   });
 
   function confirmHardDelete() {

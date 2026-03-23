@@ -232,7 +232,7 @@ export default function ProformaInvoiceDetailPage() {
       message.success("Proforma Invoice permanently deleted.");
       navigate("/proforma-invoices");
     },
-    onError: () => message.error("Delete failed. Please try again."),
+    onError: (err: unknown) => message.error(extractApiError(err, "Delete failed. Please try again.")),
   });
 
   function confirmHardDelete() {

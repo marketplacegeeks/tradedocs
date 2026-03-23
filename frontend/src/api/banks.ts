@@ -85,3 +85,8 @@ export async function deactivateBank(id: number): Promise<Bank> {
   const { data } = await api.patch<Bank>(`/master-data/banks/${id}/`, { is_active: false });
   return data;
 }
+
+/** Permanently delete a bank account. SUPER_ADMIN only. Blocked if documents reference it. */
+export async function deleteBank(id: number): Promise<void> {
+  await api.delete(`/master-data/banks/${id}/`);
+}

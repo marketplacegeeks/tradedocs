@@ -121,7 +121,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
         return Response(read_serializer.data)
 
     def perform_create(self, serializer):
-        if self.request.user.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN):
+        if self.request.user.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN):
             raise PermissionDenied("Only Makers can create Packing Lists.")
 
         # Pop CI-specific fields before saving the PL.
@@ -332,11 +332,16 @@ class PackingListViewSet(viewsets.ModelViewSet):
     def hard_delete(self, request, pk=None):
         """
         DELETE /packing-lists/{id}/hard-delete/
-        Permanently removes the PL and its linked CI (cascade) from the database.
-        Restricted to SUPER_ADMIN only.
+        Permanently removes the PL and its linked CI from the database.
+        Restricted to SUPER_ADMIN only. CI is deleted first to avoid the PROTECT constraint.
         """
         pl = self.get_object()
-        pl.delete()
+        with transaction.atomic():
+            try:
+                pl.commercial_invoice.delete()
+            except Exception:
+                pass
+            pl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ---- Audit log endpoint -------------------------------------------------

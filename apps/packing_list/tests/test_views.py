@@ -955,3 +955,25 @@ class TestSuperAdminPackingListPermissions:
         pl = PackingListFactory()
         resp = auth_client(CompanyAdminFactory()).delete(f"/api/v1/packing-lists/{pl.pk}/hard-delete/")
         assert resp.status_code == 403
+
+    def test_super_admin_can_create_pl(self):
+        """SUPER_ADMIN must be allowed by perform_create (same as Maker / Company Admin)."""
+        super_admin = SuperAdminFactory()
+        pi = _approved_pi()
+        payload = _pl_payload(pi)
+        resp = auth_client(super_admin).post(PL_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
+        assert resp.data["pl_number"].startswith("PL-")
+
+    def test_super_admin_hard_delete_pl_also_deletes_ci(self):
+        """Hard delete on a PL must atomically delete its linked CI before removing the PL."""
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.commercial_invoice.models import CommercialInvoice
+        from apps.packing_list.models import PackingList
+        super_admin = SuperAdminFactory()
+        pl = PackingListFactory()
+        ci = CommercialInvoiceFactory(packing_list=pl, created_by=super_admin)
+        resp = auth_client(super_admin).delete(f"/api/v1/packing-lists/{pl.pk}/hard-delete/")
+        assert resp.status_code == 204
+        assert not PackingList.objects.filter(pk=pl.pk).exists()
+        assert not CommercialInvoice.objects.filter(pk=ci.pk).exists()

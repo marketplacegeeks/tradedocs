@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyAdminFactory, SuperAdminFactory
+from apps.proforma_invoice.tests.factories import ProformaInvoiceFactory
 from .factories import (
     BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
     OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
@@ -1538,3 +1539,96 @@ class TestSuperAdminMasterDataPermissions:
             "organisations": [org.pk],
         }, format="json")
         assert response.status_code == 201
+
+    # ---- Organisation hard-delete -------------------------------------------
+
+    def test_super_admin_can_hard_delete_organisation_with_no_docs(self):
+        """SUPER_ADMIN can delete an org that has no documents referencing it."""
+        from apps.master_data.models import Organisation
+        org = OrganisationFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("organisation-detail", args=[org.id]))
+        assert response.status_code == 204
+        assert not Organisation.objects.filter(pk=org.pk).exists()
+
+    def test_super_admin_cannot_hard_delete_organisation_with_linked_pi(self):
+        """SUPER_ADMIN delete returns 400 when the org is referenced by a Proforma Invoice."""
+        org = OrganisationFactory()
+        ProformaInvoiceFactory(exporter=org)
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("organisation-detail", args=[org.id]))
+        assert response.status_code == 400
+        assert "documents" in str(response.data).lower()
+
+    def test_non_super_admin_delete_org_still_returns_405(self):
+        """Checker and Company Admin must still receive 405 — only SUPER_ADMIN can hard delete."""
+        org = OrganisationFactory()
+        for user in (CheckerFactory(), CompanyAdminFactory()):
+            client = auth_client(user)
+            response = client.delete(reverse("organisation-detail", args=[org.id]))
+            assert response.status_code == 405
+
+    # ---- Bank hard-delete ---------------------------------------------------
+
+    def test_super_admin_can_hard_delete_bank_with_no_docs(self):
+        """SUPER_ADMIN can delete a bank that no document references."""
+        from apps.master_data.models import Bank
+        bank = BankFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("bank-detail", args=[bank.id]))
+        assert response.status_code == 204
+        assert not Bank.objects.filter(pk=bank.pk).exists()
+
+    def test_super_admin_cannot_hard_delete_bank_with_linked_pi(self):
+        """SUPER_ADMIN delete returns 400 when the bank is referenced by a Proforma Invoice."""
+        bank = BankFactory()
+        ProformaInvoiceFactory(bank=bank)
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("bank-detail", args=[bank.id]))
+        assert response.status_code == 400
+        assert "documents" in str(response.data).lower()
+
+    def test_non_super_admin_delete_bank_soft_deletes(self):
+        """Checker DELETE on a bank must soft-delete (is_active=False), not hard-delete."""
+        from apps.master_data.models import Bank
+        bank = BankFactory()
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("bank-detail", args=[bank.id]))
+        assert response.status_code == 204
+        bank.refresh_from_db()
+        assert bank.is_active is False
+        assert Bank.objects.filter(pk=bank.pk).exists()
+
+    # ---- T&C Template hard-delete -------------------------------------------
+
+    def test_super_admin_can_hard_delete_tc_template_with_no_docs(self):
+        """SUPER_ADMIN can hard-delete a template that no document references."""
+        from apps.master_data.models import TCTemplate
+        org = OrganisationFactory()
+        template = TCTemplateFactory(organisations=[org])
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 204
+        assert not TCTemplate.objects.filter(pk=template.pk).exists()
+
+    def test_super_admin_cannot_hard_delete_tc_template_with_linked_pi(self):
+        """SUPER_ADMIN delete returns 400 when the template is referenced by a Proforma Invoice."""
+        org = OrganisationFactory()
+        template = TCTemplateFactory(organisations=[org])
+        ProformaInvoiceFactory(tc_template=template)
+        client = auth_client(SuperAdminFactory())
+        response = client.delete(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 400
+        assert "documents" in str(response.data).lower()
+
+    def test_non_super_admin_delete_tc_template_soft_deletes(self):
+        """Checker DELETE on a template must soft-delete, not hard-delete."""
+        from apps.master_data.models import TCTemplate
+        org = OrganisationFactory()
+        template = TCTemplateFactory(organisations=[org])
+        client = auth_client(CheckerFactory())
+        response = client.delete(reverse("tctemplate-detail", args=[template.id]))
+        assert response.status_code == 204
+        template.refresh_from_db()
+        assert template.is_active is False
+        assert TCTemplate.objects.filter(pk=template.pk).exists()

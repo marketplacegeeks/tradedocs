@@ -92,8 +92,8 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        # Only Makers (and Company Admins) can create documents.
-        if self.request.user.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN):
+        # Only Makers, Company Admins, and Super Admins can create documents.
+        if self.request.user.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN):
             raise PermissionDenied("Only Makers can create Proforma Invoices.")
         serializer.save()
 
@@ -203,9 +203,18 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
         """
         DELETE /proforma-invoices/{id}/hard-delete/
         Permanently removes the PI and all its line items + charges from the database.
-        Restricted to SUPER_ADMIN only.
+        Restricted to SUPER_ADMIN only. Blocked if a linked Packing List exists —
+        the user must delete the PL first (which auto-deletes the CI).
         """
         pi = self.get_object()
+        linked_pl = pi.packing_lists.select_related().first()
+        if linked_pl is not None:
+            raise ValidationError(
+                {"detail": (
+                    f"This Proforma Invoice has a linked Packing List ({linked_pl.pl_number}). "
+                    "Delete the Packing List first."
+                )}
+            )
         pi.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

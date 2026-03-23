@@ -10,6 +10,7 @@ import { listTCTemplates, deleteTCTemplate } from "../../api/tcTemplates";
 import type { TCTemplate } from "../../api/tcTemplates";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES } from "../../utils/constants";
+import { extractApiError } from "../../utils/apiErrors";
 
 type SortKey = "name" | "updated_at";
 type SortDir = "asc" | "desc" | null;
@@ -85,15 +86,17 @@ export default function TCTemplateListPage() {
     };
   }
 
+  const isSuperAdmin = user?.role === ROLES.SUPER_ADMIN;
+
   const deleteMutation = useMutation({
     mutationFn: deleteTCTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tc-templates"] });
-      message.success("Template deactivated.");
+      message.success(isSuperAdmin ? "Template permanently deleted." : "Template deactivated.");
       setDeletingId(null);
     },
-    onError: () => {
-      message.error("Failed to deactivate template. Please try again.");
+    onError: (err: unknown) => {
+      message.error(extractApiError(err, "Failed to remove template. Please try again."));
       setDeletingId(null);
     },
   });
