@@ -4,9 +4,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal, message, Select } from "antd";
-import { UserPlus, Pencil } from "lucide-react";
+import { UserPlus, Pencil, KeyRound } from "lucide-react";
 
-import { listUsers, createUser, updateUser } from "../../api/users";
+import { listUsers, createUser, updateUser, resetPassword } from "../../api/users";
 import type { User, UserCreatePayload, UserUpdatePayload } from "../../api/users";
 import { useAuth } from "../../store/AuthContext";
 import { ROLES, COUNTRY_DIAL_CODES } from "../../utils/constants";
@@ -133,6 +133,11 @@ export default function UserListPage() {
   const [editForm, setEditForm] = useState<UserUpdatePayload>({});
   const [editPhoneError, setEditPhoneError] = useState<string | null>(null);
 
+  // ---- Reset password modal state
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+
   // ---- Data
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["users"],
@@ -188,6 +193,30 @@ export default function UserListPage() {
         message.error(detail.is_active[0]);
       } else {
         message.error("Failed to update user. Please try again.");
+      }
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: number; password: string }) =>
+      resetPassword(id, password),
+    onSuccess: () => {
+      message.success("Password reset successfully.");
+      setResetPasswordUser(null);
+      setNewPassword("");
+      setNewPasswordError(null);
+    },
+    onError: (err: unknown) => {
+      const apiErrors = (err as { response?: { data?: Record<string, string[]> } })
+        ?.response?.data;
+      if (apiErrors?.new_password) {
+        setNewPasswordError(
+          Array.isArray(apiErrors.new_password)
+            ? apiErrors.new_password[0]
+            : String(apiErrors.new_password)
+        );
+      } else {
+        message.error("Failed to reset password. Please try again.");
       }
     },
   });
@@ -424,32 +453,68 @@ export default function UserListPage() {
                         textAlign: "right",
                       }}
                     >
-                      <button
-                        onClick={() => openEdit(u)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          padding: "5px 10px",
-                          background: "transparent",
-                          border: "1px solid var(--border-medium)",
-                          borderRadius: 6,
-                          fontFamily: "var(--font-body)",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color: "var(--text-secondary)",
-                          cursor: "pointer",
-                        }}
-                        onMouseEnter={(e) =>
-                          ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
-                        }
-                        onMouseLeave={(e) =>
-                          ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-                        }
-                      >
-                        <Pencil size={12} strokeWidth={1.5} />
-                        Edit
-                      </button>
+                      <div style={{ display: "inline-flex", gap: 8 }}>
+                        <button
+                          onClick={() => openEdit(u)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "5px 10px",
+                            background: "transparent",
+                            border: "1px solid var(--border-medium)",
+                            borderRadius: 6,
+                            fontFamily: "var(--font-body)",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "var(--text-secondary)",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
+                          }
+                          onMouseLeave={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                          }
+                        >
+                          <Pencil size={12} strokeWidth={1.5} />
+                          Edit
+                        </button>
+
+                        {/* Reset Password button — visible to Company Admin and Super Admin only */}
+                        {(currentUser?.role === ROLES.COMPANY_ADMIN || currentUser?.role === ROLES.SUPER_ADMIN) && (
+                          <button
+                            onClick={() => {
+                              setResetPasswordUser(u);
+                              setNewPassword("");
+                              setNewPasswordError(null);
+                            }}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "5px 10px",
+                              background: "transparent",
+                              border: "1px solid var(--border-medium)",
+                              borderRadius: 6,
+                              fontFamily: "var(--font-body)",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: "var(--text-secondary)",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")
+                            }
+                            onMouseLeave={(e) =>
+                              ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
+                            }
+                          >
+                            <KeyRound size={12} strokeWidth={1.5} />
+                            Reset Password
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -566,6 +631,47 @@ export default function UserListPage() {
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* ---- Reset Password Modal ---- */}
+      <Modal
+        title={
+          <span style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16 }}>
+            Reset Password — {resetPasswordUser?.full_name}
+          </span>
+        }
+        open={resetPasswordUser !== null}
+        onOk={() => {
+          if (!resetPasswordUser) return;
+          if (!newPassword || newPassword.length < 8) {
+            setNewPasswordError("Password must be at least 8 characters.");
+            return;
+          }
+          resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: newPassword });
+        }}
+        onCancel={() => {
+          setResetPasswordUser(null);
+          setNewPassword("");
+          setNewPasswordError(null);
+        }}
+        okText="Reset Password"
+        okButtonProps={{ loading: resetPasswordMutation.isPending }}
+        cancelText="Cancel"
+        width={400}
+      >
+        {resetPasswordUser && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 8 }}>
+            <div>
+              {fieldLabel("New Password")}
+              {textInput(newPassword, (v) => { setNewPassword(v); setNewPasswordError(null); }, "Min 8 characters", "password")}
+              {newPasswordError && (
+                <div style={{ color: "var(--error)", fontSize: 12, marginTop: 4 }}>
+                  {newPasswordError}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ---- Edit User Modal ---- */}

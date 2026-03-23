@@ -274,6 +274,112 @@ class TestUserCreateWithPhone:
 
 
 @pytest.mark.django_db
+class TestResetPasswordView:
+    """Tests for POST /api/v1/users/{id}/reset-password/"""
+
+    def _auth(self, client, user):
+        tokens = get_tokens(client, user.email, "testpass123")
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def test_company_admin_can_reset_password(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, admin)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "newpassword123"},
+        )
+        assert response.status_code == 200
+        assert response.data["detail"] == "Password reset successfully."
+
+    def test_super_admin_can_reset_password(self, api_client):
+        super_admin = SuperAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, super_admin)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "newpassword123"},
+        )
+        assert response.status_code == 200
+
+    def test_maker_cannot_reset_password(self, api_client):
+        maker = MakerFactory()
+        other = MakerFactory()
+        self._auth(api_client, maker)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": other.pk}),
+            {"new_password": "newpassword123"},
+        )
+        assert response.status_code == 403
+
+    def test_checker_cannot_reset_password(self, api_client):
+        checker = CheckerFactory()
+        maker = MakerFactory()
+        self._auth(api_client, checker)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "newpassword123"},
+        )
+        assert response.status_code == 403
+
+    def test_short_password_rejected(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, admin)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "short"},
+        )
+        assert response.status_code == 400
+        assert "new_password" in response.data
+
+    def test_empty_password_rejected(self, api_client):
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, admin)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": ""},
+        )
+        assert response.status_code == 400
+
+    def test_nonexistent_user_returns_404(self, api_client):
+        admin = CompanyAdminFactory()
+        self._auth(api_client, admin)
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": 99999}),
+            {"new_password": "validpassword123"},
+        )
+        assert response.status_code == 404
+
+    def test_password_actually_changes(self, api_client):
+        # After reset, the user can log in with the new password.
+        admin = CompanyAdminFactory()
+        maker = MakerFactory()
+        self._auth(api_client, admin)
+        api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "brandnewpass456"},
+        )
+        # Clear credentials, then try logging in with the new password.
+        api_client.credentials()
+        login_response = api_client.post(
+            reverse("auth-login"),
+            {"email": maker.email, "password": "brandnewpass456"},
+        )
+        assert login_response.status_code == 200
+        assert "access" in login_response.data
+
+    def test_unauthenticated_cannot_reset_password(self, api_client):
+        maker = MakerFactory()
+        response = api_client.post(
+            reverse("user-reset-password", kwargs={"pk": maker.pk}),
+            {"new_password": "validpassword123"},
+        )
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
 class TestSuperAdminPermissions:
     """
     Every endpoint guarded by IsCompanyAdmin or IsCheckerOrAdmin must also

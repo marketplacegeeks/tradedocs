@@ -54,3 +54,8 @@ export async function updateUser(id: number, payload: UserUpdatePayload): Promis
   const { data } = await api.patch<User>(`/users/${id}/`, payload);
   return data;
 }
+
+/** Reset a user's password. Company Admin and Super Admin only. */
+export async function resetPassword(userId: number, newPassword: string): Promise<void> {
+  await api.post(`/users/${userId}/reset-password/`, { new_password: newPassword });
+}

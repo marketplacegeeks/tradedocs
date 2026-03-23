@@ -85,3 +85,30 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         if self.request.method in ("PUT", "PATCH"):
             return UserUpdateSerializer
         return UserListSerializer
+
+
+class ResetPasswordView(APIView):
+    """
+    POST /api/v1/users/{id}/reset-password/
+    Allows Company Admin (and Super Admin) to set a new password for any user.
+    The new_password field must be at least 8 characters.
+    """
+    permission_classes = [IsCompanyAdmin]
+
+    def post(self, request, pk):
+        # Look up the target user or return 404.
+        try:
+            target_user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        new_password = request.data.get("new_password", "")
+        if not new_password or len(new_password) < 8:
+            return Response(
+                {"new_password": "Password must be at least 8 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_user.set_password(new_password)
+        target_user.save()
+        return Response({"detail": "Password reset successfully."}, status=status.HTTP_200_OK)
