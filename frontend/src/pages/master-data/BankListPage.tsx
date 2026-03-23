@@ -26,7 +26,7 @@ export default function BankListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
+  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);

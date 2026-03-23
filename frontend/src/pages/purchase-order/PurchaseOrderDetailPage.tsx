@@ -150,7 +150,7 @@ export default function PurchaseOrderDetailPage() {
 
   const isEditable = po.status === DOCUMENT_STATUS.DRAFT || po.status === DOCUMENT_STATUS.REWORK;
   const isCreator = po.created_by === user?.id;
-  const canEdit = isEditable && (isCreator || user?.role === "COMPANY_ADMIN");
+  const canEdit = isEditable && (isCreator || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN);
 
   const txType = po.transaction_type;
   const showIGST = txType === "IGST";

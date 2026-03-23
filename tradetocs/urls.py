@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.urls import include, path
 from apps.accounts.urls import auth_urlpatterns, user_urlpatterns
 from apps.proforma_invoice.report_views import CommoditySalesReportView, ConsigneeBusinessSummaryView
+from apps.workflow.dashboard_views import DashboardView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -14,6 +15,7 @@ urlpatterns = [
     path("api/v1/", include("apps.packing_list.urls")),
     path("api/v1/", include("apps.commercial_invoice.urls")),
     path("api/v1/", include("apps.purchase_order.urls")),
+    path("api/v1/dashboard/", DashboardView.as_view(), name="dashboard"),
     # Report endpoints
     path("api/v1/reports/commodity-sales/", CommoditySalesReportView.as_view(), name="report-commodity-sales"),
     path("api/v1/reports/consignee-business-summary/", ConsigneeBusinessSummaryView.as_view(), name="report-consignee-business-summary"),

@@ -61,7 +61,7 @@ export default function ProformaInvoiceListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("pi_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN;
+  const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["proforma-invoices", activeStatus],

@@ -256,7 +256,7 @@ export default function ProformaInvoiceDetailPage() {
 
   const isEditable = pi.status === DOCUMENT_STATUS.DRAFT || pi.status === DOCUMENT_STATUS.REWORK;
   const isCreator = pi.created_by === user?.id;
-  const canEdit = isEditable && (isCreator || user?.role === "COMPANY_ADMIN");
+  const canEdit = isEditable && (isCreator || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN);
 
   const incotermsCode = pi.incoterms_code ?? "";
   const sellerFields = INCOTERM_SELLER_FIELDS[incotermsCode] ?? new Set<string>();

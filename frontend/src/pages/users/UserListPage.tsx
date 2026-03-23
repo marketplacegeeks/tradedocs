@@ -518,8 +518,12 @@ export default function UserListPage() {
               onChange={(v) => setInviteForm((f) => ({ ...f, role: v }))}
               style={{ width: "100%" }}
               options={[
-                { value: ROLES.MAKER, label: "Maker" },
+                // Super Admin can create Company Admins; Company Admin cannot.
+                ...(currentUser?.role === ROLES.SUPER_ADMIN
+                  ? [{ value: ROLES.COMPANY_ADMIN, label: "Company Admin" }]
+                  : []),
                 { value: ROLES.CHECKER, label: "Checker" },
+                { value: ROLES.MAKER, label: "Maker" },
               ]}
             />
           </div>

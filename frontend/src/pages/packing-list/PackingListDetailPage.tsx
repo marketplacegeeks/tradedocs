@@ -629,7 +629,7 @@ export default function PackingListDetailPage() {
   const isEditable = pl.status === DOCUMENT_STATUS.DRAFT || pl.status === DOCUMENT_STATUS.REWORK;
   const isDraft = pl.status === DOCUMENT_STATUS.DRAFT;
   const isCreator = user?.id === pl.created_by;
-  const isAdmin = user?.role === ROLES.COMPANY_ADMIN;
+  const isAdmin = user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
   const canEdit = isEditable && (isCreator || isAdmin);
   const canDelete = isDraft && (isCreator || isAdmin);
   const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;

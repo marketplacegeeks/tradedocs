@@ -19,7 +19,7 @@ export default function TCTemplateListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
+  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
