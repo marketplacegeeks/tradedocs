@@ -22,25 +22,25 @@ const NAV_ITEMS = [
     key: "/proforma-invoices",
     icon: FileText,
     label: "Proforma Invoice",
-    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     key: "/packing-lists",
     icon: Package,
     label: "P.List & C. Invoice",
-    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     key: "/purchase-orders",
     icon: ShoppingBag,
     label: "Purchase Order",
-    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     key: "/master-data",
     icon: Database,
     label: "Master Data",
-    roles: [ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+    roles: [ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
     children: [
       { key: "/master-data/organisations", label: "Organisations" },
       { key: "/master-data/banks", label: "Banks" },
@@ -52,13 +52,13 @@ const NAV_ITEMS = [
     key: "/users",
     icon: Users,
     label: "User Management",
-    roles: [ROLES.COMPANY_ADMIN],
+    roles: [ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     key: "/reports",
     icon: BarChart2,
     label: "Reports",
-    roles: [ROLES.CHECKER, ROLES.COMPANY_ADMIN],
+    roles: [ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
 ];
 

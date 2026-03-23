@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyAdminFactory
+from apps.accounts.tests.factories import MakerFactory, CheckerFactory, CompanyAdminFactory, SuperAdminFactory
 from .factories import (
     BankFactory, CountryFactory, CurrencyFactory, IncotermFactory, LocationFactory,
     OrganisationAddressFactory, OrganisationFactory, OrganisationTagFactory,
@@ -1457,3 +1457,84 @@ class TestTCTemplateEndpoints:
         response = client.get(reverse("tctemplate-list") + "?is_active=false")
         ids = [item["id"] for item in response.data]
         assert inactive.id in ids
+
+
+@pytest.mark.django_db
+class TestSuperAdminMasterDataPermissions:
+    """
+    SUPER_ADMIN must have the same write access as COMPANY_ADMIN / CHECKER
+    across all master-data endpoints. These tests guard against regressions
+    when a new role is added to permissions but its access is not verified.
+    """
+
+    # ---- Organisations --------------------------------------------------
+
+    def test_super_admin_can_create_organisation(self):
+        country = CountryFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.post(reverse("organisation-list"), _org_payload(country.id), format="json")
+        assert response.status_code == 201
+
+    def test_super_admin_can_patch_organisation(self):
+        org = OrganisationFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.patch(reverse("organisation-detail", kwargs={"pk": org.pk}), {"name": "Updated"})
+        assert response.status_code == 200
+
+    def test_super_admin_can_deactivate_organisation(self):
+        org = OrganisationFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.patch(reverse("organisation-detail", kwargs={"pk": org.pk}), {"is_active": False})
+        assert response.status_code == 200
+
+    # ---- Banks ----------------------------------------------------------
+
+    def test_super_admin_can_create_bank(self):
+        country = CountryFactory()
+        currency = CurrencyFactory()
+        org = OrganisationFactory()
+        OrganisationTagFactory(organisation=org, tag="EXPORTER")
+        client = auth_client(SuperAdminFactory())
+        response = client.post(reverse("bank-list"), {
+            "organisation": org.id,
+            "nickname": "SA Account",
+            "beneficiary_name": "SA Corp",
+            "bank_name": "SA Bank",
+            "bank_country": country.id,
+            "branch_name": "Main",
+            "account_number": "1234567890",
+            "account_type": "CURRENT",
+            "currency": currency.id,
+        })
+        assert response.status_code == 201
+
+    def test_super_admin_can_patch_bank(self):
+        bank = BankFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.patch(reverse("bank-detail", kwargs={"pk": bank.pk}), {"bank_name": "Updated"})
+        assert response.status_code == 200
+
+    # ---- Reference data (Country as representative) ---------------------
+
+    def test_super_admin_can_create_country(self):
+        client = auth_client(SuperAdminFactory())
+        response = client.post(reverse("country-list"), {"name": "SA Land", "iso2": "SL", "iso3": "SLA"})
+        assert response.status_code == 201
+
+    def test_super_admin_can_patch_country(self):
+        country = CountryFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.patch(reverse("country-detail", kwargs={"pk": country.pk}), {"name": "Updated"})
+        assert response.status_code == 200
+
+    # ---- T&C Templates --------------------------------------------------
+
+    def test_super_admin_can_create_tc_template(self):
+        org = OrganisationFactory()
+        client = auth_client(SuperAdminFactory())
+        response = client.post(reverse("tctemplate-list"), {
+            "name": "SA Template",
+            "body": "<p>Terms</p>",
+            "organisations": [org.pk],
+        }, format="json")
+        assert response.status_code == 201

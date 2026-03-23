@@ -11,7 +11,7 @@ from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory
+from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory, SuperAdminFactory
 from apps.master_data.tests.factories import (
     BankFactory,
     OrganisationFactory,
@@ -920,3 +920,37 @@ class TestPlExtendedCoverage:
         assert resp.status_code == 200
         pl.refresh_from_db()
         assert pl.incoterms is None
+
+
+@pytest.mark.django_db
+class TestSuperAdminPackingListPermissions:
+    """SUPER_ADMIN must have the same access as COMPANY_ADMIN on all PL endpoints."""
+
+    def test_super_admin_can_list_pls(self):
+        PackingListFactory()
+        resp = auth_client(SuperAdminFactory()).get(PL_LIST_URL)
+        assert resp.status_code == 200
+
+    def test_super_admin_can_retrieve_pl(self):
+        pl = PackingListFactory()
+        resp = auth_client(SuperAdminFactory()).get(pl_detail_url(pl.pk))
+        assert resp.status_code == 200
+
+    def test_super_admin_can_hard_delete_pl(self):
+        from apps.packing_list.models import PackingList
+        super_admin = SuperAdminFactory()
+        pl = PackingListFactory()
+        resp = auth_client(super_admin).delete(f"/api/v1/packing-lists/{pl.pk}/hard-delete/")
+        assert resp.status_code == 204
+        assert not PackingList.objects.filter(pk=pl.pk).exists()
+
+    def test_maker_cannot_hard_delete_pl(self):
+        maker = MakerFactory()
+        pl = PackingListFactory(created_by=maker)
+        resp = auth_client(maker).delete(f"/api/v1/packing-lists/{pl.pk}/hard-delete/")
+        assert resp.status_code == 403
+
+    def test_company_admin_cannot_hard_delete_pl(self):
+        pl = PackingListFactory()
+        resp = auth_client(CompanyAdminFactory()).delete(f"/api/v1/packing-lists/{pl.pk}/hard-delete/")
+        assert resp.status_code == 403

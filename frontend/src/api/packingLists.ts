@@ -308,3 +308,8 @@ export function uploadCiSignedCopy(ciId: number, file: File) {
     })
     .then((r) => r.data);
 }
+
+// Super Admin only — permanently removes the PL (and its linked CI) from the database.
+export async function hardDeletePackingList(id: number): Promise<void> {
+  await axiosInstance.delete(`/packing-lists/${id}/hard-delete/`);
+}

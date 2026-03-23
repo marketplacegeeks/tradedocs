@@ -2,6 +2,7 @@
 // Constraint #23: status values and role constants must come from this file.
 
 export const ROLES = {
+  SUPER_ADMIN: "SUPER_ADMIN",
   COMPANY_ADMIN: "COMPANY_ADMIN",
   CHECKER: "CHECKER",
   MAKER: "MAKER",

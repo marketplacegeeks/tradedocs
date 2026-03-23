@@ -226,3 +226,8 @@ export async function updateLineItem(
 export async function deleteLineItem(poId: number, lid: number): Promise<void> {
   await api.delete(`/purchase-orders/${poId}/line-items/${lid}/`);
 }
+
+// Super Admin only — permanently removes the PO from the database.
+export async function hardDeletePurchaseOrder(id: number): Promise<void> {
+  await api.delete(`/purchase-orders/${id}/hard-delete/`);
+}

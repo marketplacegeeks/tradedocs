@@ -21,6 +21,7 @@ import {
   downloadPiPdf,
   getAuditLog,
   uploadSignedCopy,
+  hardDeleteProformaInvoice,
 } from "../../api/proformaInvoices";
 import { listUOMs, listIncoterms, listPaymentTerms } from "../../api/referenceData";
 import type { UOM, Incoterm, PaymentTerm } from "../../api/referenceData";
@@ -33,6 +34,7 @@ import {
   DOCUMENT_STATUS_LABELS,
   INCOTERM_SELLER_FIELDS,
   COST_FIELD_LABELS,
+  ROLES,
 } from "../../utils/constants";
 import { extractApiError } from "../../utils/apiErrors";
 
@@ -223,6 +225,26 @@ export default function ProformaInvoiceDetailPage() {
     onSuccess: () => { invalidate(); message.success("Signed copy uploaded."); },
     onError: (err: unknown) => message.error(extractApiError(err, "Upload failed.")),
   });
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: () => hardDeleteProformaInvoice(piId),
+    onSuccess: () => {
+      message.success("Proforma Invoice permanently deleted.");
+      navigate("/proforma-invoices");
+    },
+    onError: () => message.error("Delete failed. Please try again."),
+  });
+
+  function confirmHardDelete() {
+    Modal.confirm({
+      title: "Permanently delete this Proforma Invoice?",
+      content: "This action cannot be undone. The PI and all its line items will be removed from the database.",
+      okText: "Delete permanently",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: () => hardDeleteMutation.mutate(),
+    });
+  }
 
   if (isLoading || !pi) {
     return (
@@ -737,6 +759,19 @@ export default function ProformaInvoiceDetailPage() {
           >
             <Download size={14} strokeWidth={1.5} /> Download PDF
           </button>
+          {user?.role === ROLES.SUPER_ADMIN && (
+            <button
+              onClick={confirmHardDelete}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+                border: "none", borderRadius: 8, padding: "8px 14px",
+                fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              }}
+            >
+              <Trash2 size={14} strokeWidth={1.5} /> Delete
+            </button>
+          )}
           {user && (
             <WorkflowActionButton
               documentId={piId}

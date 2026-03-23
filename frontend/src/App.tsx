@@ -48,11 +48,11 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
 
-        {/* Master data — Checker and Company Admin only */}
+        {/* Master data — Checker, Company Admin, and Super Admin */}
         <Route
           path="/master-data/organisations"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <OrganisationListPage />
             </ProtectedRoute>
           }
@@ -60,7 +60,7 @@ export default function App() {
         <Route
           path="/master-data/organisations/new"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <OrganisationFormPage />
             </ProtectedRoute>
           }
@@ -68,7 +68,7 @@ export default function App() {
         <Route
           path="/master-data/organisations/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <OrganisationFormPage />
             </ProtectedRoute>
           }
@@ -76,7 +76,7 @@ export default function App() {
         <Route
           path="/master-data/banks"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <BankListPage />
             </ProtectedRoute>
           }
@@ -84,7 +84,7 @@ export default function App() {
         <Route
           path="/master-data/banks/new"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <BankFormPage />
             </ProtectedRoute>
           }
@@ -92,12 +92,12 @@ export default function App() {
         <Route
           path="/master-data/banks/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <BankFormPage />
             </ProtectedRoute>
           }
         />
-        {/* T&C Templates — Checker and Company Admin can write; all roles can read */}
+        {/* T&C Templates — Checker, Company Admin, and Super Admin can write; all roles can read */}
         <Route
           path="/master-data/tc-templates"
           element={<TCTemplateListPage />}
@@ -105,7 +105,7 @@ export default function App() {
         <Route
           path="/master-data/tc-templates/new"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <TCTemplateFormPage />
             </ProtectedRoute>
           }
@@ -113,7 +113,7 @@ export default function App() {
         <Route
           path="/master-data/tc-templates/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <TCTemplateFormPage />
             </ProtectedRoute>
           }
@@ -127,7 +127,7 @@ export default function App() {
         <Route
           path="/proforma-invoices/new"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <ProformaInvoiceCreatePage />
             </ProtectedRoute>
           }
@@ -136,7 +136,7 @@ export default function App() {
         <Route
           path="/proforma-invoices/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <ProformaInvoiceEditPage />
             </ProtectedRoute>
           }
@@ -147,7 +147,7 @@ export default function App() {
         <Route
           path="/packing-lists/new"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <PackingListCreatePage />
             </ProtectedRoute>
           }
@@ -156,7 +156,7 @@ export default function App() {
         <Route
           path="/packing-lists/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <PackingListCreatePage />
             </ProtectedRoute>
           }
@@ -168,21 +168,21 @@ export default function App() {
         <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
         <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
 
-        {/* User Management — Company Admin only */}
+        {/* User Management — Company Admin and Super Admin */}
         <Route
           path="/users"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <UserListPage />
             </ProtectedRoute>
           }
         />
 
-        {/* Reports — Checker and Company Admin only */}
+        {/* Reports — Checker, Company Admin, and Super Admin */}
         <Route
           path="/reports"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <ReportsPage />
             </ProtectedRoute>
           }
