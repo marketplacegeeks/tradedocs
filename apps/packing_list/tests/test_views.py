@@ -311,21 +311,21 @@ class TestPackingListWorkflow:
         assert resp.status_code == 400
         assert "comment" in resp.json()
 
-    def test_maker_can_approve(self):
+    def test_maker_cannot_approve(self):
         pl, maker = self._pl_with_ci(PENDING_APPROVAL, maker=MakerFactory())
         other_maker = MakerFactory()
         resp = auth_client(other_maker).post(
             pl_workflow_url(pl.pk), {"action": "APPROVE"}, format="json"
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    def test_maker_can_approve_own_document(self):
-        """A Maker who created the document is now allowed to approve it."""
+    def test_maker_cannot_approve_own_document(self):
+        """FR-08.2: a Maker who created the document cannot approve it."""
         pl, maker = self._pl_with_ci(PENDING_APPROVAL, maker=MakerFactory())
         resp = auth_client(maker).post(
             pl_workflow_url(pl.pk), {"action": "APPROVE"}, format="json"
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_admin_can_approve_own_document(self):
         """Company Admin who created the document is allowed to approve it."""

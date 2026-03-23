@@ -203,10 +203,10 @@ class TestProformaInvoiceWorkflow:
         assert resp.status_code == 200
         assert resp.data["status"] == REWORK
 
-    def test_maker_can_approve(self):
+    def test_maker_cannot_approve(self):
         pi = ProformaInvoiceFactory(status=PENDING_APPROVAL)
         resp = auth_client(MakerFactory()).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_permanently_reject_requires_comment(self):
         pi = ProformaInvoiceFactory(status=PENDING_APPROVAL)
@@ -364,12 +364,12 @@ class TestSerializerTotals:
 @pytest.mark.django_db
 class TestSelfApprovalBlock:
 
-    def test_maker_can_approve_own_document(self):
-        """A Maker who created a PI is allowed to approve it."""
+    def test_maker_cannot_approve_own_document(self):
+        """A Maker who created a PI cannot approve it."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
         resp = auth_client(maker).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_checker_cannot_approve_own_document(self):
         """A Checker who created a PI cannot approve it."""
@@ -875,16 +875,16 @@ class TestWorkflowStateMachineExtended:
         )
         assert resp.status_code == 400
 
-    def test_maker_can_permanently_reject(self):
-        """Maker role is now allowed to permanently reject documents."""
+    def test_maker_cannot_permanently_reject(self):
+        """Maker role is not allowed to permanently reject documents."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
         resp = auth_client(maker).post(
             pi_workflow_url(pi.pk),
-            {"action": "PERMANENTLY_REJECT", "comment": "Maker rejecting."},
+            {"action": "PERMANENTLY_REJECT", "comment": "Maker trying to reject."},
             format="json",
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_audit_log_records_rework_comment(self):
         """The comment entered on REWORK must appear verbatim in the audit log."""

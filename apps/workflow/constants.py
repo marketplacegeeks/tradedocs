@@ -46,7 +46,7 @@ from apps.accounts.models import UserRole  # noqa: E402  (imported here to avoid
 # Both PackingList and CommercialInvoice share the same transition rules.
 # WorkflowService applies this state machine to BOTH records simultaneously.
 SUBMIT_ROLES = [UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN]
-APPROVE_ROLES = [UserRole.MAKER, UserRole.CHECKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN]
+APPROVE_ROLES = [UserRole.CHECKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN]
 
 PLCI_TRANSITIONS = {
     DRAFT: {

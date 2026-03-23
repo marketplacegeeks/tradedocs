@@ -75,7 +75,7 @@ class WorkflowService:
         if (action == APPROVE
                 and hasattr(document, "created_by")
                 and document.created_by == performed_by
-                and performed_by.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
+                and performed_by.role not in (UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
             raise PermissionDenied(
                 "You cannot approve a document you created."
             )
@@ -157,7 +157,7 @@ class WorkflowService:
         # FR-08.2: creator cannot approve their own document, unless they are a Company Admin.
         if (action == APPROVE
                 and packing_list.created_by == performed_by
-                and performed_by.role not in (UserRole.MAKER, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
+                and performed_by.role not in (UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
             raise PermissionDenied("You cannot approve a document you created.")
 
         if action in COMMENT_REQUIRED_ACTIONS and not comment.strip():
