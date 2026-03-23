@@ -18,6 +18,14 @@ const VIDEOS = [
     chip: "Intermediate",
     chipColor: { bg: "var(--pastel-blue)", text: "var(--pastel-blue-text)" },
   },
+  {
+    id: "EiGsxObQf2E",
+    title: "Proforma Invoice, Packing List & Commercial Invoice",
+    description:
+      "Understand the three core trade documents — how a Proforma Invoice is created, linked to a Packing List, and flows through to a Commercial Invoice.",
+    chip: "Advanced",
+    chipColor: { bg: "var(--pastel-yellow)", text: "var(--pastel-yellow-text)" },
+  },
 ];
 
 export default function TrainingPage() {
