@@ -8,7 +8,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
   FileText, Package, Database, Users, BarChart2,
-  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag,
+  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard,
 } from "lucide-react";
 
 import { useAuth } from "../store/AuthContext";
@@ -18,6 +18,12 @@ import { ROLES } from "../utils/constants";
 // ---- Nav configuration ----------------------------------------------------
 
 const NAV_ITEMS = [
+  {
+    key: "/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
+  },
   {
     key: "/proforma-invoices",
     icon: FileText,

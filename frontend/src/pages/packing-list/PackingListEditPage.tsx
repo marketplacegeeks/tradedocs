@@ -130,7 +130,7 @@ export default function PackingListEditPage() {
     if (!pl) return;
     const isEditable = pl.status === DOCUMENT_STATUS.DRAFT || pl.status === DOCUMENT_STATUS.REWORK;
     const isCreator = user?.id === pl.created_by;
-    const isAdmin = user?.role === ROLES.COMPANY_ADMIN;
+    const isAdmin = user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
     if (!isEditable || (!isCreator && !isAdmin)) {
       navigate(`/packing-lists/${id}`);
     }

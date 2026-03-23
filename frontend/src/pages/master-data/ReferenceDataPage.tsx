@@ -281,7 +281,7 @@ function TextAreaInput({ value, onChange, placeholder }: { value: string; onChan
 
 export default function ReferenceDataPage() {
   const { user } = useAuth();
-  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN;
+  const canWrite = user?.role === ROLES.CHECKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabKey>("countries");

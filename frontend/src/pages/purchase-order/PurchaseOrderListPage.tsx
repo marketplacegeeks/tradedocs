@@ -466,7 +466,7 @@ function PORow({
   const isOwner = po.created_by === currentUserId;
   const isEditable =
     (po.status === DOCUMENT_STATUS.DRAFT || po.status === DOCUMENT_STATUS.REWORK) &&
-    (isOwner || currentUserRole === ROLES.COMPANY_ADMIN);
+    (isOwner || currentUserRole === ROLES.COMPANY_ADMIN || currentUserRole === ROLES.SUPER_ADMIN);
 
   return (
     <tr

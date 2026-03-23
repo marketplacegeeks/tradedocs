@@ -63,7 +63,7 @@ export default function PackingListListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("pl_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN;
+  const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
   const { data: packingLists = [], isLoading } = useQuery({
     queryKey: ["packing-lists", activeStatus],
