@@ -33,5 +33,5 @@ class ContainerAdmin(admin.ModelAdmin):
 
 @admin.register(ContainerItem)
 class ContainerItemAdmin(admin.ModelAdmin):
-    list_display = ("item_code", "container", "quantity", "uom", "item_gross_weight")
+    list_display = ("item_code", "container", "no_of_packages", "uom", "item_gross_weight")
     readonly_fields = ("item_gross_weight",)
