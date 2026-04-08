@@ -15,3 +15,15 @@ media/
 
 # Playwright MCP artifacts (screenshots, PDFs, console logs)
 .playwright-mcp/
+railway_exports/banks.csv
+railway_exports/commercial_invoice_line_items.csv
+railway_exports/commercial_invoices.csv
+railway_exports/container_items.csv
+railway_exports/containers.csv
+railway_exports/organisation_addresses.csv
+railway_exports/organisation_tags.csv
+railway_exports/organisations.csv
+railway_exports/packing_lists.csv
+railway_exports/proforma_invoice_charges.csv
+railway_exports/proforma_invoice_line_items.csv
+railway_exports/proforma_invoices.csv
