@@ -504,21 +504,8 @@ def build_pl_story(packing_list, styles):
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
         ]))
 
-        item_header = [
-            Paragraph("<b>Sr.</b>", style_label_center),
-            Paragraph("<b>HSN Code</b>", style_label_center),
-            Paragraph("<b>Item Code</b>", style_label_center),
-            Paragraph("<b>Description</b>", style_label_center),
-            Paragraph("<b>Batch No.</b>", style_label_center),
-            Paragraph("<b>Quantity of Items</b>", style_label_center),
-            Paragraph("<b>Type of Package</b>", style_label_center),
-            Paragraph("<b>Material Unit</b>", style_label_center),
-            Paragraph("<b>Net Weight Per Item</b>", style_label_center),
-            Paragraph("<b>Weight per empty package</b>", style_label_center),
-            Paragraph("<b>Net Material Wt</b>", style_label_center),
-            Paragraph("<b>Gross Weight</b>", style_label_center),
-        ]
-        item_rows = [item_header]
+        # Two-row layout per item
+        item_rows = []
         sr = 0
         for it in cont.items.all().order_by("id"):
             sr += 1
@@ -527,43 +514,57 @@ def build_pl_story(packing_list, styles):
             pkg_obj = getattr(it, "type_of_package", None)
             pkg_display = safe(getattr(pkg_obj, "name", "")) if pkg_obj else ""
 
-            item_rows.append([
-                Paragraph(str(sr), style_text),
-                Paragraph(safe(getattr(it, "hsn_code", "")) or "-", style_text),
-                Paragraph(safe(getattr(it, "item_code", "")) or "-", style_text),
-                Paragraph(safe(getattr(it, "description", "")) or "-", style_text),
-                Paragraph(safe(getattr(it, "batch_details", "")) or "-", style_text),
-                Paragraph(_fmt_qty(getattr(it, "no_of_packages", None)) or "-", style_text),
-                Paragraph(pkg_display or "-", style_text),
-                Paragraph(uom_display or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "qty_per_package", None), 1) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "weight_per_unit_packaging", None), 1) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "net_material_weight", None), 1) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "item_gross_weight", None), 1) or "-", style_text),
-            ])
+            # Row 1: Serial, HSN Code, Item Code, Description, Batch No.
+            row1 = [
+                Paragraph(f"<b>{sr}</b>", style_label_center),
+                Paragraph(f"<b>HSN CODE</b><br/>{safe(getattr(it, 'hsn_code', '')) or '-'}", style_small),
+                Paragraph(f"<b>ITEM CODE</b><br/>{safe(getattr(it, 'item_code', '')) or '-'}", style_small),
+                Paragraph(f"<b>DESCRIPTION</b><br/>{safe(getattr(it, 'description', '')) or '-'}", style_small),
+                Paragraph(f"<b>BATCH NO.</b><br/>{safe(getattr(it, 'batch_details', '')) or '-'}", style_small),
+            ]
 
-        # 12 columns: Sr | HSN | Item Code | Desc | Batch | No.Pkg | Type | Unit | Qty/Pkg | Wt/Unit | Net Mat | Gross
+            # Row 2: Weights and quantities
+            row2 = [
+                "",  # Empty cell under serial number
+                Paragraph(f"<b>QTY</b><br/>{_fmt_qty(getattr(it, 'no_of_packages', None)) or '-'}", style_small),
+                Paragraph(f"<b>PKG TYPE</b><br/>{pkg_display or '-'}", style_small),
+                Paragraph(f"<b>UNIT</b><br/>{uom_display or '-'}", style_small),
+                Paragraph(f"<b>NET WT/ITEM</b><br/>{_fmt_decimal(getattr(it, 'qty_per_package', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>EMPTY PKG WT</b><br/>{_fmt_decimal(getattr(it, 'weight_per_unit_packaging', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>NET MAT WT</b><br/>{_fmt_decimal(getattr(it, 'net_material_weight', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>GROSS WT</b><br/>{_fmt_decimal(getattr(it, 'item_gross_weight', None), 1) or '-'}", style_small),
+            ]
+
+            item_rows.append(row1)
+            item_rows.append(row2)
+
+        # 8 columns for row2, but row1 only uses 5 - need to span correctly
+        # Actually both rows need same column count, so row1 needs to span
+        # Let's use 8 columns total: Sr(1) + 7 data columns
+        # Row1: Sr | HSN(2 cols) | Item Code(2 cols) | Description(2 cols) | Batch(1 col)
         items_table = Table(
             item_rows,
-            colWidths=[8*mm, 16*mm, 16*mm, 30*mm, 18*mm, 14*mm, 18*mm, 13*mm, 14*mm, 14*mm, 14*mm, 15*mm],
-            repeatRows=1,
+            colWidths=[10*mm, 22*mm, 22*mm, 40*mm, 18*mm, 18*mm, 18*mm, 22*mm],
         )
         items_table.hAlign = "LEFT"
-        items_table.setStyle(TableStyle([
+
+        # Build style with row spans
+        table_style = [
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-            ("ALIGN", (0, 1), (0, -1), "CENTER"),
-            ("ALIGN", (5, 1), (-1, -1), "RIGHT"),
             ("LEFTPADDING", (0, 0), (-1, -1), 3),
             ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (0, 0), 6),
-            ("BOTTOMPADDING", (0, 0), (0, 0), 6),
-            ("TOPPADDING", (0, 1), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
-        ]))
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+
+        # Span serial number across both rows for each item
+        for i in range(0, len(item_rows), 2):
+            table_style.append(("SPAN", (0, i), (0, i+1)))
+            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#F5F5F5")))
+
+        items_table.setStyle(TableStyle(table_style))
 
         story.append(KeepTogether([cont_header, weights_table, items_table]))
         story.append(Spacer(1, 10))
