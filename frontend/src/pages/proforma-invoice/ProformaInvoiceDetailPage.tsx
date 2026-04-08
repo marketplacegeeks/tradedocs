@@ -347,10 +347,12 @@ export default function ProformaInvoiceDetailPage() {
                     </td>
                     <td style={TD}>
                       <input
+                        type="number"
+                        step="0.01"
                         style={INPUT}
                         value={lineItemForm.rate_usd}
                         onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
-                        placeholder="rate usd"
+                        placeholder="0.00"
                       />
                     </td>
                     <td style={TD}>—</td>
@@ -428,10 +430,12 @@ export default function ProformaInvoiceDetailPage() {
                   </td>
                   <td style={TD}>
                     <input
+                      type="number"
+                      step="0.01"
                       style={INPUT}
                       value={lineItemForm.rate_usd}
                       onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
-                      placeholder="rate usd"
+                      placeholder="0.00"
                     />
                   </td>
                   <td style={TD}>—</td>

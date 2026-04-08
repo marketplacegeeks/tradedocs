@@ -80,6 +80,9 @@ class PurchaseOrderLineItemSerializer(serializers.ModelSerializer):
     def validate_unit_price(self, value):
         if value < 0:
             raise serializers.ValidationError("Unit price must be zero or greater.")
+        # Reject more than 2 decimal places
+        if value.as_tuple().exponent < -2:
+            raise serializers.ValidationError("Unit price can have at most 2 decimal places.")
         return value
 
 

@@ -62,6 +62,9 @@ class ProformaInvoiceLineItemSerializer(serializers.ModelSerializer):
     def validate_rate_usd(self, value):
         if value < 0:
             raise serializers.ValidationError("Rate must be zero or greater.")
+        # Reject more than 2 decimal places
+        if value.as_tuple().exponent < -2:
+            raise serializers.ValidationError("Rate can have at most 2 decimal places.")
         return value
 
 

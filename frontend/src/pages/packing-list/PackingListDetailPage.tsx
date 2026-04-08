@@ -392,6 +392,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                         <input
                           autoFocus
                           type="number"
+                          step="0.01"
                           style={{ background: "var(--bg-input)", border: "1px solid var(--border-medium)", borderRadius: 6, padding: "4px 8px", fontSize: 13, width: 100, fontFamily: "var(--font-body)" }}
                           value={editingRate.value}
                           onChange={(e) => setEditingRate({ id: li.id, value: e.target.value })}

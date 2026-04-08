@@ -60,11 +60,9 @@ def safe(v: Any, default: str = "") -> str:
 
 
 def _fmt_money(v: Any) -> str:
+    """Format number as money with comma separators and exactly 2 decimal places."""
     try:
-        s = f"{float(v):,.2f}"
-        if "." in s:
-            s = s.rstrip("0").rstrip(".")
-        return s
+        return f"{float(v):,.2f}"
     except Exception:
         return safe(v)
 
