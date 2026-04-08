@@ -17,7 +17,7 @@ Table 5  Terms                Payment Terms | Incoterms  (2 cols, 1 row)
 
 Container section:
   - Container header (container ref, marks & numbers)
-  - Weights row (Net Material Wt, Tare Weight, Gross Weight)
+  - Weights row (Net Weight, Tare Weight, Gross Weight)
 
   ITEMS TABLE (Total width = 180mm, two-row layout per item):
   - Columns (mm): [12 | 20 | 20 | 22 | 22 | 22 | 22 | 20 | 20]
@@ -29,23 +29,23 @@ Container section:
     │ 4mm  │ CODE   │ CODE    │                                                                    │
     │      │ 22mm   │ 22mm    │ 22mm + 22mm + 22mm + 22mm + 22mm + 22mm                            │
     ├──────┼────────┼─────────┼────────┬────────┬────────┬────────┬────────┬────────┬────────────┤
-    │      │ BATCH  │ QTY     │ PKG    │ UNIT   │ NET    │ EMPTY  │ NET    │ GROSS WT           │
-    │      │ NO     │         │ TYPE   │        │ WT/    │ PKG WT │ MAT WT │                    │
-    │      │        │         │        │        │ ITEM   │        │        │                    │
+    │      │ BATCH  │ QTY     │ PKG    │ UNIT   │ NET WT │ Tare   │ NET WT │ GROSS WT           │
+    │      │ NO     │         │ TYPE   │        │ /ITEM  │ Wt/Item│ (KGS)  │ (KGS)              │
+    │      │        │         │        │        │ (KGS)  │ (KGS)  │        │                    │
     └──────┴────────┴─────────┴────────┴────────┴────────┴────────┴────────┴────────────────────┘
          4     22       22       22       22       22       22       22       22        => Total=180mm
 
     Layout notes:
     - Row 1: Sr (spans rows 1-2), HSN CODE, ITEM CODE, DESCRIPTION (spans cols 3-8)
-    - Row 2: (empty under Sr), BATCH NO, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
+    - Row 2: (empty under Sr), BATCH NO, QTY, PKG TYPE, UNIT, NET WT/ITEM (KGS), Tare Wt/Item (KGS), NET WT (KGS), GROSS WT (KGS)
     - Sr spans vertically across both rows
     - DESCRIPTION spans horizontally across 6 columns in row 1
-    - Row 2 has 8 data columns: Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
+    - Row 2 has 8 data columns: Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM (KGS), Tare Wt/Item (KGS), NET WT (KGS), GROSS WT (KGS)
 
   TOTALS ROW (Total width = 180mm):
-  - Layout: [30mm label | 30mm value] x 3 pairs (Net Material Wt, Tare Weight, Gross Weight)
+  - Layout: [30mm label | 30mm value] x 3 pairs (Net Weight, Tare Weight, Gross Weight)
     ┌─────────────────────────────┬────────────────┬──────────────────────────┬────────────────┬──────────────────────┬────────────────┐
-    │ Total Net Material Wt       │ 2000 KGS       │ Total Tare Weight        │ 100 KGS        │ Total Gross Weight   │ 3150 KGS       │
+    │ Total Net Weight            │ 2000 KGS       │ Total Tare Weight        │ 100 KGS        │ Total Gross Weight   │ 3150 KGS       │
     │ 30mm                        │ 30mm           │ 30mm                     │ 30mm           │ 30mm                 │ 30mm           │
     └─────────────────────────────┴────────────────┴──────────────────────────┴────────────────┴──────────────────────┴────────────────┘
                                                                     30 + 30 x 3 = 180mm
@@ -514,7 +514,7 @@ def build_pl_story(packing_list, styles):
 
         weights_table = Table(
             [[
-                Paragraph("<b>Net Material Wt</b>", style_label),
+                Paragraph("<b>Net Weight</b>", style_label),
                 Paragraph(f"{_fmt_decimal(net_val, 1)} KGS" if net_val is not None else "-", style_text),
                 Paragraph("<b>Tare Weight</b>", style_label),
                 Paragraph(f"{_fmt_decimal(tare_val, 1)} KGS" if tare_val is not None else "-", style_text),
@@ -561,17 +561,17 @@ def build_pl_story(packing_list, styles):
                 "",  # Merge cell 5
             ]
 
-            # Row 2: 8 data columns - Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
+            # Row 2: 8 data columns - Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM (KGS), Tare Wt/Item (KGS), NET WT (KGS), GROSS WT (KGS)
             row2 = [
                 "",  # Empty cell under serial number
                 Paragraph(f"<b>BATCH NO.</b><br/>{safe(getattr(it, 'batch_details', '')) or '-'}", style_small),
                 Paragraph(f"<b>QTY</b><br/>{_fmt_qty(getattr(it, 'no_of_packages', None)) or '-'}", style_small),
                 Paragraph(f"<b>PKG TYPE</b><br/>{pkg_display or '-'}", style_small),
                 Paragraph(f"<b>UNIT</b><br/>{uom_display or '-'}", style_small),
-                Paragraph(f"<b>NET WT/ITEM</b><br/>{_fmt_decimal(getattr(it, 'qty_per_package', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>EMPTY PKG WT</b><br/>{_fmt_decimal(getattr(it, 'weight_per_unit_packaging', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>NET MAT WT</b><br/>{_fmt_decimal(getattr(it, 'net_material_weight', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>GROSS WT</b><br/>{_fmt_decimal(getattr(it, 'item_gross_weight', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>NET WT/ITEM (KGS)</b><br/>{_fmt_decimal(getattr(it, 'qty_per_package', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>Tare Wt/Item (KGS)</b><br/>{_fmt_decimal(getattr(it, 'weight_per_unit_packaging', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>NET WT (KGS)</b><br/>{_fmt_decimal(getattr(it, 'net_material_weight', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>GROSS WT (KGS)</b><br/>{_fmt_decimal(getattr(it, 'item_gross_weight', None), 1) or '-'}", style_small),
             ]
 
             item_rows.append(row1)
@@ -612,7 +612,7 @@ def build_pl_story(packing_list, styles):
 
     totals_tbl = Table(
         [[
-            Paragraph("<b>Total Net Material Wt</b>", style_label),
+            Paragraph("<b>Total Net Weight</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text),
             Paragraph("<b>Total Tare Weight</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_tare, 1)} KGS", style_text),
