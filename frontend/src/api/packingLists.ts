@@ -283,9 +283,15 @@ export function listCommercialInvoices(params?: Record<string, string>) {
     .then((r) => r.data);
 }
 
-export function updateCILineItem(id: number, data: { rate_usd?: string; packages_kind?: string }) {
+export function updateCILineItem(id: number, data: { rate_usd?: string; packages_kind?: string; uom?: number }) {
   return axiosInstance
     .patch<CILineItem>(`/ci-line-items/${id}/`, data)
+    .then((r) => r.data);
+}
+
+export function updateCommercialInvoice(id: number, data: Record<string, unknown>) {
+  return axiosInstance
+    .patch<CommercialInvoice>(`/commercial-invoices/${id}/`, data)
     .then((r) => r.data);
 }
 
