@@ -50,7 +50,7 @@ def safe(v: Any, default: str = "") -> str:
     return default if v is None else str(v)
 
 
-def _fmt_decimal(v: Optional[Decimal], places: int = 3) -> str:
+def _fmt_decimal(v: Optional[Decimal], places: int = 1) -> str:
     """Format a Decimal to a fixed number of decimal places."""
     if v is None:
         return ""
@@ -61,6 +61,18 @@ def _fmt_decimal(v: Optional[Decimal], places: int = 3) -> str:
             return f"{float(v):.{places}f}"
         except Exception:
             return str(v)
+
+def _fmt_qty(v: Optional[Decimal]) -> str:
+    """Format quantity - show decimals only if not a whole number."""
+    if v is None:
+        return ""
+    try:
+        num = Decimal(v)
+        if num == int(num):
+            return str(int(num))
+        return f"{num:.3f}".rstrip('0').rstrip('.')
+    except Exception:
+        return str(v)
 
 
 def _org_address_by_type(org, address_type: str):
@@ -467,11 +479,11 @@ def build_pl_story(packing_list, styles):
         weights_table = Table(
             [[
                 Paragraph("<b>Net Material Wt</b>", style_label),
-                Paragraph(f"{_fmt_decimal(net_val, 3)} KGS" if net_val is not None else "-", style_text),
+                Paragraph(f"{_fmt_decimal(net_val, 1)} KGS" if net_val is not None else "-", style_text),
                 Paragraph("<b>Tare Weight</b>", style_label),
-                Paragraph(f"{_fmt_decimal(tare_val, 3)} KGS" if tare_val is not None else "-", style_text),
+                Paragraph(f"{_fmt_decimal(tare_val, 1)} KGS" if tare_val is not None else "-", style_text),
                 Paragraph("<b>Gross Weight</b>", style_label),
-                Paragraph(f"{_fmt_decimal(gross_val, 3)} KGS" if gross_val is not None else "-", style_text),
+                Paragraph(f"{_fmt_decimal(gross_val, 1)} KGS" if gross_val is not None else "-", style_text),
             ]],
             colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
         )
@@ -519,13 +531,13 @@ def build_pl_story(packing_list, styles):
                 Paragraph(safe(getattr(it, "item_code", "")) or "-", style_text),
                 Paragraph(safe(getattr(it, "description", "")) or "-", style_text),
                 Paragraph(safe(getattr(it, "batch_details", "")) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "no_of_packages", None)) or "-", style_text),
+                Paragraph(_fmt_qty(getattr(it, "no_of_packages", None)) or "-", style_text),
                 Paragraph(pkg_display or "-", style_text),
                 Paragraph(uom_display or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "qty_per_package", None)) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "weight_per_unit_packaging", None)) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "net_material_weight", None)) or "-", style_text),
-                Paragraph(_fmt_decimal(getattr(it, "item_gross_weight", None)) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "qty_per_package", None), 1) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "weight_per_unit_packaging", None), 1) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "net_material_weight", None), 1) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "item_gross_weight", None), 1) or "-", style_text),
             ])
 
         # 12 columns: Sr | HSN | Item Code | Desc | Batch | No.Pkg | Type | Unit | Qty/Pkg | Wt/Unit | Net Mat | Gross
@@ -557,11 +569,11 @@ def build_pl_story(packing_list, styles):
     totals_tbl = Table(
         [[
             Paragraph("<b>Total Net Material Wt</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_net, 3)} KGS", style_text),
+            Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text),
             Paragraph("<b>Total Tare Weight</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_tare, 3)} KGS", style_text),
+            Paragraph(f"{_fmt_decimal(total_tare, 1)} KGS", style_text),
             Paragraph("<b>Total Gross Weight</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_gross, 3)} KGS", style_text),
+            Paragraph(f"{_fmt_decimal(total_gross, 1)} KGS", style_text),
         ]],
         colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
     )
