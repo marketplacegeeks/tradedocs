@@ -1094,7 +1094,7 @@ function Step3({
                   <th style={TH}>Batch No.</th>
                   <th style={TH}>Qty</th>
                   <th style={TH}>UOM</th>
-                  <th style={TH}>Net Weight</th>
+                  <th style={TH}>Net Wt/unit</th>
                   <th style={TH}>Inner Pkg Wt</th>
                   <th style={TH}>Gross Wt (auto)</th>
                   <th style={{ ...TH, width: 36 }}></th>
@@ -1192,8 +1192,8 @@ function Step3({
                     </td>
                     <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
                       {item.item_gross_weight ?? (
-                        item.net_weight && item.inner_packing_weight
-                          ? (parseFloat(String(item.net_weight)) + parseFloat(String(item.inner_packing_weight))).toFixed(3)
+                        item.net_weight && item.inner_packing_weight && item.quantity
+                          ? ((parseFloat(String(item.net_weight)) + parseFloat(String(item.inner_packing_weight))) * parseFloat(String(item.quantity))).toFixed(3)
                           : "—"
                       )}
                     </td>
@@ -1249,8 +1249,8 @@ function Step3({
                         value={pItem.inner_packing_weight || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { inner_packing_weight: e.target.value })} />
                     </td>
                     <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
-                      {pItem.net_weight && pItem.inner_packing_weight
-                        ? (parseFloat(pItem.net_weight) + parseFloat(pItem.inner_packing_weight)).toFixed(3)
+                      {pItem.net_weight && pItem.inner_packing_weight && pItem.quantity
+                        ? ((parseFloat(pItem.net_weight) + parseFloat(pItem.inner_packing_weight)) * parseFloat(pItem.quantity)).toFixed(3)
                         : "—"}
                     </td>
                     <td style={{ ...TD, whiteSpace: "nowrap" }}>
@@ -1351,7 +1351,8 @@ function Step3({
                   const tare = parseFloat(data.tare_weight || "0");
                   const netW = parseFloat(data._item?.net_weight || "0");
                   const innerW = parseFloat(data._item?.inner_packing_weight || "0");
-                  return data.tare_weight ? (tare + netW + innerW).toFixed(3) : "—";
+                  const qty = parseFloat(data._item?.quantity || "0");
+                  return data.tare_weight ? (tare + (netW + innerW) * qty).toFixed(3) : "—";
                 })()} />
               </div>
             </div>
@@ -1431,8 +1432,8 @@ function Step3({
                 <div>
                   <label style={LABEL}>Item Gross Wt (auto)</label>
                   <input style={INPUT_READONLY} readOnly value={
-                    data._item?.net_weight && data._item?.inner_packing_weight
-                      ? (parseFloat(data._item.net_weight) + parseFloat(data._item.inner_packing_weight)).toFixed(3)
+                    data._item?.net_weight && data._item?.inner_packing_weight && data._item?.quantity
+                      ? ((parseFloat(data._item.net_weight) + parseFloat(data._item.inner_packing_weight)) * parseFloat(data._item.quantity)).toFixed(3)
                       : "—"
                   } />
                 </div>
@@ -1689,6 +1690,7 @@ function Step4({
                   <td style={TD}>
                     <input
                       type="number"
+                      step="0.01"
                       style={{ ...INPUT, width: 120 }}
                       value={rate}
                       onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })}
@@ -1735,14 +1737,14 @@ function Step4({
               {visibleCostFields.has("freight") && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
-                  <input type="number" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
+                  <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
                 </div>
               )}
               {/* Insurance */}
               {visibleCostFields.has("insurance") && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
-                  <input type="number" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
+                  <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
                 </div>
               )}
             </div>

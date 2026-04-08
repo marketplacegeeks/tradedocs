@@ -270,7 +270,7 @@ class ContainerItem(models.Model):
         Compute item_gross_weight before saving, then propagate the change up
         to the parent Container so its gross_weight stays accurate.
         """
-        self.item_gross_weight = self.net_weight + self.inner_packing_weight
+        self.item_gross_weight = (self.net_weight + self.inner_packing_weight) * self.quantity
         super().save(*args, **kwargs)
         # Recompute the parent container's gross_weight to reflect this item's weight.
         self.container.save()

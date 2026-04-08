@@ -510,8 +510,8 @@ class TestContainerItemCRUD:
         resp = auth_client(maker).post(item_list_url(), payload, format="json")
         assert resp.status_code == 201
         data = resp.json()
-        # item_gross_weight must be computed.
-        assert Decimal(data["item_gross_weight"]) == Decimal("100.000")
+        # item_gross_weight = (net_weight + inner_packing_weight) * quantity = (95 + 5) * 100 = 10000.000
+        assert Decimal(data["item_gross_weight"]) == Decimal("10000.000")
 
     def test_invalid_hsn_rejected(self):
         maker = MakerFactory()

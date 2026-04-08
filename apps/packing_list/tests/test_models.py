@@ -61,15 +61,16 @@ class TestContainerModel:
         Adding an item must trigger Container.save(), which adds item_gross_weight to tare.
         """
         container = ContainerFactory(tare_weight=Decimal("2000.000"))
-        item = ContainerItemFactory(
+        ContainerItemFactory(
             container=container,
             net_weight=Decimal("100.000"),
             inner_packing_weight=Decimal("10.000"),
+            quantity=Decimal("2.000"),
         )
         container.refresh_from_db()
-        # item_gross_weight = 100.000 + 10.000 = 110.000
-        # container gross = 110.000 + 2000.000 = 2110.000
-        assert container.gross_weight == Decimal("2110.000")
+        # item_gross_weight = (100.000 + 10.000) * 2 = 220.000
+        # container gross = 220.000 + 2000.000 = 2220.000
+        assert container.gross_weight == Decimal("2220.000")
 
     def test_gross_weight_sums_multiple_items(self):
         container = ContainerFactory(tare_weight=Decimal("1500.000"))
@@ -77,15 +78,18 @@ class TestContainerModel:
             container=container,
             net_weight=Decimal("50.000"),
             inner_packing_weight=Decimal("5.000"),
+            quantity=Decimal("2.000"),
         )
         ContainerItemFactory(
             container=container,
             net_weight=Decimal("80.000"),
             inner_packing_weight=Decimal("8.000"),
+            quantity=Decimal("3.000"),
         )
         container.refresh_from_db()
-        # item gross: 55.000 + 88.000 = 143.000; container gross = 1500 + 143 = 1643.000
-        assert container.gross_weight == Decimal("1643.000")
+        # item1 gross: (50+5)*2 = 110.000; item2 gross: (80+8)*3 = 264.000
+        # container gross = 1500 + 110 + 264 = 1874.000
+        assert container.gross_weight == Decimal("1874.000")
 
 
 @pytest.mark.django_db
@@ -94,22 +98,27 @@ class TestContainerItemModel:
         item = ContainerItemFactory(
             net_weight=Decimal("200.000"),
             inner_packing_weight=Decimal("20.500"),
+            quantity=Decimal("2.000"),
         )
         item.refresh_from_db()
-        assert item.item_gross_weight == Decimal("220.500")
+        # item_gross_weight = (200.000 + 20.500) * 2 = 441.000
+        assert item.item_gross_weight == Decimal("441.000")
 
     def test_item_gross_weight_updates_on_resave(self):
         item = ContainerItemFactory(
             net_weight=Decimal("100.000"),
             inner_packing_weight=Decimal("10.000"),
+            quantity=Decimal("2.000"),
         )
         item.refresh_from_db()
-        assert item.item_gross_weight == Decimal("110.000")
+        # (100 + 10) * 2 = 220.000
+        assert item.item_gross_weight == Decimal("220.000")
 
         item.net_weight = Decimal("150.000")
         item.save()
         item.refresh_from_db()
-        assert item.item_gross_weight == Decimal("160.000")
+        # (150 + 10) * 2 = 320.000
+        assert item.item_gross_weight == Decimal("320.000")
 
     def test_str_includes_item_code_and_container(self):
         item = ContainerItemFactory(item_code="ITEM-001")

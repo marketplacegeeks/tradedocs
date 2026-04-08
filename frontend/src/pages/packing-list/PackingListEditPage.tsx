@@ -635,7 +635,7 @@ export default function PackingListEditPage() {
                     <td style={TD}>{li.total_quantity}</td>
                     <td style={TD}>{li.uom_abbr ?? "—"}</td>
                     <td style={TD}>
-                      <input type="number" style={{ ...INPUT, width: 120 }} value={rate}
+                      <input type="number" step="0.01" style={{ ...INPUT, width: 120 }} value={rate}
                         onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })} />
                     </td>
                     <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
@@ -655,21 +655,21 @@ export default function PackingListEditPage() {
                 {visible.has("fob_rate") && (
                   <div>
                     <label style={LABEL}>FOB Rate (USD per UOM)</label>
-                    <input type="number" style={INPUT} value={headerForm.fob_rate || ""}
+                    <input type="number" step="0.01" style={INPUT} value={headerForm.fob_rate || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, fob_rate: e.target.value })} />
                   </div>
                 )}
                 {visible.has("freight") && (
                   <div>
                     <label style={LABEL}>Freight (USD)</label>
-                    <input type="number" style={INPUT} value={headerForm.freight || ""}
+                    <input type="number" step="0.01" style={INPUT} value={headerForm.freight || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, freight: e.target.value })} />
                   </div>
                 )}
                 {visible.has("insurance") && (
                   <div>
                     <label style={LABEL}>Insurance (USD)</label>
-                    <input type="number" style={INPUT} value={headerForm.insurance || ""}
+                    <input type="number" step="0.01" style={INPUT} value={headerForm.insurance || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, insurance: e.target.value })} />
                   </div>
                 )}
@@ -706,7 +706,7 @@ export default function PackingListEditPage() {
             ["hsn_code", "HSN Code", "text"],
             ["batch_details", "Batch Number", "text"],
             ["quantity", "Quantity *", "number"],
-            ["net_weight", "Net Weight (kg) *", "number"],
+            ["net_weight", "Net Weight/unit (kg) *", "number"],
             ["inner_packing_weight", "Inner Packing Weight (kg) *", "number"],
           ].map(([field, label, type]) => (
             <div key={field as string} style={field === "description" ? { gridColumn: "1 / -1" } : {}}>
