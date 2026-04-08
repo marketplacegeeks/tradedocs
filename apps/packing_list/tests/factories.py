@@ -8,6 +8,7 @@ from apps.master_data.tests.factories import (
     OrganisationFactory,
     PaymentTermFactory,
     PortFactory,
+    TypeOfPackageFactory,
     UOMFactory,
 )
 from apps.proforma_invoice.tests.factories import ProformaInvoiceFactory
@@ -50,17 +51,17 @@ class ContainerItemFactory(factory.django.DjangoModelFactory):
 
     container = factory.SubFactory(ContainerFactory)
     item_code = factory.Sequence(lambda n: f"ITEM-{n + 1:03d}")
-    packages_kind = factory.Sequence(lambda n: f"{n + 1} Boxes")
     description = factory.Sequence(lambda n: f"Commodity description {n + 1}")
     batch_details = ""
     uom = factory.SubFactory(UOMFactory)
-    quantity = factory.Faker(
+    type_of_package = factory.SubFactory(TypeOfPackageFactory)
+    no_of_packages = factory.Faker(
+        "pydecimal", left_digits=3, right_digits=3, positive=True
+    )
+    qty_per_package = factory.Faker(
         "pydecimal", left_digits=4, right_digits=3, positive=True
     )
-    net_weight = factory.Faker(
-        "pydecimal", left_digits=4, right_digits=3, positive=True
-    )
-    inner_packing_weight = factory.Faker(
+    weight_per_unit_packaging = factory.Faker(
         "pydecimal", left_digits=2, right_digits=3, positive=True
     )
-    # item_gross_weight is computed on save — do not set here
+    # net_material_weight and item_gross_weight are computed on save — do not set here

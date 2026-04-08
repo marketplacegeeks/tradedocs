@@ -228,7 +228,7 @@ class Container(models.Model):
 class ContainerItem(models.Model):
     """
     One commodity line within a container (FR-14M.8A).
-    item_gross_weight is stored and computed on save as net_weight + inner_packing_weight.
+    net_material_weight and item_gross_weight are stored computed fields updated on save().
     item_code + uom is the aggregation key used in the Final Rates section (FR-14M.8B).
     """
 
@@ -242,21 +242,31 @@ class ContainerItem(models.Model):
     hsn_code = models.CharField(max_length=10, blank=True, default="")
     # item_code is mandatory — it is the aggregation key for Final Rates and the CI.
     item_code = models.CharField(max_length=100)
-    # "No & Kind of Packages" e.g. "10 Boxes", "5 Pallets"
-    packages_kind = models.CharField(max_length=255)
     description = models.TextField()
     batch_details = models.CharField(max_length=255, blank=True, default="")
 
-    # Constraint #7: PROTECT on UOM FK
+    # Constraint #7: PROTECT on FK references to master data
     uom = models.ForeignKey(
         "master_data.UOM",
         on_delete=models.PROTECT,
     )
-    # Constraint #6: 3 decimal places for quantity and all weights
-    quantity = models.DecimalField(max_digits=12, decimal_places=3)
-    net_weight = models.DecimalField(max_digits=12, decimal_places=3)
-    inner_packing_weight = models.DecimalField(max_digits=12, decimal_places=3)
-    # Stored computed value: net_weight + inner_packing_weight
+    # Constraint #7: PROTECT on TypeOfPackage FK
+    type_of_package = models.ForeignKey(
+        "master_data.TypeOfPackage",
+        on_delete=models.PROTECT,
+    )
+
+    # Constraint #6: 3 decimal places for all quantity/weight fields
+    no_of_packages = models.DecimalField(max_digits=12, decimal_places=3)
+    qty_per_package = models.DecimalField(max_digits=12, decimal_places=3)
+    weight_per_unit_packaging = models.DecimalField(max_digits=12, decimal_places=3)
+
+    # Stored computed values — updated on every save()
+    # net_material_weight = no_of_packages × qty_per_package
+    net_material_weight = models.DecimalField(
+        max_digits=12, decimal_places=3, editable=False, default=0
+    )
+    # item_gross_weight = net_material_weight + (no_of_packages × weight_per_unit_packaging)
     item_gross_weight = models.DecimalField(
         max_digits=12, decimal_places=3, editable=False, default=0
     )
@@ -267,10 +277,11 @@ class ContainerItem(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Compute item_gross_weight before saving, then propagate the change up
-        to the parent Container so its gross_weight stays accurate.
+        Compute net_material_weight and item_gross_weight before saving, then
+        propagate the change up to the parent Container so its gross_weight stays accurate.
         """
-        self.item_gross_weight = (self.net_weight + self.inner_packing_weight) * self.quantity
+        self.net_material_weight = self.no_of_packages * self.qty_per_package
+        self.item_gross_weight = self.net_material_weight + (self.no_of_packages * self.weight_per_unit_packaging)
         super().save(*args, **kwargs)
         # Recompute the parent container's gross_weight to reflect this item's weight.
         self.container.save()

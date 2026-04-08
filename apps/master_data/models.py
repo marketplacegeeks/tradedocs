@@ -115,6 +115,25 @@ class PreCarriageBy(models.Model):
         return self.name
 
 
+class TypeOfPackage(models.Model):
+    """
+    Physical packaging type used on Packing List container items.
+    Examples: Drums, Bags, Boxes, Cartons, Pallets, etc.
+    Soft-deleted via is_active=False — same pattern as all other ReferenceData entities.
+    """
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "master_data_typeofpackage"
+        ordering = ["name"]
+        verbose_name = "Type of Package"
+        verbose_name_plural = "Types of Package"
+
+    def __str__(self):
+        return self.name
+
+
 # ---------------------------------------------------------------------------
 # Terms & Conditions Templates (FR-07)
 # ---------------------------------------------------------------------------

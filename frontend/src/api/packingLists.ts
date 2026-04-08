@@ -10,14 +10,16 @@ export interface ContainerItem {
   container: number;
   hsn_code: string;
   item_code: string;
-  packages_kind: string;
   description: string;
   batch_details: string;
   uom: number | null;
   uom_abbr: string | null;
-  quantity: string;
-  net_weight: string;
-  inner_packing_weight: string;
+  no_of_packages: string;
+  type_of_package: number | null;
+  type_of_package_name: string | null;
+  qty_per_package: string;
+  weight_per_unit_packaging: string;
+  net_material_weight: string;
   item_gross_weight: string;
 }
 

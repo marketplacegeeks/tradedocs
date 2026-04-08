@@ -24,7 +24,7 @@ import {
 } from "../../api/packingLists";
 import type { PackingList } from "../../api/packingLists";
 import { listOrganisations } from "../../api/organisations";
-import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy } from "../../api/referenceData";
+import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy, listTypeOfPackages } from "../../api/referenceData";
 import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { useAuth } from "../../store/AuthContext";
@@ -150,6 +150,7 @@ export default function PackingListEditPage() {
   const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
   const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
+  const { data: typeOfPackages = [] } = useQuery({ queryKey: ["type-of-packages"], queryFn: listTypeOfPackages });
 
   const { data: ci } = useQuery({
     queryKey: ["commercial-invoice", pl?.ci_id],
@@ -276,13 +277,13 @@ export default function PackingListEditPage() {
         container: addingItem.containerId,
         hsn_code: itemForm.hsn_code || "",
         item_code: itemForm.item_code,
-        packages_kind: itemForm.packages_kind,
         description: itemForm.description,
         batch_details: itemForm.batch_details || "",
         uom: itemForm.uom,
-        quantity: itemForm.quantity,
-        net_weight: itemForm.net_weight,
-        inner_packing_weight: itemForm.inner_packing_weight,
+        no_of_packages: itemForm.no_of_packages,
+        type_of_package: itemForm.type_of_package,
+        qty_per_package: itemForm.qty_per_package,
+        weight_per_unit_packaging: itemForm.weight_per_unit_packaging,
       });
       setAddingItem(null);
       setItemForm({});
@@ -556,7 +557,7 @@ export default function PackingListEditPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
                 <thead>
                   <tr>
-                    {["Item Code", "Desc", "HSN", "Pkgs", "Qty", "UOM", "Net Wt", "Batch No.", ""].map((h) => (
+                    {["Item Code", "Desc", "HSN", "Batch No.", "No. of Pkg", "Type of Pkg", "Material Unit", "Qty/Pkg", "Wt/Unit Pkg", "Net Mat Wt", "Gross Wt", ""].map((h) => (
                       <th key={h} style={TH}>{h}</th>
                     ))}
                   </tr>
@@ -567,11 +568,14 @@ export default function PackingListEditPage() {
                       <td style={TD}>{item.item_code}</td>
                       <td style={TD}>{item.description}</td>
                       <td style={TD}>{item.hsn_code || "—"}</td>
-                      <td style={TD}>{item.packages_kind}</td>
-                      <td style={TD}>{item.quantity}</td>
-                      <td style={TD}>{item.uom_abbr ?? "—"}</td>
-                      <td style={TD}>{item.net_weight}</td>
                       <td style={TD}>{item.batch_details || "—"}</td>
+                      <td style={TD}>{item.no_of_packages}</td>
+                      <td style={TD}>{item.type_of_package_name || "—"}</td>
+                      <td style={TD}>{item.uom_abbr ?? "—"}</td>
+                      <td style={TD}>{item.qty_per_package}</td>
+                      <td style={TD}>{item.weight_per_unit_packaging}</td>
+                      <td style={TD}>{item.net_material_weight}</td>
+                      <td style={TD}>{item.item_gross_weight}</td>
                       <td style={TD}>
                         <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--pastel-pink-text)" }} onClick={async () => {
                           try {
@@ -701,25 +705,46 @@ export default function PackingListEditPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             ["item_code", "Item Code *", "text"],
-            ["packages_kind", "No & Kind of Packages *", "text"],
-            ["description", "Description *", "text"],
             ["hsn_code", "HSN Code", "text"],
             ["batch_details", "Batch Number", "text"],
-            ["quantity", "Quantity *", "number"],
-            ["net_weight", "Net Weight/unit (kg) *", "number"],
-            ["inner_packing_weight", "Inner Packing Weight (kg) *", "number"],
           ].map(([field, label, type]) => (
-            <div key={field as string} style={field === "description" ? { gridColumn: "1 / -1" } : {}}>
+            <div key={field as string}>
               <label style={LABEL}>{label as string}</label>
-              <input style={INPUT} type={type as string} value={itemForm[field as string] || ""}
+              <input style={INPUT} type={type as string ?? "text"} value={itemForm[field as string] || ""}
                 onChange={(e) => setItemForm({ ...itemForm, [field as string]: e.target.value })} />
             </div>
           ))}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={LABEL}>Description *</label>
+            <input style={INPUT} value={itemForm.description || ""}
+              onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} />
+          </div>
           <div>
-            <label style={LABEL}>UOM *</label>
+            <label style={LABEL}>No. of Package *</label>
+            <input style={INPUT} type="number" value={itemForm.no_of_packages || ""}
+              onChange={(e) => setItemForm({ ...itemForm, no_of_packages: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>Type of Package *</label>
+            <Select style={{ width: "100%" }} value={itemForm.type_of_package}
+              onChange={(v) => setItemForm({ ...itemForm, type_of_package: v })}
+              showSearch optionFilterProp="label" options={(typeOfPackages as any[]).map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
+          </div>
+          <div>
+            <label style={LABEL}>Material Unit *</label>
             <Select style={{ width: "100%" }} value={itemForm.uom}
               onChange={(v) => setItemForm({ ...itemForm, uom: v })}
               showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
+          </div>
+          <div>
+            <label style={LABEL}>Qty Per Package *</label>
+            <input style={INPUT} type="number" value={itemForm.qty_per_package || ""}
+              onChange={(e) => setItemForm({ ...itemForm, qty_per_package: e.target.value })} />
+          </div>
+          <div>
+            <label style={LABEL}>Wt Per Unit Pkg *</label>
+            <input style={INPUT} type="number" value={itemForm.weight_per_unit_packaging || ""}
+              onChange={(e) => setItemForm({ ...itemForm, weight_per_unit_packaging: e.target.value })} />
           </div>
         </div>
       </Modal>

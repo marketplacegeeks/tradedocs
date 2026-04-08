@@ -7,11 +7,11 @@ from rest_framework.response import Response
 
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsAnyRole, IsCheckerOrAdmin
-from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM
+from .models import Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress, Port, PaymentTerm, PreCarriageBy, TCTemplate, TypeOfPackage, UOM
 from .serializers import (
     BankSerializer, CountrySerializer, CurrencySerializer, IncotermSerializer, LocationSerializer,
     OrganisationAddressSerializer, OrganisationSerializer,
-    PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, TCTemplateSerializer, UOMSerializer,
+    PortSerializer, PaymentTermSerializer, PreCarriageBySerializer, TCTemplateSerializer, TypeOfPackageSerializer, UOMSerializer,
 )
 
 
@@ -87,6 +87,12 @@ class PreCarriageByViewSet(ReferenceDataViewSet):
     permission_classes = [IsAnyRole]
     queryset = PreCarriageBy.objects.all()
     serializer_class = PreCarriageBySerializer
+
+
+class TypeOfPackageViewSet(ReferenceDataViewSet):
+    permission_classes = [IsAnyRole]
+    queryset = TypeOfPackage.objects.all()
+    serializer_class = TypeOfPackageSerializer
 
 
 # ---------------------------------------------------------------------------

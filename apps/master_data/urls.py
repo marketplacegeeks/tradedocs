@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     BankViewSet, CountryViewSet, CurrencyViewSet, IncotermViewSet, LocationViewSet,
     OrganisationAddressViewSet, OrganisationViewSet,
-    PortViewSet, PaymentTermViewSet, PreCarriageByViewSet, TCTemplateViewSet, UOMViewSet,
+    PortViewSet, PaymentTermViewSet, PreCarriageByViewSet, TCTemplateViewSet, TypeOfPackageViewSet, UOMViewSet,
 )
 
 router = DefaultRouter()
@@ -19,6 +19,7 @@ router.register("currencies", CurrencyViewSet, basename="currency")
 router.register("banks", BankViewSet, basename="bank")
 router.register("organisations", OrganisationViewSet, basename="organisation")
 router.register("tc-templates", TCTemplateViewSet, basename="tctemplate")
+router.register("type-of-packages", TypeOfPackageViewSet, basename="typeofpackage")
 
 # Nested address routes under /organisations/{organisation_pk}/addresses/
 # Written manually so we don't need an extra package (drf-nested-routers).

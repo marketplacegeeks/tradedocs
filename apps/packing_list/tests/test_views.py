@@ -15,6 +15,7 @@ from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, M
 from apps.master_data.tests.factories import (
     BankFactory,
     OrganisationFactory,
+    TypeOfPackageFactory,
     UOMFactory,
 )
 from apps.proforma_invoice.tests.factories import ProformaInvoiceFactory
@@ -497,37 +498,40 @@ class TestContainerItemCRUD:
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         container = ContainerFactory(packing_list=pl)
         uom = UOMFactory()
+        pkg = TypeOfPackageFactory()
         payload = {
             "container": container.pk,
             "item_code": "ITEM001",
-            "packages_kind": "10 Bags",
             "description": "Wheat",
             "uom": uom.pk,
-            "quantity": "100.000",
-            "net_weight": "95.000",
-            "inner_packing_weight": "5.000",
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
         }
         resp = auth_client(maker).post(item_list_url(), payload, format="json")
         assert resp.status_code == 201
         data = resp.json()
-        # item_gross_weight = (net_weight + inner_packing_weight) * quantity = (95 + 5) * 100 = 10000.000
-        assert Decimal(data["item_gross_weight"]) == Decimal("10000.000")
+        # net_material_weight = 10 × 50 = 500; item_gross_weight = 500 + (10 × 5) = 550
+        assert Decimal(data["net_material_weight"]) == Decimal("500.000")
+        assert Decimal(data["item_gross_weight"]) == Decimal("550.000")
 
     def test_invalid_hsn_rejected(self):
         maker = MakerFactory()
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         container = ContainerFactory(packing_list=pl)
         uom = UOMFactory()
+        pkg = TypeOfPackageFactory()
         payload = {
             "container": container.pk,
             "item_code": "ITEM001",
-            "packages_kind": "10 Bags",
             "description": "Wheat",
             "hsn_code": "123",  # 3 digits — invalid
             "uom": uom.pk,
-            "quantity": "100.000",
-            "net_weight": "95.000",
-            "inner_packing_weight": "5.000",
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
         }
         resp = auth_client(maker).post(item_list_url(), payload, format="json")
         assert resp.status_code == 400
@@ -541,15 +545,16 @@ class TestContainerItemCRUD:
         ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
         container = ContainerFactory(packing_list=pl)
         uom = UOMFactory()
+        pkg = TypeOfPackageFactory()
         payload = {
             "container": container.pk,
             "item_code": "ITEM001",
-            "packages_kind": "10 Bags",
             "description": "Wheat",
             "uom": uom.pk,
-            "quantity": "100.000",
-            "net_weight": "95.000",
-            "inner_packing_weight": "5.000",
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
         }
         auth_client(maker).post(item_list_url(), payload, format="json")
         assert CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM001").exists()
@@ -861,20 +866,22 @@ class TestPlExtendedCoverage:
         c1 = ContainerFactory(packing_list=pl)
         c2 = ContainerFactory(packing_list=pl)
         # Same item_code + same uom in both containers → should aggregate
+        pkg = TypeOfPackageFactory()
         payload_base = {
             "item_code": "ITEM-AGG",
-            "packages_kind": "10 Drums",
             "description": "Castor Oil",
             "uom": uom.pk,
-            "quantity": "100.000",
-            "net_weight": "100.000",
-            "inner_packing_weight": "2.000",
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "20.000",   # net_material_weight = 200 per container
+            "weight_per_unit_packaging": "2.000",
         }
         auth_client(maker).post(item_list_url(), {**payload_base, "container": c1.pk}, format="json")
         auth_client(maker).post(item_list_url(), {**payload_base, "container": c2.pk}, format="json")
         line_items = CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM-AGG")
         assert line_items.count() == 1
-        assert Decimal(line_items.first().total_quantity) == Decimal("200.000")
+        # total_quantity = sum of net_material_weight = 200 + 200 = 400
+        assert Decimal(line_items.first().total_quantity) == Decimal("400.000")
 
     # ---- 11. CI aggregation: different UOM → separate line items ------------
 
@@ -888,14 +895,15 @@ class TestPlExtendedCoverage:
         uom_a = UOMFactory()
         uom_b = UOMFactory()
         container = ContainerFactory(packing_list=pl)
+        pkg = TypeOfPackageFactory()
         base = {
             "container": container.pk,
             "item_code": "ITEM-SPLIT",
-            "packages_kind": "10 Drums",
             "description": "Castor Oil",
-            "quantity": "50.000",
-            "net_weight": "50.000",
-            "inner_packing_weight": "1.000",
+            "type_of_package": pkg.pk,
+            "no_of_packages": "5.000",
+            "qty_per_package": "10.000",
+            "weight_per_unit_packaging": "1.000",
         }
         auth_client(maker).post(item_list_url(), {**base, "uom": uom_a.pk}, format="json")
         auth_client(maker).post(item_list_url(), {**base, "uom": uom_b.pk}, format="json")

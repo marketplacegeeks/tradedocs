@@ -446,9 +446,9 @@ def build_pl_story(packing_list, styles):
         net_val = None
         try:
             computed_net = sum(
-                item.net_weight * item.quantity
+                item.net_material_weight
                 for item in cont.items.all()
-                if item.net_weight is not None and item.quantity is not None
+                if item.net_material_weight is not None
             )
             net_val = computed_net
         except Exception:
@@ -466,7 +466,7 @@ def build_pl_story(packing_list, styles):
 
         weights_table = Table(
             [[
-                Paragraph("<b>Net Weight</b>", style_label),
+                Paragraph("<b>Net Material Wt</b>", style_label),
                 Paragraph(f"{_fmt_decimal(net_val, 3)} KGS" if net_val is not None else "-", style_text),
                 Paragraph("<b>Tare Weight</b>", style_label),
                 Paragraph(f"{_fmt_decimal(tare_val, 3)} KGS" if tare_val is not None else "-", style_text),
@@ -494,11 +494,15 @@ def build_pl_story(packing_list, styles):
             Paragraph("<b>Sr.</b>", style_label_center),
             Paragraph("<b>HSN Code</b>", style_label_center),
             Paragraph("<b>Item Code</b>", style_label_center),
-            Paragraph("<b>No &amp; Kind of Packages</b>", style_label_center),
-            Paragraph("<b>Description of Goods</b>", style_label_center),
-            Paragraph("<b>Qty</b>", style_label_center),
-            Paragraph("<b>UOM</b>", style_label_center),
-            Paragraph("<b>Batch Details</b>", style_label_center),
+            Paragraph("<b>Description</b>", style_label_center),
+            Paragraph("<b>Batch No.</b>", style_label_center),
+            Paragraph("<b>No. of Package</b>", style_label_center),
+            Paragraph("<b>Type of Package</b>", style_label_center),
+            Paragraph("<b>Material Unit</b>", style_label_center),
+            Paragraph("<b>Qty Per Package</b>", style_label_center),
+            Paragraph("<b>Wt Per Unit Pkg</b>", style_label_center),
+            Paragraph("<b>Net Material Wt</b>", style_label_center),
+            Paragraph("<b>Gross Weight</b>", style_label_center),
         ]
         item_rows = [item_header]
         sr = 0
@@ -506,22 +510,28 @@ def build_pl_story(packing_list, styles):
             sr += 1
             uom_obj = getattr(it, "uom", None)
             uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
-            qty_display = _fmt_decimal(getattr(it, "quantity", None))
+            pkg_obj = getattr(it, "type_of_package", None)
+            pkg_display = safe(getattr(pkg_obj, "name", "")) if pkg_obj else ""
 
             item_rows.append([
                 Paragraph(str(sr), style_text),
                 Paragraph(safe(getattr(it, "hsn_code", "")) or "-", style_text),
                 Paragraph(safe(getattr(it, "item_code", "")) or "-", style_text),
-                Paragraph(safe(getattr(it, "packages_kind", "")) or "-", style_text),
                 Paragraph(safe(getattr(it, "description", "")) or "-", style_text),
-                Paragraph(qty_display or "-", style_text),
-                Paragraph(uom_display or "-", style_text),
                 Paragraph(safe(getattr(it, "batch_details", "")) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "no_of_packages", None)) or "-", style_text),
+                Paragraph(pkg_display or "-", style_text),
+                Paragraph(uom_display or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "qty_per_package", None)) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "weight_per_unit_packaging", None)) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "net_material_weight", None)) or "-", style_text),
+                Paragraph(_fmt_decimal(getattr(it, "item_gross_weight", None)) or "-", style_text),
             ])
 
+        # 12 columns: Sr | HSN | Item Code | Desc | Batch | No.Pkg | Type | Unit | Qty/Pkg | Wt/Unit | Net Mat | Gross
         items_table = Table(
             item_rows,
-            colWidths=[10 * mm, 20 * mm, 20 * mm, 26 * mm, 45 * mm, 15 * mm, 14 * mm, 30 * mm],
+            colWidths=[8*mm, 16*mm, 16*mm, 30*mm, 18*mm, 14*mm, 18*mm, 13*mm, 14*mm, 14*mm, 14*mm, 15*mm],
             repeatRows=1,
         )
         items_table.hAlign = "LEFT"
@@ -531,9 +541,9 @@ def build_pl_story(packing_list, styles):
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("ALIGN", (0, 0), (-1, 0), "CENTER"),
             ("ALIGN", (0, 1), (0, -1), "CENTER"),
-            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("ALIGN", (5, 1), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
             ("TOPPADDING", (0, 0), (0, 0), 6),
             ("BOTTOMPADDING", (0, 0), (0, 0), 6),
             ("TOPPADDING", (0, 1), (-1, -1), 4),
@@ -546,7 +556,7 @@ def build_pl_story(packing_list, styles):
 
     totals_tbl = Table(
         [[
-            Paragraph("<b>Total Net Weight</b>", style_label),
+            Paragraph("<b>Total Net Material Wt</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_net, 3)} KGS", style_text),
             Paragraph("<b>Total Tare Weight</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_tare, 3)} KGS", style_text),

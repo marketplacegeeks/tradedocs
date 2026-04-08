@@ -26,7 +26,7 @@ import {
 } from "../../api/packingLists";
 import type { PackingList, Container, ContainerItem } from "../../api/packingLists";
 import { listOrganisations } from "../../api/organisations";
-import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy } from "../../api/referenceData";
+import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy, listTypeOfPackages } from "../../api/referenceData";
 import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
 import { listProformaInvoices } from "../../api/proformaInvoices";
@@ -825,6 +825,7 @@ function Step3({
   const [pendingItems, setPendingItems] = useState<Record<number, Record<string, any>[]>>({});
 
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
+  const { data: typeOfPackages = [] } = useQuery({ queryKey: ["type-of-packages"], queryFn: listTypeOfPackages });
 
   const { data: currentPl } = useQuery({
     queryKey: ["packing-list", pl.id],
@@ -845,7 +846,7 @@ function Step3({
       return;
     }
     const item = _item as Record<string, any> | undefined;
-    const itemReady = item && item.item_code && item.uom && item.quantity && item.net_weight && item.inner_packing_weight && item.packages_kind && item.description;
+    const itemReady = item && item.item_code && item.uom && item.no_of_packages && item.type_of_package && item.qty_per_package && item.weight_per_unit_packaging !== undefined && item.description;
     try {
       const newContainer = await createContainer({
         packing_list: pl.id,
@@ -860,13 +861,13 @@ function Step3({
           container: newContainer.id,
           hsn_code: item.hsn_code || "",
           item_code: item.item_code,
-          packages_kind: item.packages_kind,
           description: item.description,
           batch_details: item.batch_details || "",
           uom: item.uom,
-          quantity: item.quantity,
-          net_weight: item.net_weight,
-          inner_packing_weight: item.inner_packing_weight,
+          no_of_packages: item.no_of_packages,
+          type_of_package: item.type_of_package,
+          qty_per_package: item.qty_per_package,
+          weight_per_unit_packaging: item.weight_per_unit_packaging,
         });
         invalidate();
         message.success("Container and item added.");
@@ -916,8 +917,8 @@ function Step3({
 
   async function savePendingItem(containerId: number, idx: number) {
     const item = (pendingItems[containerId] ?? [])[idx];
-    if (!item || !item.item_code || !item.uom || !item.quantity || !item.net_weight || !item.inner_packing_weight || !item.packages_kind || !item.description) {
-      message.error("Item Code, Packages, Description, UOM, Quantity, Net Weight, and Inner Packing Weight are required.");
+    if (!item || !item.item_code || !item.uom || !item.no_of_packages || !item.type_of_package || !item.qty_per_package || item.weight_per_unit_packaging === undefined || !item.description) {
+      message.error("Item Code, Description, UOM, No. of Package, Type of Package, Qty Per Package, and Wt Per Unit Pkg are required.");
       return;
     }
     try {
@@ -925,13 +926,13 @@ function Step3({
         container: containerId,
         hsn_code: item.hsn_code || "",
         item_code: item.item_code,
-        packages_kind: item.packages_kind,
         description: item.description,
         batch_details: item.batch_details || "",
         uom: item.uom,
-        quantity: item.quantity,
-        net_weight: item.net_weight,
-        inner_packing_weight: item.inner_packing_weight,
+        no_of_packages: item.no_of_packages,
+        type_of_package: item.type_of_package,
+        qty_per_package: item.qty_per_package,
+        weight_per_unit_packaging: item.weight_per_unit_packaging,
       });
       removePendingItem(containerId, idx);
       invalidate();
@@ -1089,21 +1090,22 @@ function Step3({
                   <th style={{ ...TH, width: 24 }}>#</th>
                   <th style={TH}>HSN Code</th>
                   <th style={TH}>Item Code</th>
-                  <th style={TH}>No &amp; Kind of Pkgs</th>
                   <th style={TH}>Description</th>
                   <th style={TH}>Batch No.</th>
-                  <th style={TH}>Qty</th>
-                  <th style={TH}>UOM</th>
-                  <th style={TH}>Net Wt/unit</th>
-                  <th style={TH}>Inner Pkg Wt</th>
-                  <th style={TH}>Gross Wt (auto)</th>
+                  <th style={TH}>No. of Package</th>
+                  <th style={TH}>Type of Package</th>
+                  <th style={TH}>Material Unit</th>
+                  <th style={TH}>Qty Per Package</th>
+                  <th style={TH}>Wt Per Unit Pkg</th>
+                  <th style={TH}>Net Material Wt</th>
+                  <th style={TH}>Gross Weight</th>
                   <th style={{ ...TH, width: 36 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {(!c.items || c.items.length === 0) && !(pendingItems[c.id]?.length) && (
                   <tr>
-                    <td colSpan={11} style={{ ...TD, textAlign: "center", fontStyle: "italic", color: "var(--text-muted)" }}>
+                    <td colSpan={13} style={{ ...TD, textAlign: "center", fontStyle: "italic", color: "var(--text-muted)" }}>
                       No items yet — click "+ Add Item" to add the first item.
                     </td>
                   </tr>
@@ -1130,14 +1132,6 @@ function Step3({
                     </td>
                     <td style={TD}>
                       <input
-                        key={`pk-${item.id}`}
-                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
-                        defaultValue={item.packages_kind}
-                        onBlur={(e) => { if (e.target.value !== item.packages_kind) updateContainerItem(item.id, { packages_kind: e.target.value }).then(invalidate); }}
-                      />
-                    </td>
-                    <td style={TD}>
-                      <input
                         key={`desc-${item.id}`}
                         style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }}
                         defaultValue={item.description}
@@ -1154,11 +1148,22 @@ function Step3({
                     </td>
                     <td style={TD}>
                       <input
-                        key={`qty-${item.id}`}
+                        key={`nop-${item.id}`}
                         type="number"
-                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }}
-                        defaultValue={item.quantity}
-                        onBlur={(e) => { if (e.target.value !== String(item.quantity)) updateContainerItem(item.id, { quantity: e.target.value }).then(invalidate); }}
+                        style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }}
+                        defaultValue={item.no_of_packages}
+                        onBlur={(e) => { if (e.target.value !== String(item.no_of_packages)) updateContainerItem(item.id, { no_of_packages: e.target.value }).then(invalidate); }}
+                      />
+                    </td>
+                    <td style={TD}>
+                      <Select
+                        size="small"
+                        style={{ width: 110 }}
+                        defaultValue={item.type_of_package}
+                        onChange={(v) => updateContainerItem(item.id, { type_of_package: v }).then(invalidate)}
+                        showSearch
+                        optionFilterProp="label"
+                        options={(typeOfPackages as any[]).map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))}
                       />
                     </td>
                     <td style={TD}>
@@ -1174,28 +1179,27 @@ function Step3({
                     </td>
                     <td style={TD}>
                       <input
-                        key={`nw-${item.id}`}
+                        key={`qpp-${item.id}`}
                         type="number"
                         style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }}
-                        defaultValue={item.net_weight}
-                        onBlur={(e) => { if (e.target.value !== String(item.net_weight)) updateContainerItem(item.id, { net_weight: e.target.value }).then(invalidate); }}
+                        defaultValue={item.qty_per_package}
+                        onBlur={(e) => { if (e.target.value !== String(item.qty_per_package)) updateContainerItem(item.id, { qty_per_package: e.target.value }).then(invalidate); }}
                       />
                     </td>
                     <td style={TD}>
                       <input
-                        key={`ipw-${item.id}`}
+                        key={`wpup-${item.id}`}
                         type="number"
                         style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }}
-                        defaultValue={item.inner_packing_weight}
-                        onBlur={(e) => { if (e.target.value !== String(item.inner_packing_weight)) updateContainerItem(item.id, { inner_packing_weight: e.target.value }).then(invalidate); }}
+                        defaultValue={item.weight_per_unit_packaging}
+                        onBlur={(e) => { if (e.target.value !== String(item.weight_per_unit_packaging)) updateContainerItem(item.id, { weight_per_unit_packaging: e.target.value }).then(invalidate); }}
                       />
                     </td>
                     <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
-                      {item.item_gross_weight ?? (
-                        item.net_weight && item.inner_packing_weight && item.quantity
-                          ? ((parseFloat(String(item.net_weight)) + parseFloat(String(item.inner_packing_weight))) * parseFloat(String(item.quantity))).toFixed(3)
-                          : "—"
-                      )}
+                      {item.net_material_weight || "—"}
+                    </td>
+                    <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
+                      {item.item_gross_weight || "—"}
                     </td>
                     <td style={TD}>
                       <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--error, #f87171)", padding: 2 }} onClick={() => removeItem(item.id)}>
@@ -1217,10 +1221,6 @@ function Step3({
                         value={pItem.item_code || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { item_code: e.target.value })} />
                     </td>
                     <td style={TD}>
-                      <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="e.g. 10 Bags *"
-                        value={pItem.packages_kind || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { packages_kind: e.target.value })} />
-                    </td>
-                    <td style={TD}>
                       <input style={{ ...INPUT, fontSize: 12, padding: "3px 6px" }} placeholder="Description *"
                         value={pItem.description || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { description: e.target.value })} />
                     </td>
@@ -1229,11 +1229,19 @@ function Step3({
                         value={pItem.batch_details || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { batch_details: e.target.value })} />
                     </td>
                     <td style={TD}>
-                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 70 }} placeholder="0"
-                        value={pItem.quantity || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { quantity: e.target.value })} />
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0 *"
+                        value={pItem.no_of_packages || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { no_of_packages: e.target.value })} />
                     </td>
                     <td style={TD}>
-                      <Select size="small" style={{ width: 80 }} placeholder="UOM *"
+                      <Select size="small" style={{ width: 110 }} placeholder="Type *"
+                        value={pItem.type_of_package}
+                        onChange={(v) => updatePendingItem(c.id, pIdx, { type_of_package: v })}
+                        showSearch
+                        optionFilterProp="label"
+                        options={(typeOfPackages as any[]).map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
+                    </td>
+                    <td style={TD}>
+                      <Select size="small" style={{ width: 80 }} placeholder="Unit *"
                         value={pItem.uom}
                         onChange={(v) => updatePendingItem(c.id, pIdx, { uom: v })}
                         showSearch
@@ -1241,16 +1249,21 @@ function Step3({
                         options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation })).sort((a, b) => a.label.localeCompare(b.label))} />
                     </td>
                     <td style={TD}>
-                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000"
-                        value={pItem.net_weight || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { net_weight: e.target.value })} />
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000 *"
+                        value={pItem.qty_per_package || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { qty_per_package: e.target.value })} />
                     </td>
                     <td style={TD}>
-                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000"
-                        value={pItem.inner_packing_weight || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { inner_packing_weight: e.target.value })} />
+                      <input type="number" style={{ ...INPUT, fontSize: 12, padding: "3px 6px", width: 80 }} placeholder="0.000 *"
+                        value={pItem.weight_per_unit_packaging || ""} onChange={(e) => updatePendingItem(c.id, pIdx, { weight_per_unit_packaging: e.target.value })} />
                     </td>
                     <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
-                      {pItem.net_weight && pItem.inner_packing_weight && pItem.quantity
-                        ? ((parseFloat(pItem.net_weight) + parseFloat(pItem.inner_packing_weight)) * parseFloat(pItem.quantity)).toFixed(3)
+                      {pItem.no_of_packages && pItem.qty_per_package
+                        ? (parseFloat(pItem.no_of_packages) * parseFloat(pItem.qty_per_package)).toFixed(3)
+                        : "—"}
+                    </td>
+                    <td style={{ ...TD, color: "var(--text-muted)", fontSize: 12 }}>
+                      {pItem.no_of_packages && pItem.qty_per_package && pItem.weight_per_unit_packaging
+                        ? (parseFloat(pItem.no_of_packages) * parseFloat(pItem.qty_per_package) + parseFloat(pItem.no_of_packages) * parseFloat(pItem.weight_per_unit_packaging)).toFixed(3)
                         : "—"}
                     </td>
                     <td style={{ ...TD, whiteSpace: "nowrap" }}>
@@ -1349,10 +1362,11 @@ function Step3({
               <div style={{ padding: "6px 10px" }}>
                 <input style={INPUT_READONLY} readOnly value={(() => {
                   const tare = parseFloat(data.tare_weight || "0");
-                  const netW = parseFloat(data._item?.net_weight || "0");
-                  const innerW = parseFloat(data._item?.inner_packing_weight || "0");
-                  const qty = parseFloat(data._item?.quantity || "0");
-                  return data.tare_weight ? (tare + (netW + innerW) * qty).toFixed(3) : "—";
+                  const nop = parseFloat(data._item?.no_of_packages || "0");
+                  const qpp = parseFloat(data._item?.qty_per_package || "0");
+                  const wpup = parseFloat(data._item?.weight_per_unit_packaging || "0");
+                  const itemGross = nop * qpp + nop * wpup;
+                  return data.tare_weight ? (tare + itemGross).toFixed(3) : "—";
                 })()} />
               </div>
             </div>
@@ -1380,10 +1394,10 @@ function Step3({
                   }} />
                 </div>
                 <div>
-                  <label style={LABEL}>No &amp; Kind of Packages *</label>
-                  <input style={INPUT} value={data._item?.packages_kind || ""} onChange={(e) => {
+                  <label style={LABEL}>Batch No.</label>
+                  <input style={INPUT} value={data._item?.batch_details || ""} onChange={(e) => {
                     const next = [...pendingContainers];
-                    next[pendingIdx] = { ...data, _item: { ...data._item, packages_kind: e.target.value } };
+                    next[pendingIdx] = { ...data, _item: { ...data._item, batch_details: e.target.value } };
                     setPendingContainers(next);
                   }} />
                 </div>
@@ -1396,17 +1410,25 @@ function Step3({
                   setPendingContainers(next);
                 }} />
               </div>
-              <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
+              <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 1fr" }}>
                 <div>
-                  <label style={LABEL}>Quantity *</label>
-                  <input type="number" style={INPUT} value={data._item?.quantity || ""} onChange={(e) => {
+                  <label style={LABEL}>No. of Package *</label>
+                  <input type="number" style={INPUT} value={data._item?.no_of_packages || ""} onChange={(e) => {
                     const next = [...pendingContainers];
-                    next[pendingIdx] = { ...data, _item: { ...data._item, quantity: e.target.value } };
+                    next[pendingIdx] = { ...data, _item: { ...data._item, no_of_packages: e.target.value } };
                     setPendingContainers(next);
                   }} />
                 </div>
                 <div>
-                  <label style={LABEL}>UOM *</label>
+                  <label style={LABEL}>Type of Package *</label>
+                  <Select style={{ width: "100%" }} value={data._item?.type_of_package} onChange={(v) => {
+                    const next = [...pendingContainers];
+                    next[pendingIdx] = { ...data, _item: { ...data._item, type_of_package: v } };
+                    setPendingContainers(next);
+                  }} showSearch optionFilterProp="label" options={(typeOfPackages as any[]).map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
+                </div>
+                <div>
+                  <label style={LABEL}>Material Unit *</label>
                   <Select style={{ width: "100%" }} value={data._item?.uom} onChange={(v) => {
                     const next = [...pendingContainers];
                     next[pendingIdx] = { ...data, _item: { ...data._item, uom: v } };
@@ -1414,26 +1436,34 @@ function Step3({
                   }} showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
                 </div>
                 <div>
-                  <label style={LABEL}>Net Weight/unit (kg) *</label>
-                  <input type="number" style={INPUT} value={data._item?.net_weight || ""} onChange={(e) => {
+                  <label style={LABEL}>Qty Per Package *</label>
+                  <input type="number" style={INPUT} value={data._item?.qty_per_package || ""} onChange={(e) => {
                     const next = [...pendingContainers];
-                    next[pendingIdx] = { ...data, _item: { ...data._item, net_weight: e.target.value } };
+                    next[pendingIdx] = { ...data, _item: { ...data._item, qty_per_package: e.target.value } };
                     setPendingContainers(next);
                   }} />
                 </div>
                 <div>
-                  <label style={LABEL}>Inner Packing Wt (kg) *</label>
-                  <input type="number" style={INPUT} value={data._item?.inner_packing_weight || ""} onChange={(e) => {
+                  <label style={LABEL}>Wt Per Unit Pkg *</label>
+                  <input type="number" style={INPUT} value={data._item?.weight_per_unit_packaging || ""} onChange={(e) => {
                     const next = [...pendingContainers];
-                    next[pendingIdx] = { ...data, _item: { ...data._item, inner_packing_weight: e.target.value } };
+                    next[pendingIdx] = { ...data, _item: { ...data._item, weight_per_unit_packaging: e.target.value } };
                     setPendingContainers(next);
                   }} />
+                </div>
+                <div>
+                  <label style={LABEL}>Net Material Wt (auto)</label>
+                  <input style={INPUT_READONLY} readOnly value={
+                    data._item?.no_of_packages && data._item?.qty_per_package
+                      ? (parseFloat(data._item.no_of_packages) * parseFloat(data._item.qty_per_package)).toFixed(3)
+                      : "—"
+                  } />
                 </div>
                 <div>
                   <label style={LABEL}>Item Gross Wt (auto)</label>
                   <input style={INPUT_READONLY} readOnly value={
-                    data._item?.net_weight && data._item?.inner_packing_weight && data._item?.quantity
-                      ? ((parseFloat(data._item.net_weight) + parseFloat(data._item.inner_packing_weight)) * parseFloat(data._item.quantity)).toFixed(3)
+                    data._item?.no_of_packages && data._item?.qty_per_package && data._item?.weight_per_unit_packaging
+                      ? (parseFloat(data._item.no_of_packages) * parseFloat(data._item.qty_per_package) + parseFloat(data._item.no_of_packages) * parseFloat(data._item.weight_per_unit_packaging)).toFixed(3)
                       : "—"
                   } />
                 </div>

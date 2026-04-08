@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
+    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, TypeOfPackage, UOM,
 )
 
 
@@ -53,6 +53,12 @@ class PaymentTermSerializer(serializers.ModelSerializer):
 class PreCarriageBySerializer(serializers.ModelSerializer):
     class Meta:
         model = PreCarriageBy
+        fields = ["id", "name", "is_active"]
+
+
+class TypeOfPackageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypeOfPackage
         fields = ["id", "name", "is_active"]
 
 

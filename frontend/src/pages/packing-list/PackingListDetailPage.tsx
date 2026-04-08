@@ -261,12 +261,13 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                   <th style={TH}>HSN</th>
                   <th style={TH}>Description</th>
                   <th style={TH}>Batch No.</th>
-                  <th style={TH}>Pkgs</th>
-                  <th style={TH}>Qty</th>
-                  <th style={TH}>UOM</th>
-                  <th style={TH}>Net Wt</th>
-                  <th style={TH}>Inner Packing Wt</th>
-                  <th style={TH}>Item Gross Wt</th>
+                  <th style={TH}>No. of Package</th>
+                  <th style={TH}>Type of Package</th>
+                  <th style={TH}>Material Unit</th>
+                  <th style={TH}>Qty Per Package</th>
+                  <th style={TH}>Wt Per Unit Pkg</th>
+                  <th style={TH}>Net Material Wt</th>
+                  <th style={TH}>Gross Weight</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,12 +277,13 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                     <td style={TD}>{item.hsn_code || "—"}</td>
                     <td style={TD}>{item.description}</td>
                     <td style={TD}>{item.batch_details || "—"}</td>
-                    <td style={TD}>{item.packages_kind}</td>
-                    <td style={TD}>{item.quantity}</td>
-                    <td style={TD}>{item.uom_abbr ?? item.uom ?? "—"}</td>
-                    <td style={TD}>{item.net_weight}</td>
-                    <td style={TD}>{item.inner_packing_weight}</td>
-                    <td style={TD}>{item.item_gross_weight}</td>
+                    <td style={TD}>{fmtQty(item.no_of_packages)}</td>
+                    <td style={TD}>{item.type_of_package_name || "—"}</td>
+                    <td style={TD}>{item.uom_abbr ?? "—"}</td>
+                    <td style={TD}>{fmtQty(item.qty_per_package)}</td>
+                    <td style={TD}>{fmtQty(item.weight_per_unit_packaging)}</td>
+                    <td style={TD}>{fmtQty(item.net_material_weight)}</td>
+                    <td style={TD}>{fmtQty(item.item_gross_weight)}</td>
                   </tr>
                 ))}
               </tbody>

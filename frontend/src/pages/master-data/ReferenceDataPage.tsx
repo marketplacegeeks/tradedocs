@@ -19,6 +19,7 @@ import {
   listPorts, createPort, updatePort, deletePort,
   listLocations, createLocation, updateLocation, deleteLocation,
   listPreCarriageBy, createPreCarriageBy, updatePreCarriageBy, deletePreCarriageBy,
+  listTypeOfPackages, createTypeOfPackage, updateTypeOfPackage, deleteTypeOfPackage,
 } from "../../api/referenceData";
 import type {
   Incoterm, IncotermPayload,
@@ -27,6 +28,7 @@ import type {
   Port, PortPayload,
   Location, LocationPayload,
   PreCarriageBy, PreCarriageByPayload,
+  TypeOfPackage, TypeOfPackagePayload,
 } from "../../api/referenceData";
 import { listCurrencies, createCurrency, updateCurrency, deleteCurrency } from "../../api/currencies";
 import type { Currency, CurrencyPayload } from "../../api/currencies";
@@ -34,14 +36,15 @@ import type { Currency, CurrencyPayload } from "../../api/currencies";
 // ---- Tab definitions --------------------------------------------------------
 
 const TABS = [
-  { key: "countries",     label: "Countries" },
-  { key: "incoterms",     label: "Incoterms" },
-  { key: "uom",           label: "UOM" },
-  { key: "payment-terms", label: "Payment Terms" },
-  { key: "ports",         label: "Ports" },
-  { key: "locations",     label: "Locations" },
-  { key: "pre-carriage",  label: "Pre-Carriage By" },
-  { key: "currency",      label: "Currency" },
+  { key: "countries",        label: "Countries" },
+  { key: "incoterms",        label: "Incoterms" },
+  { key: "uom",              label: "Material Unit" },
+  { key: "payment-terms",    label: "Payment Terms" },
+  { key: "ports",            label: "Ports" },
+  { key: "locations",        label: "Locations" },
+  { key: "pre-carriage",     label: "Pre-Carriage By" },
+  { key: "currency",         label: "Currency" },
+  { key: "type-of-packages", label: "Type of Package" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -49,14 +52,15 @@ type SortDir = "asc" | "desc" | null;
 
 // The primary field to sort by for each tab
 const TAB_SORT_KEY: Record<TabKey, string> = {
-  "countries":     "name",
-  "incoterms":     "code",
-  "uom":           "name",
-  "payment-terms": "name",
-  "ports":         "name",
-  "locations":     "name",
-  "pre-carriage":  "name",
-  "currency":      "code",
+  "countries":        "name",
+  "incoterms":        "code",
+  "uom":              "name",
+  "payment-terms":    "name",
+  "ports":            "name",
+  "locations":        "name",
+  "pre-carriage":     "name",
+  "currency":         "code",
+  "type-of-packages": "name",
 };
 
 // Which fields to search within for each tab
@@ -335,14 +339,15 @@ export default function ReferenceDataPage() {
   const queryKey = [activeTab];
 
   const listFns: Record<TabKey, () => Promise<unknown[]>> = {
-    "countries":     listCountries,
-    "incoterms":     listIncoterms,
-    "uom":           listUOMs,
-    "payment-terms": listPaymentTerms,
-    "ports":         listPorts,
-    "locations":     listLocations,
-    "pre-carriage":  listPreCarriageBy,
-    "currency":      listCurrencies,
+    "countries":        listCountries,
+    "incoterms":        listIncoterms,
+    "uom":              listUOMs,
+    "payment-terms":    listPaymentTerms,
+    "ports":            listPorts,
+    "locations":        listLocations,
+    "pre-carriage":     listPreCarriageBy,
+    "currency":         listCurrencies,
+    "type-of-packages": listTypeOfPackages,
   };
 
   const { data: records = [], isLoading } = useQuery({
@@ -385,17 +390,19 @@ export default function ReferenceDataPage() {
         if (activeTab === "payment-terms") return createPaymentTerm(payload as PaymentTermPayload);
         if (activeTab === "ports")         return createPort(payload as PortPayload);
         if (activeTab === "locations")     return createLocation(payload as LocationPayload);
-        if (activeTab === "pre-carriage")  return createPreCarriageBy(payload as PreCarriageByPayload);
-        if (activeTab === "currency")      return createCurrency(payload as CurrencyPayload);
+        if (activeTab === "pre-carriage")     return createPreCarriageBy(payload as PreCarriageByPayload);
+        if (activeTab === "currency")         return createCurrency(payload as CurrencyPayload);
+        if (activeTab === "type-of-packages") return createTypeOfPackage(payload as TypeOfPackagePayload);
       } else if (typeof modal === "number") {
-        if (activeTab === "countries")     return updateCountry(modal, payload as Partial<CountryPayload>);
-        if (activeTab === "incoterms")     return updateIncoterm(modal, payload as Partial<IncotermPayload>);
-        if (activeTab === "uom")           return updateUOM(modal, payload as Partial<UOMPayload>);
-        if (activeTab === "payment-terms") return updatePaymentTerm(modal, payload as Partial<PaymentTermPayload>);
-        if (activeTab === "ports")         return updatePort(modal, payload as Partial<PortPayload>);
-        if (activeTab === "locations")     return updateLocation(modal, payload as Partial<LocationPayload>);
-        if (activeTab === "pre-carriage")  return updatePreCarriageBy(modal, payload as Partial<PreCarriageByPayload>);
-        if (activeTab === "currency")      return updateCurrency(modal, payload as Partial<CurrencyPayload>);
+        if (activeTab === "countries")        return updateCountry(modal, payload as Partial<CountryPayload>);
+        if (activeTab === "incoterms")        return updateIncoterm(modal, payload as Partial<IncotermPayload>);
+        if (activeTab === "uom")              return updateUOM(modal, payload as Partial<UOMPayload>);
+        if (activeTab === "payment-terms")    return updatePaymentTerm(modal, payload as Partial<PaymentTermPayload>);
+        if (activeTab === "ports")            return updatePort(modal, payload as Partial<PortPayload>);
+        if (activeTab === "locations")        return updateLocation(modal, payload as Partial<LocationPayload>);
+        if (activeTab === "pre-carriage")     return updatePreCarriageBy(modal, payload as Partial<PreCarriageByPayload>);
+        if (activeTab === "currency")         return updateCurrency(modal, payload as Partial<CurrencyPayload>);
+        if (activeTab === "type-of-packages") return updateTypeOfPackage(modal, payload as Partial<TypeOfPackagePayload>);
       }
     },
     onSuccess: () => {
@@ -416,8 +423,9 @@ export default function ReferenceDataPage() {
       if (activeTab === "payment-terms") return deletePaymentTerm(id);
       if (activeTab === "ports")         return deletePort(id);
       if (activeTab === "locations")     return deleteLocation(id);
-      if (activeTab === "pre-carriage")  return deletePreCarriageBy(id);
-      if (activeTab === "currency")      return deleteCurrency(id);
+      if (activeTab === "pre-carriage")     return deletePreCarriageBy(id);
+      if (activeTab === "currency")         return deleteCurrency(id);
+      if (activeTab === "type-of-packages") return deleteTypeOfPackage(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -601,6 +609,25 @@ export default function ReferenceDataPage() {
             </>
           )}
 
+          {activeTab === "type-of-packages" && (
+            <>
+              <thead>
+                <tr style={{ background: "var(--bg-base)" }}>
+                  <SortableTh label="Package Type" active={true} dir={sortDir} onClick={toggleSort} />
+                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
+                </tr>
+              </thead>
+              <tbody>
+                {(rows as TypeOfPackage[]).map((r) => (
+                  <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
+                    <td style={tdStyle}>{r.name}</td>
+                    <ActionCell canWrite={canWrite} onEdit={() => openEdit(r as unknown as Record<string, unknown>)} onDelete={() => setDeletingId(r.id)} />
+                  </tr>
+                ))}
+              </tbody>
+            </>
+          )}
+
           {activeTab === "currency" && (
             <>
               <thead>
@@ -718,6 +745,13 @@ export default function ReferenceDataPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 8 }}>
             <div>{fieldLabel("Currency Name")}<TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. US Dollar" /></div>
             <div>{fieldLabel("Currency Code")}<TextInput value={form.code ?? ""} onChange={(v) => setForm((f) => ({ ...f, code: v.toUpperCase() }))} placeholder="e.g. USD" /></div>
+          </div>
+        );
+      case "type-of-packages":
+        return (
+          <div style={{ paddingTop: 8 }}>
+            {fieldLabel("Package Type Name")}
+            <TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Drums, Cartons, Bags" />
           </div>
         );
     }

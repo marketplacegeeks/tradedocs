@@ -1,7 +1,7 @@
 import factory
 from apps.master_data.models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
-    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, UOM,
+    OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, TypeOfPackage, UOM,
 )
 
 
@@ -63,6 +63,13 @@ class PreCarriageByFactory(factory.django.DjangoModelFactory):
         model = PreCarriageBy
 
     name = factory.Sequence(lambda n: f"Carrier {n}")
+
+
+class TypeOfPackageFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = TypeOfPackage
+
+    name = factory.Sequence(lambda n: f"Package Type {n}")
 
 
 class OrganisationFactory(factory.django.DjangoModelFactory):

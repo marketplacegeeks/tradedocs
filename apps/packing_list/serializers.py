@@ -22,22 +22,27 @@ HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$"
 # ---- ContainerItem serializer -----------------------------------------------
 
 class ContainerItemSerializer(serializers.ModelSerializer):
-    # Expose UOM abbreviation alongside the FK id for display.
+    # Expose UOM abbreviation and package type name for display without extra requests.
     uom_abbr = serializers.SerializerMethodField(read_only=True)
+    type_of_package_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ContainerItem
         fields = [
             "id", "container",
-            "hsn_code", "item_code", "packages_kind",
-            "description", "batch_details",
+            "hsn_code", "item_code", "description", "batch_details",
             "uom", "uom_abbr",
-            "quantity", "net_weight", "inner_packing_weight", "item_gross_weight",
+            "type_of_package", "type_of_package_name",
+            "no_of_packages", "qty_per_package", "weight_per_unit_packaging",
+            "net_material_weight", "item_gross_weight",
         ]
-        read_only_fields = ["id", "item_gross_weight", "uom_abbr"]
+        read_only_fields = ["id", "net_material_weight", "item_gross_weight", "uom_abbr", "type_of_package_name"]
 
     def get_uom_abbr(self, obj):
         return obj.uom.abbreviation if obj.uom_id else None
+
+    def get_type_of_package_name(self, obj):
+        return obj.type_of_package.name if obj.type_of_package_id else None
 
     def validate_hsn_code(self, value):
         if value and not HSN_REGEX.match(value):
@@ -46,19 +51,19 @@ class ContainerItemSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_quantity(self, value):
+    def validate_no_of_packages(self, value):
         if value <= 0:
-            raise serializers.ValidationError("Quantity must be greater than zero.")
+            raise serializers.ValidationError("Number of packages must be greater than zero.")
         return value
 
-    def validate_net_weight(self, value):
+    def validate_qty_per_package(self, value):
         if value < 0:
-            raise serializers.ValidationError("Net weight must be zero or greater.")
+            raise serializers.ValidationError("Qty per package must be zero or greater.")
         return value
 
-    def validate_inner_packing_weight(self, value):
+    def validate_weight_per_unit_packaging(self, value):
         if value < 0:
-            raise serializers.ValidationError("Inner packing weight must be zero or greater.")
+            raise serializers.ValidationError("Weight per unit packaging must be zero or greater.")
         return value
 
 

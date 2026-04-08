@@ -139,6 +139,31 @@ export async function deleteLocation(id: number): Promise<void> {
   await api.delete(`/master-data/locations/${id}/`);
 }
 
+// ---- Type of Package --------------------------------------------------------
+
+export interface TypeOfPackage {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
+export interface TypeOfPackagePayload { name: string; }
+
+export async function listTypeOfPackages(): Promise<TypeOfPackage[]> {
+  const { data } = await api.get<TypeOfPackage[]>("/master-data/type-of-packages/");
+  return data;
+}
+export async function createTypeOfPackage(payload: TypeOfPackagePayload): Promise<TypeOfPackage> {
+  const { data } = await api.post<TypeOfPackage>("/master-data/type-of-packages/", payload);
+  return data;
+}
+export async function updateTypeOfPackage(id: number, payload: Partial<TypeOfPackagePayload>): Promise<TypeOfPackage> {
+  const { data } = await api.patch<TypeOfPackage>(`/master-data/type-of-packages/${id}/`, payload);
+  return data;
+}
+export async function deleteTypeOfPackage(id: number): Promise<void> {
+  await api.delete(`/master-data/type-of-packages/${id}/`);
+}
+
 // ---- Pre-Carriage By --------------------------------------------------------
 
 export interface PreCarriageBy {
