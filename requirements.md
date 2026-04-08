@@ -1755,11 +1755,11 @@ Container `gross_weight` rollup stays the same: `SUM(item.item_gross_weight) + t
 | 3 | Item Code | `item_code` |
 | 4 | Description | `description` |
 | 5 | Batch No. | `batch_details` |
-| 6 | No. of Package | `no_of_packages` |
+| 6 | Quantity of Items | `no_of_packages` |
 | 7 | Type of Package | `type_of_package` (dropdown — TypeOfPackage master data) |
 | 8 | Material Unit | `uom` (dropdown — UOM master data, now labelled "Material Unit") |
-| 9 | Qty Per Package | `qty_per_package` |
-| 10 | Wt Per Unit Pkg | `weight_per_unit_packaging` |
+| 9 | Net Weight Per Item | `qty_per_package` |
+| 10 | Weight per empty package | `weight_per_unit_packaging` |
 | 11 | Net Material Wt | `net_material_weight` (read-only, computed) |
 | 12 | Gross Weight | `item_gross_weight` (read-only, computed) |
 
@@ -1794,11 +1794,11 @@ Required: `item_code`, `uom`, `no_of_packages`, `type_of_package`, `qty_per_pack
 | 3 | Item Code |
 | 4 | Description |
 | 5 | Batch No. |
-| 6 | No. of Package |
+| 6 | Quantity of Items |
 | 7 | Type of Package |
 | 8 | Material Unit |
-| 9 | Qty Per Package |
-| 10 | Wt Per Unit Pkg |
+| 9 | Net Weight Per Item |
+| 10 | Weight per empty package |
 | 11 | Net Material Wt |
 | 12 | Gross Weight |
 

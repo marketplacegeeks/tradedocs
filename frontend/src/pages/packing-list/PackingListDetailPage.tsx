@@ -261,11 +261,11 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                   <th style={TH}>HSN</th>
                   <th style={TH}>Description</th>
                   <th style={TH}>Batch No.</th>
-                  <th style={TH}>No. of Package</th>
+                  <th style={TH}>Quantity of Items</th>
                   <th style={TH}>Type of Package</th>
                   <th style={TH}>Material Unit</th>
-                  <th style={TH}>Qty Per Package</th>
-                  <th style={TH}>Wt Per Unit Pkg</th>
+                  <th style={TH}>Net Weight Per Item</th>
+                  <th style={TH}>Weight per empty package</th>
                   <th style={TH}>Net Material Wt</th>
                   <th style={TH}>Gross Weight</th>
                 </tr>

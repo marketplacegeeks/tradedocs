@@ -257,16 +257,19 @@ class ContainerItem(models.Model):
     )
 
     # Constraint #6: 3 decimal places for all quantity/weight fields
+    # no_of_packages = Quantity of Items (how many items in this line)
     no_of_packages = models.DecimalField(max_digits=12, decimal_places=3)
+    # qty_per_package = Net Weight Per Item (weight of one item in KGS)
     qty_per_package = models.DecimalField(max_digits=12, decimal_places=3)
+    # weight_per_unit_packaging = Weight per empty package (weight of packaging material per item in KGS)
     weight_per_unit_packaging = models.DecimalField(max_digits=12, decimal_places=3)
 
     # Stored computed values — updated on every save()
-    # net_material_weight = no_of_packages × qty_per_package
+    # net_material_weight = Quantity of Items × Net Weight Per Item
     net_material_weight = models.DecimalField(
         max_digits=12, decimal_places=3, editable=False, default=0
     )
-    # item_gross_weight = net_material_weight + (no_of_packages × weight_per_unit_packaging)
+    # item_gross_weight = (Net Weight Per Item + Weight per empty package) × Quantity of Items
     item_gross_weight = models.DecimalField(
         max_digits=12, decimal_places=3, editable=False, default=0
     )
@@ -279,6 +282,10 @@ class ContainerItem(models.Model):
         """
         Compute net_material_weight and item_gross_weight before saving, then
         propagate the change up to the parent Container so its gross_weight stays accurate.
+
+        Formulas:
+        - net_material_weight = Quantity of Items × Net Weight Per Item
+        - item_gross_weight = (Net Weight Per Item + Weight per empty package) × Quantity of Items
         """
         self.net_material_weight = self.no_of_packages * self.qty_per_package
         self.item_gross_weight = self.net_material_weight + (self.no_of_packages * self.weight_per_unit_packaging)

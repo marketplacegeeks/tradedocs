@@ -429,6 +429,8 @@ function Step1({
   const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
   const { data: preCarriage = [] } = useQuery({ queryKey: ["pre-carriage"], queryFn: listPreCarriageBy });
   const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
+  const { data: incoterms = [] } = useQuery({ queryKey: ["incoterms"], queryFn: listIncoterms });
+  const { data: paymentTerms = [] } = useQuery({ queryKey: ["payment-terms"], queryFn: listPaymentTerms });
 
   // When editing, the saved organisation might not appear in the tag-filtered list (e.g. an exporter
   // not tagged as EXPORTER). This helper injects a fallback option so the Select always shows the
@@ -629,6 +631,27 @@ function Step1({
             <Select allowClear showSearch style={{ width: "100%" }} value={form.final_destination}
               onChange={(v) => setForm({ ...form, final_destination: v })}
               options={locations.map((l: any) => ({ value: l.id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Incoterms & Payment Terms ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Incoterms &amp; Payment Terms</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Incoterms</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.incoterms}
+              onChange={(v) => setForm({ ...form, incoterms: v })}
+              options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
+          </div>
+          <div>
+            <label style={LABEL}>Payment Terms</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={form.payment_terms}
+              onChange={(v) => setForm({ ...form, payment_terms: v })}
+              options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))}
               optionFilterProp="label" />
           </div>
         </div>
@@ -918,7 +941,7 @@ function Step3({
   async function savePendingItem(containerId: number, idx: number) {
     const item = (pendingItems[containerId] ?? [])[idx];
     if (!item || !item.item_code || !item.uom || !item.no_of_packages || !item.type_of_package || !item.qty_per_package || item.weight_per_unit_packaging === undefined || !item.description) {
-      message.error("Item Code, Description, UOM, No. of Package, Type of Package, Qty Per Package, and Wt Per Unit Pkg are required.");
+      message.error("Item Code, Description, UOM, Quantity of Items, Type of Package, Net Weight Per Item, and Weight per empty package are required.");
       return;
     }
     try {
@@ -1092,11 +1115,11 @@ function Step3({
                   <th style={TH}>Item Code</th>
                   <th style={TH}>Description</th>
                   <th style={TH}>Batch No.</th>
-                  <th style={TH}>No. of Package</th>
+                  <th style={TH}>Quantity of Items</th>
                   <th style={TH}>Type of Package</th>
                   <th style={TH}>Material Unit</th>
-                  <th style={TH}>Qty Per Package</th>
-                  <th style={TH}>Wt Per Unit Pkg</th>
+                  <th style={TH}>Net Weight Per Item</th>
+                  <th style={TH}>Weight per empty package</th>
                   <th style={TH}>Net Material Wt</th>
                   <th style={TH}>Gross Weight</th>
                   <th style={{ ...TH, width: 36 }}></th>
@@ -1412,7 +1435,7 @@ function Step3({
               </div>
               <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 1fr" }}>
                 <div>
-                  <label style={LABEL}>No. of Package *</label>
+                  <label style={LABEL}>Quantity of Items *</label>
                   <input type="number" style={INPUT} value={data._item?.no_of_packages || ""} onChange={(e) => {
                     const next = [...pendingContainers];
                     next[pendingIdx] = { ...data, _item: { ...data._item, no_of_packages: e.target.value } };
@@ -1436,7 +1459,7 @@ function Step3({
                   }} showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
                 </div>
                 <div>
-                  <label style={LABEL}>Qty Per Package *</label>
+                  <label style={LABEL}>Net Weight Per Item *</label>
                   <input type="number" style={INPUT} value={data._item?.qty_per_package || ""} onChange={(e) => {
                     const next = [...pendingContainers];
                     next[pendingIdx] = { ...data, _item: { ...data._item, qty_per_package: e.target.value } };
@@ -1444,7 +1467,7 @@ function Step3({
                   }} />
                 </div>
                 <div>
-                  <label style={LABEL}>Wt Per Unit Pkg *</label>
+                  <label style={LABEL}>Weight per empty package *</label>
                   <input type="number" style={INPUT} value={data._item?.weight_per_unit_packaging || ""} onChange={(e) => {
                     const next = [...pendingContainers];
                     next[pendingIdx] = { ...data, _item: { ...data._item, weight_per_unit_packaging: e.target.value } };

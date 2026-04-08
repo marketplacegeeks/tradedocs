@@ -720,7 +720,7 @@ export default function PackingListEditPage() {
               onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} />
           </div>
           <div>
-            <label style={LABEL}>No. of Package *</label>
+            <label style={LABEL}>Quantity of Items *</label>
             <input style={INPUT} type="number" value={itemForm.no_of_packages || ""}
               onChange={(e) => setItemForm({ ...itemForm, no_of_packages: e.target.value })} />
           </div>
@@ -737,12 +737,12 @@ export default function PackingListEditPage() {
               showSearch optionFilterProp="label" options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))} />
           </div>
           <div>
-            <label style={LABEL}>Qty Per Package *</label>
+            <label style={LABEL}>Net Weight Per Item *</label>
             <input style={INPUT} type="number" value={itemForm.qty_per_package || ""}
               onChange={(e) => setItemForm({ ...itemForm, qty_per_package: e.target.value })} />
           </div>
           <div>
-            <label style={LABEL}>Wt Per Unit Pkg *</label>
+            <label style={LABEL}>Weight per empty package *</label>
             <input style={INPUT} type="number" value={itemForm.weight_per_unit_packaging || ""}
               onChange={(e) => setItemForm({ ...itemForm, weight_per_unit_packaging: e.target.value })} />
           </div>
