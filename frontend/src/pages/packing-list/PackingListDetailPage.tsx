@@ -37,11 +37,15 @@ function fmtQty(v: string | number | null | undefined) {
   return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
 }
 
-// Format weight values (1 decimal place)
+// Format weight values (show decimals only if present)
 function fmtWeight(v: string | number | null | undefined) {
   if (v === null || v === undefined || v === "") return "—";
   const n = parseFloat(String(v));
-  return n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  // Show decimals only if not a whole number
+  if (Number.isInteger(n)) {
+    return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  }
+  return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 // Like fmtQty but max 2 decimal places (for money without $ sign)
 function fmtNum(v: string | number | null | undefined) {

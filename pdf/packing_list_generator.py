@@ -51,16 +51,18 @@ def safe(v: Any, default: str = "") -> str:
 
 
 def _fmt_decimal(v: Optional[Decimal], places: int = 1) -> str:
-    """Format a Decimal to a fixed number of decimal places."""
+    """Format a Decimal - show decimals only if not a whole number."""
     if v is None:
         return ""
     try:
-        return f"{Decimal(v):.{places}f}"
+        num = Decimal(v)
+        if num == int(num):
+            return str(int(num))
+        # Show decimals with specified places, strip trailing zeros
+        formatted = f"{num:.{places}f}"
+        return formatted.rstrip('0').rstrip('.')
     except Exception:
-        try:
-            return f"{float(v):.{places}f}"
-        except Exception:
-            return str(v)
+        return str(v)
 
 def _fmt_qty(v: Optional[Decimal]) -> str:
     """Format quantity - show decimals only if not a whole number."""
