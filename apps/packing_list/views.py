@@ -431,13 +431,13 @@ class ContainerViewSet(viewsets.ModelViewSet):
                     container=new_container,
                     hsn_code=item.hsn_code,
                     item_code=item.item_code,
-                    packages_kind=item.packages_kind,
                     description=item.description,
                     batch_details=item.batch_details,
                     uom=item.uom,
-                    quantity=item.quantity,
-                    net_weight=item.net_weight,
-                    inner_packing_weight=item.inner_packing_weight,
+                    type_of_package=item.type_of_package,
+                    no_of_packages=item.no_of_packages,
+                    qty_per_package=item.qty_per_package,
+                    weight_per_unit_packaging=item.weight_per_unit_packaging,
                 )
 
         serializer = self.get_serializer(new_container)
