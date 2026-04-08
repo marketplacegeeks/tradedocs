@@ -14,7 +14,41 @@ Table 4  Shipping             single 4-col × 2-row table so column borders alig
            row1: Pre-carriage by | Place of Receipt | Port of Loading | Port of Discharge
            row2: Final Destination | Country of Final Destination | Country of Origin | Vessel/Flight No.
 Table 5  Terms                Payment Terms | Incoterms  (2 cols, 1 row)
-[unchanged] Container section (container header → weights → items → grand totals)
+
+Container section:
+  - Container header (container ref, marks & numbers)
+  - Weights row (Net Material Wt, Tare Weight, Gross Weight)
+
+  ITEMS TABLE (Total width = 180mm, two-row layout per item):
+  - Columns (mm): [12 | 20 | 20 | 22 | 22 | 22 | 22 | 20 | 20]
+    9 columns total: Sr | HSN CODE | ITEM CODE | DESCRIPTION (spans 5) | BATCH NO.
+
+    ASCII (widths annotated):
+    ┌──────┬────────┬─────────┬────────────────────────────────────────────────────────────────────┐
+    │ Sr.  │ HSN    │ ITEM    │ DESCRIPTION (spans 6 columns = 132mm)                              │
+    │ 4mm  │ CODE   │ CODE    │                                                                    │
+    │      │ 22mm   │ 22mm    │ 22mm + 22mm + 22mm + 22mm + 22mm + 22mm                            │
+    ├──────┼────────┼─────────┼────────┬────────┬────────┬────────┬────────┬────────┬────────────┤
+    │      │ BATCH  │ QTY     │ PKG    │ UNIT   │ NET    │ EMPTY  │ NET    │ GROSS WT           │
+    │      │ NO     │         │ TYPE   │        │ WT/    │ PKG WT │ MAT WT │                    │
+    │      │        │         │        │        │ ITEM   │        │        │                    │
+    └──────┴────────┴─────────┴────────┴────────┴────────┴────────┴────────┴────────────────────┘
+         4     22       22       22       22       22       22       22       22        => Total=180mm
+
+    Layout notes:
+    - Row 1: Sr (spans rows 1-2), HSN CODE, ITEM CODE, DESCRIPTION (spans cols 3-8)
+    - Row 2: (empty under Sr), BATCH NO, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
+    - Sr spans vertically across both rows
+    - DESCRIPTION spans horizontally across 6 columns in row 1
+    - Row 2 has 8 data columns: Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
+
+  TOTALS ROW (Total width = 180mm):
+  - Layout: [30mm label | 30mm value] x 3 pairs (Net Material Wt, Tare Weight, Gross Weight)
+    ┌─────────────────────────────┬────────────────┬──────────────────────────┬────────────────┬──────────────────────┬────────────────┐
+    │ Total Net Material Wt       │ 2000 KGS       │ Total Tare Weight        │ 100 KGS        │ Total Gross Weight   │ 3150 KGS       │
+    │ 30mm                        │ 30mm           │ 30mm                     │ 30mm           │ 30mm                 │ 30mm           │
+    └─────────────────────────────┴────────────────┴──────────────────────────┴────────────────┴──────────────────────┴────────────────┘
+                                                                    30 + 30 x 3 = 180mm
 
 Assumptions:
   - Exporter name rendered as bold heading above all tables (unchanged from before).
@@ -514,18 +548,23 @@ def build_pl_story(packing_list, styles):
             pkg_obj = getattr(it, "type_of_package", None)
             pkg_display = safe(getattr(pkg_obj, "name", "")) if pkg_obj else ""
 
-            # Row 1: Serial, HSN Code, Item Code, Description, Batch No.
+            # Row 1: Serial, HSN Code, Item Code, Description (merged across 6 cols)
             row1 = [
                 Paragraph(f"<b>{sr}</b>", style_label_center),
                 Paragraph(f"<b>HSN CODE</b><br/>{safe(getattr(it, 'hsn_code', '')) or '-'}", style_small),
                 Paragraph(f"<b>ITEM CODE</b><br/>{safe(getattr(it, 'item_code', '')) or '-'}", style_small),
                 Paragraph(f"<b>DESCRIPTION</b><br/>{safe(getattr(it, 'description', '')) or '-'}", style_small),
-                Paragraph(f"<b>BATCH NO.</b><br/>{safe(getattr(it, 'batch_details', '')) or '-'}", style_small),
+                "",  # Merge cell 1
+                "",  # Merge cell 2
+                "",  # Merge cell 3
+                "",  # Merge cell 4
+                "",  # Merge cell 5
             ]
 
-            # Row 2: Weights and quantities
+            # Row 2: 8 data columns - Batch No, QTY, PKG TYPE, UNIT, NET WT/ITEM, EMPTY PKG WT, NET MAT WT, GROSS WT
             row2 = [
                 "",  # Empty cell under serial number
+                Paragraph(f"<b>BATCH NO.</b><br/>{safe(getattr(it, 'batch_details', '')) or '-'}", style_small),
                 Paragraph(f"<b>QTY</b><br/>{_fmt_qty(getattr(it, 'no_of_packages', None)) or '-'}", style_small),
                 Paragraph(f"<b>PKG TYPE</b><br/>{pkg_display or '-'}", style_small),
                 Paragraph(f"<b>UNIT</b><br/>{uom_display or '-'}", style_small),
@@ -538,17 +577,15 @@ def build_pl_story(packing_list, styles):
             item_rows.append(row1)
             item_rows.append(row2)
 
-        # 8 columns for row2, but row1 only uses 5 - need to span correctly
-        # Actually both rows need same column count, so row1 needs to span
-        # Let's use 8 columns total: Sr(1) + 7 data columns
-        # Row1: Sr | HSN(2 cols) | Item Code(2 cols) | Description(2 cols) | Batch(1 col)
+        # 9 columns total: Sr | HSN | Item Code | Description (spans 6 cols in row1) | Row2: 8 data columns
+        # Column widths: Sr=4mm, all others=22mm (total = 180mm, perfect fit)
         items_table = Table(
             item_rows,
-            colWidths=[10*mm, 22*mm, 22*mm, 40*mm, 18*mm, 18*mm, 18*mm, 22*mm],
+            colWidths=[4*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm],
         )
         items_table.hAlign = "LEFT"
 
-        # Build style with row spans
+        # Build style with row spans and column merging
         table_style = [
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
@@ -559,9 +596,13 @@ def build_pl_story(packing_list, styles):
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]
 
-        # Span serial number across both rows for each item
+        # Apply spans for each item
         for i in range(0, len(item_rows), 2):
+            # Span serial number across both rows
             table_style.append(("SPAN", (0, i), (0, i+1)))
+            # Span description across 6 columns in row1 (cols 3-8)
+            table_style.append(("SPAN", (3, i), (8, i)))
+            # Background for row1
             table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#F5F5F5")))
 
         items_table.setStyle(TableStyle(table_style))

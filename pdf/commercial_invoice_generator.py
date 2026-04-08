@@ -60,19 +60,34 @@ def safe(v: Any, default: str = "") -> str:
 
 
 def _fmt_money(v: Any) -> str:
-    """Format number as money with comma separators and exactly 2 decimal places."""
+    """Format number as money - show decimals only if non-zero (max 2 decimal places)."""
     try:
-        return f"{float(v):,.2f}"
+        num = float(v)
+        # Check if it's a whole number
+        if num == int(num):
+            return f"{int(num):,}"
+        # Has decimals - show up to 2 places, strip trailing zeros
+        formatted = f"{num:,.2f}"
+        # Remove trailing zeros after decimal point
+        if "." in formatted:
+            formatted = formatted.rstrip("0").rstrip(".")
+        return formatted
     except Exception:
         return safe(v)
 
 
 def _fmt_qty(v: Any) -> str:
+    """Format quantity - show decimals only if non-zero (max 3 decimal places)."""
     try:
-        s = f"{float(v):,.3f}"
-        if "." in s:
-            s = s.rstrip("0").rstrip(".")
-        return s
+        num = float(v)
+        # Check if it's a whole number
+        if num == int(num):
+            return f"{int(num):,}"
+        # Has decimals - show up to 3 places, strip trailing zeros
+        formatted = f"{num:,.3f}"
+        if "." in formatted:
+            formatted = formatted.rstrip("0").rstrip(".")
+        return formatted
     except Exception:
         return safe(v)
 
@@ -524,13 +539,14 @@ def build_ci_story(ci, styles) -> list:
         try:
             for cont in pl.containers.all().order_by("id"):
                 for item in cont.items.all():
-                    if item.net_weight is not None and item.quantity is not None:
+                    # Use net_material_weight from container items
+                    net_mat_wt = getattr(item, "net_material_weight", None)
+                    if net_mat_wt is not None:
                         try:
-                            total_net_val += (
-                                Decimal(str(item.net_weight)) * Decimal(str(item.quantity))
-                            )
+                            total_net_val += Decimal(str(net_mat_wt))
                         except Exception:
                             pass
+                # Sum container gross weights
                 gw = getattr(cont, "gross_weight", None)
                 if gw is not None:
                     try:
