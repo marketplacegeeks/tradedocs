@@ -1578,8 +1578,7 @@ function Step4({
 }) {
   const [saving, setSaving] = useState(false);
 
-  const { data: incoterms = [] } = useQuery({ queryKey: ["incoterms"], queryFn: listIncoterms });
-  const { data: paymentTerms = [] } = useQuery({ queryKey: ["payment-terms"], queryFn: listPaymentTerms });
+  const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
 
   const { data: ci } = useQuery({
     queryKey: ["commercial-invoice", pl.ci_id],
@@ -1589,6 +1588,7 @@ function Step4({
 
   const queryClient = useQueryClient();
   const [rateForm, setRateForm] = useState<Record<number, string>>({});
+  const [uomForm, setUomForm] = useState<Record<number, number>>({});
   // Pre-populated from the auto-aggregated packages_kind on each CI line item; editable by Maker.
   const [pkgForm, setPkgForm] = useState<Record<number, string>>({});
   const [financials, setFinancials] = useState<Record<string, string>>({
@@ -1596,30 +1596,9 @@ function Step4({
     freight: "",
     insurance: "",
     lc_details: "",
-    incoterms: pl.incoterms != null ? String(pl.incoterms) : "",
-    payment_terms: pl.payment_terms != null ? String(pl.payment_terms) : "",
   });
 
-  // Derive which cost fields are visible based on the selected Incoterm code (FR-14M.8B).
-  const selectedIncotermCode = incoterms.find((t: any) => t.id === Number(financials.incoterms))?.code ?? null;
-  const visibleCostFields: Set<string> = selectedIncotermCode
-    ? (INCOTERM_PL_FIELDS[selectedIncotermCode] ?? new Set(["fob_rate", "freight", "insurance"]))
-    : new Set(["fob_rate", "freight", "insurance"]); // show all when no incoterm selected
-
-  // When the incoterm changes, clear now-hidden fields from local state.
-  function handleIncotermChange(incotermId: number | undefined) {
-    const code = incoterms.find((t: any) => t.id === incotermId)?.code ?? null;
-    const newVisible = code ? (INCOTERM_PL_FIELDS[code] ?? new Set(["fob_rate", "freight", "insurance"])) : new Set(["fob_rate", "freight", "insurance"]);
-    setFinancials((prev) => ({
-      ...prev,
-      incoterms: incotermId ? String(incotermId) : "",
-      fob_rate: newVisible.has("fob_rate") ? prev.fob_rate : "",
-      freight: newVisible.has("freight") ? prev.freight : "",
-      insurance: newVisible.has("insurance") ? prev.insurance : "",
-    }));
-  }
-
-  // When CI line items load for the first time, seed pkgForm with the auto-aggregated values.
+  // When CI line items load for the first time, seed pkgForm and uomForm with the auto-aggregated values.
   const ciLineItemsKey = ci?.line_items.map((li) => li.id).join(",") ?? "";
   useEffect(() => {
     if (!ci) return;
@@ -1633,35 +1612,37 @@ function Step4({
       }
       return seeded;
     });
+    setUomForm((prev) => {
+      const seeded: Record<number, number> = { ...prev };
+      for (const li of ci.line_items) {
+        if (!(li.id in seeded) && li.uom_id) {
+          seeded[li.id] = li.uom_id;
+        }
+      }
+      return seeded;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciLineItemsKey]);
 
   async function handleSave() {
     if (!ci) return;
-    if (!financials.incoterms) {
-      message.error("Incoterms is required before saving.");
-      return;
-    }
     setSaving(true);
     try {
-      // Save rate_usd and packages_kind for each line item.
+      // Save rate_usd, packages_kind, and uom for each line item.
       for (const li of ci.line_items) {
-        const updates: { rate_usd?: string; packages_kind?: string } = {};
+        const updates: { rate_usd?: string; packages_kind?: string; uom?: number } = {};
         if (rateForm[li.id] !== undefined) updates.rate_usd = rateForm[li.id];
         if (pkgForm[li.id] !== undefined) updates.packages_kind = pkgForm[li.id];
+        if (uomForm[li.id] !== undefined) updates.uom = uomForm[li.id];
         if (Object.keys(updates).length > 0) {
           await updateCILineItem(li.id, updates);
         }
       }
-      // Save financial fields on the PL (incoterms, payment_terms) and CI (fob_rate etc.)
-      const { updatePackingList } = await import("../../api/packingLists");
-      await updatePackingList(pl.id, {
-        incoterms: financials.incoterms ? Number(financials.incoterms) : null,
-        payment_terms: financials.payment_terms ? Number(financials.payment_terms) : null,
-        fob_rate: financials.fob_rate || null,
+      // Save financial fields on the CI (freight and insurance)
+      const { updateCommercialInvoice } = await import("../../api/packingLists");
+      await updateCommercialInvoice(pl.ci_id!, {
         freight: financials.freight || null,
-        insurance: financials.insurance || null,
-        lc_details: financials.lc_details,
+        insurance_amount: financials.insurance || null,
       });
       queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
@@ -1677,26 +1658,6 @@ function Step4({
   return (
     <div style={CARD}>
       <p style={SECTION_TITLE}>Final Rates</p>
-
-      <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr", marginBottom: 24 }}>
-        <div>
-          <label style={LABEL}>Incoterms *</label>
-          <Select style={{ width: "100%" }} value={financials.incoterms ? Number(financials.incoterms) : undefined}
-            onChange={(v) => handleIncotermChange(v)}
-            placeholder="Select Incoterms"
-            showSearch
-            optionFilterProp="label"
-            options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))} />
-        </div>
-        <div>
-          <label style={LABEL}>Payment Terms</label>
-          <Select allowClear style={{ width: "100%" }} value={financials.payment_terms ? Number(financials.payment_terms) : undefined}
-            onChange={(v) => setFinancials({ ...financials, payment_terms: v ? String(v) : "" })}
-            showSearch
-            optionFilterProp="label"
-            options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))} />
-        </div>
-      </div>
 
       {!ci || ci.line_items.length === 0 ? (
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
@@ -1739,7 +1700,16 @@ function Step4({
                     />
                   </td>
                   <td style={TD}>{parseFloat(li.total_quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
-                  <td style={TD}>{li.uom_abbr ?? "—"}</td>
+                  <td style={TD}>
+                    <Select
+                      style={{ width: "100%" }}
+                      value={uomForm[li.id] ?? li.uom_id}
+                      onChange={(v) => setUomForm({ ...uomForm, [li.id]: v })}
+                      showSearch
+                      optionFilterProp="label"
+                      options={uoms.map((u: any) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })).sort((a, b) => a.label.localeCompare(b.label))}
+                    />
+                  </td>
                   <td style={TD}>
                     <input
                       type="number"
@@ -1748,11 +1718,14 @@ function Step4({
                       value={rate}
                       onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })}
                     />
-                    {li.uom_abbr && (
-                      <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
-                        USD per {li.uom_abbr}
-                      </div>
-                    )}
+                    {(() => {
+                      const selectedUom = uoms.find((u: any) => u.id === (uomForm[li.id] ?? li.uom_id));
+                      return selectedUom ? (
+                        <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                          USD per {selectedUom.abbreviation}
+                        </div>
+                      ) : null;
+                    })()}
                   </td>
                   <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
                 </tr>
@@ -1779,7 +1752,7 @@ function Step4({
           <>
             <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10, marginTop: 24 }}>
               <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
-                Cost Breakdown{selectedIncotermCode ? ` (${selectedIncotermCode})` : ""}
+                Cost Breakdown
               </p>
               {/* Invoice Value row — computed from line items, read-only */}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -1787,19 +1760,15 @@ function Step4({
                 <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
               </div>
               {/* Freight */}
-              {visibleCostFields.has("freight") && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
-                  <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
-                </div>
-              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
+                <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
+              </div>
               {/* Insurance */}
-              {visibleCostFields.has("insurance") && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
-                  <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
-                </div>
-              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
+                <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
+              </div>
             </div>
 
             {/* Invoice Total row */}
