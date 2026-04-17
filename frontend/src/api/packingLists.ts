@@ -2,6 +2,7 @@
 // Constraint #22: no component calls axios directly.
 
 import axiosInstance from "./axiosInstance";
+import type { CurrencyDisplay } from "./proformaInvoices";
 
 // ---- Types ------------------------------------------------------------------
 
@@ -116,8 +117,8 @@ export interface CILineItem {
   uom: number | null;
   uom_abbr: string | null;
   total_quantity: string;
-  rate_usd: string;
-  amount_usd: string;
+  rate: string;
+  amount: string;
 }
 
 export interface CommercialInvoice {
@@ -130,6 +131,7 @@ export interface CommercialInvoice {
   bank: number | null;
   bank_display: string | null;
   bank_details: BankDetails | null;
+  currency_display?: CurrencyDisplay;
   fob_rate: string | null;
   freight: string | null;
   insurance: string | null;
@@ -283,7 +285,7 @@ export function listCommercialInvoices(params?: Record<string, string>) {
     .then((r) => r.data);
 }
 
-export function updateCILineItem(id: number, data: { rate_usd?: string; packages_kind?: string; uom?: number }) {
+export function updateCILineItem(id: number, data: { rate?: string; packages_kind?: string; uom?: number }) {
   return axiosInstance
     .patch<CILineItem>(`/ci-line-items/${id}/`, data)
     .then((r) => r.data);
