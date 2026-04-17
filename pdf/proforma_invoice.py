@@ -427,8 +427,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 Paragraph(f"<b>Vessel/Flight No:</b><br/>{safe(invoice.vessel_flight_no)}", style_text),
             ],
             [
-                Paragraph("<b>No &amp; Kind of Packages</b><br/>", style_text),
-                Paragraph("<b>Marks &amp; Nos/Container No</b><br/>", style_text),
+                Paragraph(f"<b>No &amp; Kind of Packages</b><br/>{safe(invoice.kind_of_packages)}", style_text),
+                Paragraph(f"<b>Marks &amp; Nos/Container No</b><br/>{safe(invoice.marks_and_nos)}", style_text),
                 Paragraph(f"<b>Payment Terms:</b><br/>{payment_term_name}", style_text),
             ],
         ],
@@ -472,25 +472,28 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # SECTION 4: LINE ITEMS TABLE
     # ========================================================================
 
+    # Get currency code (mandatory - no fallback)
+    currency_code = invoice.currency.code
+
     li_header = [
         Paragraph("<b>Sr.</b>", style_table_header),
         Paragraph("<b>HSN Code</b>", style_table_header),
         Paragraph("<b>Item Code</b>", style_table_header),
         Paragraph("<b>Description of Goods</b>", style_table_header),
         Paragraph("<b>Qty</b>", style_table_header),
-        Paragraph("<b>Rate (USD)</b>", style_table_header),
-        Paragraph("<b>Amount (USD)</b>", style_table_header),
+        Paragraph(f"<b>Rate ({currency_code})</b>", style_table_header),
+        Paragraph(f"<b>Amount ({currency_code})</b>", style_table_header),
     ]
     li_rows = [li_header]
-    total_amount_usd = Decimal("0.00")
+    line_items_total = Decimal("0.00")
 
     for idx, it in enumerate(invoice.line_items.all().order_by("id"), start=1):
         uom_obj = getattr(it, "uom", None)
         uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
-        amount = getattr(it, "amount_usd", None)
+        amount = getattr(it, "amount", None)
         if amount is not None:
             try:
-                total_amount_usd += Decimal(str(amount))
+                line_items_total += Decimal(str(amount))
             except Exception:
                 pass
         li_rows.append([
@@ -499,7 +502,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             Paragraph(safe(it.item_code), style_text),
             Paragraph(safe(it.description), style_text),
             Paragraph(f"{fmt_qty(it.quantity)} {uom_display}".strip(), style_text),
-            Paragraph(fmt_money(it.rate_usd), style_text),
+            Paragraph(fmt_money(it.rate), style_text),
             Paragraph(fmt_money(amount), style_text),
         ])
 
@@ -531,9 +534,9 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     charges_list = list(invoice.charges.all().order_by("id"))
     charges_total = Decimal("0.00")
     for charge in charges_list:
-        charges_total += Decimal(str(charge.amount_usd or 0))
+        charges_total += Decimal(str(charge.amount or 0))
 
-    grand_total = total_amount_usd + charges_total
+    grand_total = line_items_total + charges_total
 
     _SELLER_FIELDS = {
         "EXW": [],
@@ -572,18 +575,18 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     if charges_list and not show_cost_breakdown:
         totals_rows.append([
             Paragraph("Item Total", style_text),
-            Paragraph(f"${fmt_money(total_amount_usd)}", style_text),
+            Paragraph(f"{currency_code} {fmt_money(line_items_total)}", style_text),
         ])
         for charge in charges_list:
             totals_rows.append([
                 Paragraph(safe(charge.description), style_text),
-                Paragraph(f"${fmt_money(charge.amount_usd)}", style_text),
+                Paragraph(f"{currency_code} {fmt_money(charge.amount)}", style_text),
             ])
 
     if not incoterm_disp:
         totals_rows.append([
             Paragraph("<b>Grand Total Amount</b>", style_label),
-            Paragraph(f"<b>${fmt_money(grand_total)}</b>", style_label),
+            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label),
         ])
 
     if show_cost_breakdown:
@@ -593,7 +596,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ])
         totals_rows.append([
             Paragraph("FOB Value", style_text),
-            Paragraph(f"${fmt_money(grand_total)}", style_text),
+            Paragraph(f"{currency_code} {fmt_money(grand_total)}", style_text),
         ])
         for field in seller_fields:
             val = getattr(invoice, field, None)
@@ -602,13 +605,13 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 continue
             totals_rows.append([
                 Paragraph(_FIELD_LABELS.get(field, field), style_text),
-                Paragraph(f"${fmt_money(val)}", style_text),
+                Paragraph(f"{currency_code} {fmt_money(val)}", style_text),
             ])
 
     if incoterm_disp:
         totals_rows.append([
             Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
-            Paragraph(f"<b>${fmt_money(invoice_total_pdf)}</b>", style_label),
+            Paragraph(f"<b>{currency_code} {fmt_money(invoice_total_pdf)}</b>", style_label),
         ])
 
     if totals_rows:
@@ -631,7 +634,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # ========================================================================
 
     words_table = Table(
-        [[Paragraph(f"<b>Amount in Words:</b> {amount_to_words(final_total, currency='USD')}", style_text)]],
+        [[Paragraph(f"<b>Amount in Words:</b> {amount_to_words(final_total, currency=currency_code)}", style_text)]],
         colWidths=[180 * mm],
     )
     words_table.setStyle(TableStyle([
