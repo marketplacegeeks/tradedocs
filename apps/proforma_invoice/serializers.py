@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from apps.master_data.models import Currency
 from apps.workflow.constants import EDITABLE_STATES
 from .models import ProformaInvoice, ProformaInvoiceCharge, ProformaInvoiceLineItem
 from .services import generate_document_number
@@ -43,9 +44,9 @@ class ProformaInvoiceLineItemSerializer(serializers.ModelSerializer):
         model = ProformaInvoiceLineItem
         fields = [
             "id", "hsn_code", "item_code", "description",
-            "quantity", "uom", "rate_usd", "amount_usd",
+            "quantity", "uom", "rate", "amount",
         ]
-        read_only_fields = ["id", "amount_usd"]
+        read_only_fields = ["id", "amount"]
 
     def validate_hsn_code(self, value):
         if value and not re.match(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$", value):
@@ -59,7 +60,7 @@ class ProformaInvoiceLineItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Quantity must be greater than zero.")
         return value
 
-    def validate_rate_usd(self, value):
+    def validate_rate(self, value):
         if value < 0:
             raise serializers.ValidationError("Rate must be zero or greater.")
         # Reject more than 2 decimal places
@@ -73,10 +74,10 @@ class ProformaInvoiceLineItemSerializer(serializers.ModelSerializer):
 class ProformaInvoiceChargeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProformaInvoiceCharge
-        fields = ["id", "description", "amount_usd"]
+        fields = ["id", "description", "amount"]
         read_only_fields = ["id"]
 
-    def validate_amount_usd(self, value):
+    def validate_amount(self, value):
         if value < 0:
             raise serializers.ValidationError("Charge amount must be zero or greater.")
         return value
@@ -110,6 +111,14 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     consignee_name = serializers.SerializerMethodField()
     buyer_name = serializers.SerializerMethodField()
 
+    # Currency fields
+    currency = serializers.PrimaryKeyRelatedField(
+        queryset=Currency.objects.filter(is_active=True),
+        required=True,
+        help_text="Currency for all monetary values on this PI"
+    )
+    currency_display = serializers.SerializerMethodField()
+
     # Master data name helpers
     payment_terms_name = serializers.SerializerMethodField()
     port_of_loading_name = serializers.SerializerMethodField()
@@ -139,6 +148,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "exporter", "exporter_name",
             "consignee", "consignee_name",
             "buyer", "buyer_name",
+            "currency", "currency_display",
             "buyer_order_no", "buyer_order_date", "other_references",
             "country_of_origin", "country_of_final_destination",
             # Shipping
@@ -178,7 +188,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "line_items", "charges",
             "line_items_total", "charges_total", "grand_total", "invoice_total",
             "incoterms_code",
-            "exporter_name", "consignee_name", "buyer_name",
+            "exporter_name", "consignee_name", "buyer_name", "currency_display",
             "payment_terms_name", "port_of_loading_name", "port_of_discharge_name",
             "place_of_receipt_name", "place_of_receipt_by_pre_carrier_name",
             "signed_copy_url",
@@ -192,7 +202,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         instance = kwargs.get("instance")
         if instance and instance.status not in EDITABLE_STATES:
             content_fields = [
-                "pi_date", "exporter", "consignee", "buyer",
+                "pi_date", "exporter", "consignee", "buyer", "currency",
                 "buyer_order_no", "buyer_order_date", "other_references",
                 "country_of_origin", "country_of_final_destination",
                 "pre_carriage_by", "place_of_receipt", "place_of_receipt_by_pre_carrier", "vessel_flight_no",
@@ -234,6 +244,22 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def validate_currency(self, value):
+        """
+        Prevent currency change once line items exist.
+        """
+        # On create, currency is always allowed
+        if not self.instance:
+            return value
+
+        # On update, check if line items exist
+        if self.instance.line_items.exists() and self.instance.currency != value:
+            raise serializers.ValidationError(
+                "Currency cannot be changed after line items have been added."
+            )
+
+        return value
+
     def create(self, validated_data):
         validated_data.setdefault("pi_date", date.today())
         # Auto-assign the logged-in user as creator
@@ -251,7 +277,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     def get_line_items_total(self, obj):
         """Sum of all line item amounts."""
         total = sum(
-            (item.amount_usd for item in obj.line_items.all()),
+            (item.amount for item in obj.line_items.all()),
             Decimal("0.00"),
         )
         return str(total)
@@ -259,7 +285,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     def get_charges_total(self, obj):
         """Sum of all additional charge amounts."""
         total = sum(
-            (charge.amount_usd for charge in obj.charges.all()),
+            (charge.amount for charge in obj.charges.all()),
             Decimal("0.00"),
         )
         return str(total)
@@ -267,11 +293,11 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
     def get_grand_total(self, obj):
         """Grand Total = line items total + charges total."""
         line_total = sum(
-            (item.amount_usd for item in obj.line_items.all()),
+            (item.amount for item in obj.line_items.all()),
             Decimal("0.00"),
         )
         charge_total = sum(
-            (charge.amount_usd for charge in obj.charges.all()),
+            (charge.amount for charge in obj.charges.all()),
             Decimal("0.00"),
         )
         return str(line_total + charge_total)
@@ -285,11 +311,11 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         seller_fields = INCOTERM_SELLER_FIELDS.get(incoterm_code, set())
 
         line_total = sum(
-            (item.amount_usd for item in obj.line_items.all()),
+            (item.amount for item in obj.line_items.all()),
             Decimal("0.00"),
         )
         charge_total = sum(
-            (charge.amount_usd for charge in obj.charges.all()),
+            (charge.amount for charge in obj.charges.all()),
             Decimal("0.00"),
         )
         grand_total = line_total + charge_total
@@ -337,6 +363,14 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
 
     def get_buyer_name(self, obj):
         return obj.buyer.name if obj.buyer else None
+
+    def get_currency_display(self, obj):
+        """Return currency details for display."""
+        return {
+            "id": obj.currency.id,
+            "code": obj.currency.code,
+            "name": obj.currency.name
+        }
 
     def get_payment_terms_name(self, obj):
         return obj.payment_terms.name if obj.payment_terms else None

@@ -3,7 +3,7 @@ from datetime import date
 
 from apps.accounts.tests.factories import MakerFactory
 from apps.master_data.tests.factories import (
-    BankFactory, IncotermFactory, LocationFactory, OrganisationFactory,
+    BankFactory, CurrencyFactory, IncotermFactory, LocationFactory, OrganisationFactory,
     PaymentTermFactory, PortFactory, UOMFactory,
 )
 from apps.proforma_invoice.models import (
@@ -21,6 +21,7 @@ class ProformaInvoiceFactory(factory.django.DjangoModelFactory):
     exporter = factory.SubFactory(OrganisationFactory)
     consignee = factory.SubFactory(OrganisationFactory)
     buyer = None
+    currency = factory.SubFactory(CurrencyFactory)
     payment_terms = factory.SubFactory(PaymentTermFactory)
     incoterms = factory.SubFactory(IncotermFactory)
     status = DRAFT
@@ -35,8 +36,8 @@ class ProformaInvoiceLineItemFactory(factory.django.DjangoModelFactory):
     description = factory.Sequence(lambda n: f"Item description {n}")
     quantity = factory.Faker("pydecimal", left_digits=4, right_digits=3, positive=True)
     uom = factory.SubFactory(UOMFactory)
-    rate_usd = factory.Faker("pydecimal", left_digits=5, right_digits=2, positive=True)
-    # amount_usd is computed on save — do not set here
+    rate = factory.Faker("pydecimal", left_digits=5, right_digits=2, positive=True)
+    # amount is computed on save — do not set here
 
 
 class ProformaInvoiceChargeFactory(factory.django.DjangoModelFactory):
@@ -45,4 +46,4 @@ class ProformaInvoiceChargeFactory(factory.django.DjangoModelFactory):
 
     pi = factory.SubFactory(ProformaInvoiceFactory)
     description = factory.Sequence(lambda n: f"Charge {n}")
-    amount_usd = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
+    amount = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
