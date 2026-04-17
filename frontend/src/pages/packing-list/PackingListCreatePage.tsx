@@ -1613,10 +1613,10 @@ function Step4({
     if (!ci) return;
     setSaving(true);
     try {
-      // Save rate_usd, packages_kind, and uom for each line item.
+      // Save rate, packages_kind, and uom for each line item.
       for (const li of ci.line_items) {
-        const updates: { rate_usd?: string; packages_kind?: string; uom?: number } = {};
-        if (rateForm[li.id] !== undefined) updates.rate_usd = rateForm[li.id];
+        const updates: { rate?: string; packages_kind?: string; uom?: number } = {};
+        if (rateForm[li.id] !== undefined) updates.rate = rateForm[li.id];
         if (pkgForm[li.id] !== undefined) updates.packages_kind = pkgForm[li.id];
         if (uomForm[li.id] !== undefined) updates.uom = uomForm[li.id];
         if (Object.keys(updates).length > 0) {
@@ -1695,7 +1695,7 @@ function Step4({
           </thead>
           <tbody>
             {ci.line_items.map((li) => {
-              const rate = rateForm[li.id] ?? li.rate_usd;
+              const rate = rateForm[li.id] ?? li.rate;
               const amountRaw = parseFloat(li.total_quantity) * parseFloat(rate || "0");
               const amount = amountRaw.toLocaleString("en-US", { maximumFractionDigits: 2 });
               // pkgForm is seeded from li.packages_kind on load; user can edit freely.
@@ -1751,7 +1751,7 @@ function Step4({
       {/* Cost Breakdown — PI-style summary box */}
       {ci && ci.line_items.length > 0 && (() => {
         const itemTotal = ci.line_items.reduce((sum, li) => {
-          const rate = parseFloat(rateForm[li.id] ?? li.rate_usd ?? "0") || 0;
+          const rate = parseFloat(rateForm[li.id] ?? li.rate ?? "0") || 0;
           return sum + parseFloat(li.total_quantity) * rate;
         }, 0);
         const freightAmt = parseFloat(financials.freight) || 0;
