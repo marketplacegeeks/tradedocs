@@ -1522,9 +1522,34 @@ function Step3({
   );
 }
 
+// ---- Currency Symbol helper --------------------------------------------------
+
+function getCurrencySymbol(currencyCode?: string): string {
+  const symbolMap: Record<string, string> = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    INR: "₹",
+    JPY: "¥",
+    CNY: "¥",
+    AUD: "A$",
+    CAD: "C$",
+    CHF: "CHF",
+    HKD: "HK$",
+    SGD: "S$",
+    AED: "د.إ",
+    SAR: "﷼",
+    QAR: "ر.ق",
+    KWD: "د.ك",
+    BHD: "د.ب",
+    OMR: "ر.ع.",
+  };
+  return symbolMap[currencyCode || "USD"] || currencyCode || "$";
+}
+
 // ---- Amount in Words helper --------------------------------------------------
 
-function amountToWords(amount: number): string {
+function amountToWords(amount: number, currencyName: string = "US Dollars"): string {
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
     "Eighteen", "Nineteen"];
@@ -1544,7 +1569,7 @@ function amountToWords(amount: number): string {
   const cents = Math.round((rounded - dollars) * 100);
   const dollarWords = dollars === 0 ? "Zero" : toWords(dollars);
   const centsText = cents > 0 ? ` and ${toWords(cents)} Cents` : "";
-  return `${dollarWords} US Dollars${centsText} Only`;
+  return `${dollarWords} ${currencyName}${centsText} Only`;
 }
 
 // ---- Step 4: Final Rates ----------------------------------------------------
@@ -1689,8 +1714,8 @@ function Step4({
               </th>
               <th style={TH}>Total Qty</th>
               <th style={TH}>UOM</th>
-              <th style={TH}>Rate (USD) *</th>
-              <th style={TH}>Amount (USD)</th>
+              <th style={TH}>Rate ({ci.currency_display?.code ?? "USD"}) *</th>
+              <th style={TH}>Amount ({ci.currency_display?.code ?? "USD"})</th>
             </tr>
           </thead>
           <tbody>
@@ -1734,12 +1759,12 @@ function Step4({
                       const selectedUom = uoms.find((u: any) => u.id === (uomForm[li.id] ?? li.uom_id));
                       return selectedUom ? (
                         <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
-                          USD per {selectedUom.abbreviation}
+                          {ci.currency_display?.code ?? "USD"} per {selectedUom.abbreviation}
                         </div>
                       ) : null;
                     })()}
                   </td>
-                  <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
+                  <td style={{ ...TD, fontWeight: 600 }}>{getCurrencySymbol(ci.currency_display?.code)}{amount}</td>
                 </tr>
               );
             })}
@@ -1787,14 +1812,14 @@ function Step4({
                 {showFOB && (
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value</span>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{getCurrencySymbol(ci.currency_display?.code)}{fmt(itemTotal)}</span>
                   </div>
                 )}
 
                 {/* Freight — shown for CFR, CIF, CPT, CIP, DAP, DPU, DDP */}
                 {showFreight && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight ({ci.currency_display?.code ?? "USD"})</span>
                     <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
                   </div>
                 )}
@@ -1802,7 +1827,7 @@ function Step4({
                 {/* Insurance — shown for CIF, CIP, DAP, DPU, DDP */}
                 {showInsurance && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance ({ci.currency_display?.code ?? "USD"})</span>
                     <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
                   </div>
                 )}
@@ -1812,12 +1837,12 @@ function Step4({
             {/* Invoice Total row */}
             <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>${fmt(invoiceTotal)}</span>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{getCurrencySymbol(ci.currency_display?.code)}{fmt(invoiceTotal)}</span>
             </div>
 
             {/* Amount in Words */}
             <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
-              <strong>Amount in Words:</strong> {amountToWords(invoiceTotal)}
+              <strong>Amount in Words:</strong> {amountToWords(invoiceTotal, ci.currency_display?.name ?? "US Dollars")}
             </div>
           </>
         );

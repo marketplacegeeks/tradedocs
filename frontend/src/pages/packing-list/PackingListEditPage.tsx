@@ -111,6 +111,31 @@ const BTN_SECONDARY: React.CSSProperties = {
   fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, cursor: "pointer",
 };
 
+// ---- Currency Symbol Helper -------------------------------------------------
+
+function getCurrencySymbol(currencyCode?: string): string {
+  const symbolMap: Record<string, string> = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    INR: "₹",
+    JPY: "¥",
+    CNY: "¥",
+    AUD: "A$",
+    CAD: "C$",
+    CHF: "CHF",
+    HKD: "HK$",
+    SGD: "S$",
+    AED: "د.إ",
+    SAR: "﷼",
+    QAR: "ر.ق",
+    KWD: "د.ك",
+    BHD: "د.ب",
+    OMR: "ر.ع.",
+  };
+  return symbolMap[currencyCode || "USD"] || currencyCode || "$";
+}
+
 // ---- Page -------------------------------------------------------------------
 
 export default function PackingListEditPage() {
@@ -623,8 +648,8 @@ export default function PackingListEditPage() {
                 <th style={TH}>No. & Kind of Packages</th>
                 <th style={TH}>Total Qty</th>
                 <th style={TH}>UOM</th>
-                <th style={TH}>Rate (USD per UOM) *</th>
-                <th style={TH}>Amount (USD)</th>
+                <th style={TH}>Rate ({ci.currency_display?.code ?? "USD"} per UOM) *</th>
+                <th style={TH}>Amount ({ci.currency_display?.code ?? "USD"})</th>
               </tr>
             </thead>
             <tbody>
@@ -642,7 +667,7 @@ export default function PackingListEditPage() {
                       <input type="number" step="0.01" style={{ ...INPUT, width: 120 }} value={rate}
                         onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })} />
                     </td>
-                    <td style={{ ...TD, fontWeight: 600 }}>${amount}</td>
+                    <td style={{ ...TD, fontWeight: 600 }}>{getCurrencySymbol(ci.currency_display?.code)}{amount}</td>
                   </tr>
                 );
               })}
@@ -658,21 +683,21 @@ export default function PackingListEditPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                 {visible.has("fob_rate") && (
                   <div>
-                    <label style={LABEL}>FOB Rate (USD per UOM)</label>
+                    <label style={LABEL}>FOB Rate ({ci.currency_display?.code ?? "USD"} per UOM)</label>
                     <input type="number" step="0.01" style={INPUT} value={headerForm.fob_rate || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, fob_rate: e.target.value })} />
                   </div>
                 )}
                 {visible.has("freight") && (
                   <div>
-                    <label style={LABEL}>Freight (USD)</label>
+                    <label style={LABEL}>Freight ({ci.currency_display?.code ?? "USD"})</label>
                     <input type="number" step="0.01" style={INPUT} value={headerForm.freight || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, freight: e.target.value })} />
                   </div>
                 )}
                 {visible.has("insurance") && (
                   <div>
-                    <label style={LABEL}>Insurance (USD)</label>
+                    <label style={LABEL}>Insurance ({ci.currency_display?.code ?? "USD"})</label>
                     <input type="number" step="0.01" style={INPUT} value={headerForm.insurance || ""}
                       onChange={(e) => setHeaderForm({ ...headerForm, insurance: e.target.value })} />
                   </div>
