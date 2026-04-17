@@ -22,33 +22,43 @@ def forward(apps, schema_editor):
     pi_count = ProformaInvoice.objects.filter(currency__isnull=True).update(currency=usd)
     print(f"Set currency to USD for {pi_count} Proforma Invoices")
 
-    # Copy rate_usd → rate, amount_usd → amount for PI line items
-    for item in ProformaInvoiceLineItem.objects.all():
+    # Copy rate_usd → rate, amount_usd → amount for PI line items (bulk update for performance)
+    items = list(ProformaInvoiceLineItem.objects.exclude(rate_usd__isnull=True))
+    for item in items:
         item.rate = item.rate_usd
         item.amount = item.amount_usd
-        item.save(update_fields=['rate', 'amount'])
+    if items:
+        ProformaInvoiceLineItem.objects.bulk_update(items, ['rate', 'amount'], batch_size=500)
+        print(f"Migrated {len(items)} line items")
 
-    # Copy amount_usd → amount for PI charges
-    for charge in ProformaInvoiceCharge.objects.all():
+    # Copy amount_usd → amount for PI charges (bulk update for performance)
+    charges = list(ProformaInvoiceCharge.objects.exclude(amount_usd__isnull=True))
+    for charge in charges:
         charge.amount = charge.amount_usd
-        charge.save(update_fields=['amount'])
+    if charges:
+        ProformaInvoiceCharge.objects.bulk_update(charges, ['amount'], batch_size=500)
+        print(f"Migrated {len(charges)} charges")
 
     print("Data migration complete: copied all USD values to new fields")
 
 
 def backward(apps, schema_editor):
-    # Reverse: copy data back to old fields
+    # Reverse: copy data back to old fields (bulk update for performance)
     ProformaInvoiceLineItem = apps.get_model('proforma_invoice', 'ProformaInvoiceLineItem')
     ProformaInvoiceCharge = apps.get_model('proforma_invoice', 'ProformaInvoiceCharge')
 
-    for item in ProformaInvoiceLineItem.objects.all():
+    items = list(ProformaInvoiceLineItem.objects.exclude(rate__isnull=True))
+    for item in items:
         item.rate_usd = item.rate
         item.amount_usd = item.amount
-        item.save(update_fields=['rate_usd', 'amount_usd'])
+    if items:
+        ProformaInvoiceLineItem.objects.bulk_update(items, ['rate_usd', 'amount_usd'], batch_size=500)
 
-    for charge in ProformaInvoiceCharge.objects.all():
+    charges = list(ProformaInvoiceCharge.objects.exclude(amount__isnull=True))
+    for charge in charges:
         charge.amount_usd = charge.amount
-        charge.save(update_fields=['amount_usd'])
+    if charges:
+        ProformaInvoiceCharge.objects.bulk_update(charges, ['amount_usd'], batch_size=500)
 
 
 class Migration(migrations.Migration):
