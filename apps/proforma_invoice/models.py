@@ -85,6 +85,8 @@ class ProformaInvoice(models.Model):
         blank=True,
     )
     vessel_flight_no = models.CharField(max_length=100, blank=True, default="")
+    kind_of_packages = models.CharField(max_length=100, blank=True, default="")
+    marks_and_nos = models.TextField(blank=True, default="")
     port_of_loading = models.ForeignKey(
         "master_data.Port",
         on_delete=models.PROTECT,
@@ -126,6 +128,11 @@ class ProformaInvoice(models.Model):
         on_delete=models.PROTECT,
         null=True,
         blank=True,
+    )
+    currency = models.ForeignKey(
+        "master_data.Currency",
+        on_delete=models.PROTECT,
+        help_text="Currency for all monetary values on this Proforma Invoice"
     )
     validity_for_acceptance = models.DateField(null=True, blank=True)
     validity_for_shipment = models.DateField(null=True, blank=True)
@@ -220,9 +227,9 @@ class ProformaInvoiceLineItem(models.Model):
         blank=True,
     )
     # Constraint #5: 2 decimal places for monetary amounts
-    rate_usd = models.DecimalField(max_digits=15, decimal_places=2)
+    rate = models.DecimalField(max_digits=15, decimal_places=2)
     # Stored so PDF reads it directly without re-multiplying; updated on every save
-    amount_usd = models.DecimalField(max_digits=15, decimal_places=2, editable=False)
+    amount = models.DecimalField(max_digits=15, decimal_places=2, editable=False)
 
     class Meta:
         db_table = "proforma_invoice_line_item"
@@ -230,7 +237,7 @@ class ProformaInvoiceLineItem(models.Model):
 
     def save(self, *args, **kwargs):
         # Recompute and store amount every time (no floating-point: Decimal arithmetic)
-        self.amount_usd = self.quantity * self.rate_usd
+        self.amount = self.quantity * self.rate
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -249,7 +256,7 @@ class ProformaInvoiceCharge(models.Model):
     )
     description = models.CharField(max_length=255)
     # Constraint #5: 2 decimal places for monetary amounts
-    amount_usd = models.DecimalField(max_digits=15, decimal_places=2)
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
 
     class Meta:
         db_table = "proforma_invoice_charge"
