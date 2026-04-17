@@ -59,6 +59,20 @@ def safe(v: Any, default: str = "") -> str:
     return default if v is None else str(v)
 
 
+def fmt_date(d: Any) -> str:
+    """Format date as DD/MMM/YYYY (e.g., 23/May/2026)."""
+    if d is None:
+        return ""
+    try:
+        # Handle date objects
+        if hasattr(d, 'strftime'):
+            return d.strftime("%d/%b/%Y")
+        # Handle string dates (already formatted)
+        return str(d)
+    except Exception:
+        return str(d)
+
+
 def _fmt_money(v: Any) -> str:
     """Format number as money - show decimals only if non-zero (max 2 decimal places)."""
     try:
@@ -305,18 +319,15 @@ def build_ci_story(ci, styles) -> list:
     ref_lines = []
     if pl:
         po_no = safe(getattr(pl, "po_number", ""))
-        po_date = safe(getattr(pl, "po_date", "")) if getattr(pl, "po_date", None) else ""
+        po_date = fmt_date(getattr(pl, "po_date", None))
         lc_no = safe(getattr(pl, "lc_number", ""))
-        lc_date = safe(getattr(pl, "lc_date", "")) if getattr(pl, "lc_date", None) else ""
+        lc_date = fmt_date(getattr(pl, "lc_date", None))
         bl_no = safe(getattr(pl, "bl_number", ""))
-        bl_date = safe(getattr(pl, "bl_date", "")) if getattr(pl, "bl_date", None) else ""
+        bl_date = fmt_date(getattr(pl, "bl_date", None))
         so_no = safe(getattr(pl, "so_number", ""))
-        so_date = safe(getattr(pl, "so_date", "")) if getattr(pl, "so_date", None) else ""
+        so_date = fmt_date(getattr(pl, "so_date", None))
         other_ref = safe(getattr(pl, "other_references", ""))
-        other_ref_date = (
-            safe(getattr(pl, "other_references_date", ""))
-            if getattr(pl, "other_references_date", None) else ""
-        )
+        other_ref_date = fmt_date(getattr(pl, "other_references_date", None))
         if po_no:
             ref_lines.append(f"<b>PO No/Date:</b> {po_no}{(' / ' + po_date) if po_date else ''}")
         if lc_no:
@@ -339,12 +350,43 @@ def build_ci_story(ci, styles) -> list:
     pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
     ci_number = safe(getattr(ci, "ci_number", ""))
 
+    # Get date for PI number if PI exists
+    pi_number_with_date = pi_number
+    if pi_obj:
+        pi_date = getattr(pi_obj, "pi_date", None)
+        if pi_date:
+            pi_number_with_date = f"{pi_number} {fmt_date(pi_date)}"
+
+    # Get date for CI number (approval date or current date for draft)
+    from apps.workflow.constants import APPROVED
+    ci_status = getattr(ci, "status", None)
+    if ci_status == APPROVED:
+        # Get approval date from audit log
+        ci_date_display = ""
+        try:
+            from apps.workflow.models import AuditLog
+            approval_log = AuditLog.objects.filter(
+                document_type="commercial_invoice",
+                document_id=ci.id,
+                action="APPROVE"
+            ).order_by("-created_at").first()
+            if approval_log:
+                ci_date_display = fmt_date(approval_log.created_at.date())
+        except Exception:
+            pass
+    else:
+        # Draft - use current date
+        from datetime import date
+        ci_date_display = fmt_date(date.today())
+
+    ci_number_with_date = f"{ci_number} {ci_date_display}" if ci_date_display else ci_number
+
     header_tbl = Table(
         [[
             Paragraph("<b>Exporter</b>", style_label),
             "",
-            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number}", style_text),
-            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number}", style_text),
+            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number_with_date}", style_text),
+            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text),
         ]],
         colWidths=[col_4, col_4, col_4, col_4],
     )
@@ -356,7 +398,7 @@ def build_ci_story(ci, styles) -> list:
     story.append(header_tbl)
 
     office_cell = _exp_cell("Corporate Office", corp_addr)
-    reg_cell = _exp_cell("Registered Address", reg_addr)
+    reg_cell = _exp_cell("Registered Office Address", reg_addr)
     factory_cell = _exp_cell("Factory Address", factory_addr)
 
     if factory_addr:
@@ -447,22 +489,6 @@ def build_ci_story(ci, styles) -> list:
     story.append(terms_tbl)
     story.append(Spacer(1, 12))
 
-    packages_map: dict = {}
-    if pl:
-        try:
-            for cont in pl.containers.all().order_by("id"):
-                for pitem in cont.items.all().order_by("id"):
-                    key = safe(getattr(pitem, "item_code", ""))
-                    val = safe(getattr(pitem, "packages_kind", ""))
-                    if not key:
-                        continue
-                    if key not in packages_map:
-                        packages_map[key] = set()
-                    if val:
-                        packages_map[key].add(val)
-        except Exception:
-            pass
-
     li_header = [
         Paragraph("<b>Sr.</b>", style_table_header),
         Paragraph("<b>HSN Code</b>", style_table_header),
@@ -479,13 +505,8 @@ def build_ci_story(ci, styles) -> list:
     idx = 0
     for it in ci.line_items.all().order_by("id"):
         idx += 1
-        pkg_text = ""
-        try:
-            pkset = packages_map.get(safe(getattr(it, "item_code", "")), None)
-            if pkset:
-                pkg_text = " ; ".join(sorted(pkset))
-        except Exception:
-            pass
+        # Use packages_kind directly from the CI line item (entered in Step 4 Final Rates)
+        pkg_text = safe(getattr(it, "packages_kind", ""))
 
         uom_obj = getattr(it, "uom", None)
         uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""

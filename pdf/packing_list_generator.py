@@ -84,6 +84,20 @@ def safe(v: Any, default: str = "") -> str:
     return default if v is None else str(v)
 
 
+def fmt_date(d: Any) -> str:
+    """Format date as DD/MMM/YYYY (e.g., 23/May/2026)."""
+    if d is None:
+        return ""
+    try:
+        # Handle date objects
+        if hasattr(d, 'strftime'):
+            return d.strftime("%d/%b/%Y")
+        # Handle string dates (already formatted)
+        return str(d)
+    except Exception:
+        return str(d)
+
+
 def _fmt_decimal(v: Optional[Decimal], places: int = 1) -> str:
     """Format a Decimal - show decimals only if not a whole number."""
     if v is None:
@@ -285,6 +299,13 @@ def build_pl_story(packing_list, styles):
     pi_obj = getattr(packing_list, "proforma_invoice", None)
     pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
 
+    # Add date to PI number if available
+    pi_number_with_date = pi_number
+    if pi_obj:
+        pi_date = getattr(pi_obj, "pi_date", None)
+        if pi_date:
+            pi_number_with_date = f"{pi_number} {fmt_date(pi_date)}"
+
     pl_number = safe(getattr(packing_list, "pl_number", ""))
 
     ci_number = ""
@@ -307,20 +328,20 @@ def build_pl_story(packing_list, styles):
         return f"<b>{label}</b><br/>{body}" if body else f"<b>{label}</b>"
 
     office_cell_html = _exp_cell("Corporate Office", office_addr)
-    reg_cell_html = _exp_cell("Registered Address", reg_addr)
+    reg_cell_html = _exp_cell("Registered Office Address", reg_addr)
     factory_cell_html = _exp_cell("Factory Address", factory_addr)
 
     ref_lines = []
     po_no = safe(getattr(packing_list, "po_number", ""))
-    po_date = safe(getattr(packing_list, "po_date", "")) if getattr(packing_list, "po_date", None) else ""
+    po_date = fmt_date(getattr(packing_list, "po_date", None))
     lc_no = safe(getattr(packing_list, "lc_number", ""))
-    lc_date = safe(getattr(packing_list, "lc_date", "")) if getattr(packing_list, "lc_date", None) else ""
+    lc_date = fmt_date(getattr(packing_list, "lc_date", None))
     bl_no = safe(getattr(packing_list, "bl_number", ""))
-    bl_date = safe(getattr(packing_list, "bl_date", "")) if getattr(packing_list, "bl_date", None) else ""
+    bl_date = fmt_date(getattr(packing_list, "bl_date", None))
     so_no = safe(getattr(packing_list, "so_number", ""))
-    so_date = safe(getattr(packing_list, "so_date", "")) if getattr(packing_list, "so_date", None) else ""
+    so_date = fmt_date(getattr(packing_list, "so_date", None))
     other_ref = safe(getattr(packing_list, "other_references", ""))
-    other_ref_date = safe(getattr(packing_list, "other_references_date", "")) if getattr(packing_list, "other_references_date", None) else ""
+    other_ref_date = fmt_date(getattr(packing_list, "other_references_date", None))
 
     if po_no:
         ref_lines.append(f"<b>PO No/Date:</b> {po_no}{' / ' + po_date if po_date else ''}")
@@ -341,11 +362,63 @@ def build_pl_story(packing_list, styles):
 
     col_4 = PAGE_W / 4
 
+    # Get date for PL number (approval date or current date for draft)
+    from apps.workflow.constants import APPROVED
+    pl_status = getattr(packing_list, "status", None)
+    if pl_status == APPROVED:
+        # Get approval date from audit log
+        pl_date_display = ""
+        try:
+            from apps.workflow.models import AuditLog
+            approval_log = AuditLog.objects.filter(
+                document_type="packing_list",
+                document_id=packing_list.id,
+                action="APPROVE"
+            ).order_by("-created_at").first()
+            if approval_log:
+                pl_date_display = fmt_date(approval_log.created_at.date())
+        except Exception:
+            pass
+    else:
+        # Draft - use current date
+        from datetime import date
+        pl_date_display = fmt_date(date.today())
+
+    pl_number_with_date = f"{pl_number} {pl_date_display}" if pl_date_display else pl_number
+
+    # Get date for CI number if CI exists
+    ci_number_with_date = "—"
+    if ci_number:
+        try:
+            ci_obj = packing_list.commercial_invoice
+            ci_status = getattr(ci_obj, "status", None)
+            if ci_status == APPROVED:
+                # Get approval date from audit log
+                ci_date_display = ""
+                try:
+                    from apps.workflow.models import AuditLog
+                    approval_log = AuditLog.objects.filter(
+                        document_type="commercial_invoice",
+                        document_id=ci_obj.id,
+                        action="APPROVE"
+                    ).order_by("-created_at").first()
+                    if approval_log:
+                        ci_date_display = fmt_date(approval_log.created_at.date())
+                except Exception:
+                    pass
+            else:
+                # Draft - use current date
+                from datetime import date
+                ci_date_display = fmt_date(date.today())
+            ci_number_with_date = f"{ci_number} {ci_date_display}" if ci_date_display else ci_number
+        except Exception:
+            ci_number_with_date = ci_number
+
     header_data = [[
         Paragraph("<b>Exporter</b>", style_label),
         "",
-        Paragraph(f"<b>Packing List No.</b><br/>{pl_number}", style_text),
-        Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number or '—'}", style_text),
+        Paragraph(f"<b>Packing List No.</b><br/>{pl_number_with_date}", style_text),
+        Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text),
     ]]
     header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
     header_tbl.setStyle(TableStyle(_GRID_STYLE + [

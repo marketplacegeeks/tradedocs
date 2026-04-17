@@ -2,8 +2,8 @@
 Combined Packing List + Commercial Invoice PDF generator (FR-14M.13).
 
 Produces a single in-memory PDF with two sections:
-  Section 1 — Packing List / Weight Note  (pages 1+)
-  Section 2 — Commercial Invoice          (starts on a new page)
+  Section 1 — Commercial Invoice          (pages 1+)
+  Section 2 — Packing List / Weight Note  (starts on a new page)
 
 Both sections use the pdf1/ reference layout from their respective story
 builders.  A PageBreak separates them inside a single SimpleDocTemplate so
@@ -21,11 +21,11 @@ from reportlab.pdfgen import canvas
 
 def generate_pl_ci_pdf(pl) -> io.BytesIO:
     """
-    Generate a combined Packing List + Commercial Invoice PDF.
+    Generate a combined Commercial Invoice + Packing List PDF.
     Returns an in-memory BytesIO buffer — constraint #20: never writes to disk.
 
-    Section 1 — Packing List (starts at page 1)
-    Section 2 — Commercial Invoice (starts on a new page after the PL)
+    Section 1 — Commercial Invoice (starts at page 1)
+    Section 2 — Packing List (starts on a new page after the CI)
     """
     try:
         ci = pl.commercial_invoice
@@ -42,30 +42,37 @@ def generate_pl_ci_pdf(pl) -> io.BytesIO:
         bottomMargin=20 * mm,
     )
 
-    # Import the story builders
+    # Import the story builders - CI first, then PL
+    story = []
+
+    # Section 1 — Commercial Invoice (if exists)
+    if ci is not None:
+        try:
+            from pdf.commercial_invoice_generator import _make_ci_styles, build_ci_story
+            ci_styles = _make_ci_styles()
+            story = build_ci_story(ci, ci_styles)
+        except ImportError:
+            pass
+
+    # Section 2 — Packing List (comes after CI)
     try:
         from pdf.packing_list_generator import _make_pl_styles, build_pl_story
         pl_styles = _make_pl_styles()
-        story = build_pl_story(pl, pl_styles)
+        if story:  # Add page break if CI was generated
+            story.append(PageBreak())
+        story += build_pl_story(pl, pl_styles)
     except ImportError:
         # Fallback: create minimal story if generators not available
         from reportlab.platypus import Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet
         styles = getSampleStyleSheet()
-        story = [
+        if story:
+            story.append(PageBreak())
+        story += [
             Paragraph("PACKING LIST", styles['Title']),
             Spacer(1, 12),
             Paragraph("Packing list content would appear here.", styles['Normal']),
         ]
-
-    if ci is not None:
-        try:
-            from pdf.commercial_invoice_generator import _make_ci_styles, build_ci_story
-            ci_styles = _make_ci_styles()
-            story.append(PageBreak())
-            story += build_ci_story(ci, ci_styles)
-        except ImportError:
-            pass
 
     from apps.workflow.constants import APPROVED as _APPROVED
     from reportlab.lib.colors import HexColor as _HexColor

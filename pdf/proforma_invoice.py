@@ -34,6 +34,20 @@ def safe(v: Any, default: str = "") -> str:
     return default if v is None else str(v)
 
 
+def fmt_date(d: Any) -> str:
+    """Format date as DD/MMM/YYYY (e.g., 23/May/2026)."""
+    if d is None:
+        return ""
+    try:
+        # Handle date objects
+        if hasattr(d, 'strftime'):
+            return d.strftime("%d/%b/%Y")
+        # Handle string dates (already formatted)
+        return str(d)
+    except Exception:
+        return str(d)
+
+
 def fmt_money(v: Any) -> str:
     """Format number as money with comma separators and exactly 2 decimal places."""
     try:
@@ -328,9 +342,9 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     final_country = safe(getattr(final_dest_obj, "name", "")) if final_dest_obj else ""
 
     pi_number = safe(getattr(invoice, "pi_number", ""))
-    pi_date = safe(getattr(invoice, "pi_date", ""))
+    pi_date = fmt_date(getattr(invoice, "pi_date", None))
     buyer_order_no = safe(getattr(invoice, "buyer_order_no", ""))
-    buyer_order_date = safe(getattr(invoice, "buyer_order_date", ""))
+    buyer_order_date = fmt_date(getattr(invoice, "buyer_order_date", None))
     other_references = safe(getattr(invoice, "other_references", ""))
 
     main_info_data = [
