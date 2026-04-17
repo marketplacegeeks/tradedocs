@@ -91,7 +91,7 @@ class CommercialInvoiceLineItem(models.Model):
     """
     Aggregated line item snapshot for a Commercial Invoice (FR-14M.8B / FR-14M.10).
     Rows are generated at CI creation time by grouping ContainerItems by item_code + uom.
-    amount_usd is stored and recomputed on every save (total_quantity × rate_usd).
+    amount is stored and recomputed on every save (total_quantity × rate).
     """
 
     ci = models.ForeignKey(
@@ -113,9 +113,9 @@ class CommercialInvoiceLineItem(models.Model):
     # Constraint #6: 3 decimal places for quantity
     total_quantity = models.DecimalField(max_digits=12, decimal_places=3)
     # Constraint #5: 2 decimal places for monetary amounts
-    rate_usd = models.DecimalField(max_digits=15, decimal_places=2)
-    # Stored computed value: total_quantity × rate_usd
-    amount_usd = models.DecimalField(
+    rate = models.DecimalField(max_digits=15, decimal_places=2)
+    # Stored computed value: total_quantity × rate
+    amount = models.DecimalField(
         max_digits=15, decimal_places=2, editable=False
     )
 
@@ -125,7 +125,7 @@ class CommercialInvoiceLineItem(models.Model):
 
     def save(self, *args, **kwargs):
         # Recompute and store amount every time (Decimal arithmetic — no float rounding).
-        self.amount_usd = self.total_quantity * self.rate_usd
+        self.amount = self.total_quantity * self.rate
         super().save(*args, **kwargs)
 
     def __str__(self):
