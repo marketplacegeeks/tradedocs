@@ -122,7 +122,7 @@ class CommercialInvoiceLineItemViewSet(viewsets.ModelViewSet):
     Line item updates for the Final Rates section (FR-14M.8B).
 
     GET  /ci-line-items/?ci={id}   — list line items for a CI
-    PATCH /ci-line-items/{id}/     — update rate_usd and/or packages_kind
+    PATCH /ci-line-items/{id}/     — update rate and/or packages_kind
     """
     permission_classes = [IsAnyRole]
     serializer_class = CommercialInvoiceLineItemSerializer
