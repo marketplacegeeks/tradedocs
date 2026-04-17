@@ -3,7 +3,7 @@ Serializers for CommercialInvoice and CommercialInvoiceLineItem.
 
 CommercialInvoice is created and workflow-transitioned via the PackingList endpoints.
 Direct writes are limited to financial fields (fob_rate, freight, insurance, lc_details,
-bank) via PATCH on the CI, and rate_usd / packages_kind on individual line items.
+bank) via PATCH on the CI, and rate / packages_kind on individual line items.
 """
 
 from rest_framework import serializers
@@ -22,18 +22,18 @@ class CommercialInvoiceLineItemSerializer(serializers.ModelSerializer):
             "id", "ci",
             "item_code", "description", "hsn_code", "packages_kind",
             "uom", "uom_abbr",
-            "total_quantity", "rate_usd", "amount_usd",
+            "total_quantity", "rate", "amount",
         ]
         read_only_fields = [
             "id", "ci",
             "item_code", "description", "hsn_code",
-            "uom", "uom_abbr", "total_quantity", "amount_usd",
+            "uom", "uom_abbr", "total_quantity", "amount",
         ]
 
     def get_uom_abbr(self, obj):
         return obj.uom.abbreviation if obj.uom_id else None
 
-    def validate_rate_usd(self, value):
+    def validate_rate(self, value):
         if value < 0:
             raise serializers.ValidationError("Rate must be zero or greater.")
         # Reject more than 2 decimal places
@@ -50,6 +50,7 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
     # Display labels
     pl_number_display = serializers.SerializerMethodField()
     bank_display = serializers.SerializerMethodField()
+    currency_display = serializers.SerializerMethodField()
     bank_details = serializers.SerializerMethodField()
     signed_copy_url = serializers.SerializerMethodField()
 
@@ -58,7 +59,7 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "ci_number", "ci_date", "status",
             "packing_list", "pl_number_display",
-            "bank", "bank_display", "bank_details",
+            "bank", "bank_display", "currency_display", "bank_details",
             "fob_rate", "freight", "insurance", "lc_details",
             "created_by", "created_at", "updated_at",
             # Signed copy (FR-08.4)
@@ -77,6 +78,17 @@ class CommercialInvoiceSerializer(serializers.ModelSerializer):
     def get_bank_display(self, obj):
         if obj.bank_id:
             return f"{obj.bank.bank_name} – {obj.bank.beneficiary_name}"
+        return None
+
+    def get_currency_display(self, obj):
+        """Return currency from linked PI for display."""
+        pi = obj.packing_list.proforma_invoice if obj.packing_list else None
+        if pi and pi.currency:
+            return {
+                "id": pi.currency.id,
+                "code": pi.currency.code,
+                "name": pi.currency.name
+            }
         return None
 
     def get_signed_copy_url(self, obj):

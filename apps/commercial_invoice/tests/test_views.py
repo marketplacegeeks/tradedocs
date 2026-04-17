@@ -141,12 +141,12 @@ class TestCILineItemUpdate:
         li = CommercialInvoiceLineItemFactory(ci=ci)
         resp = auth_client(maker).patch(
             line_item_detail_url(li.pk),
-            {"rate_usd": "250.00"},
+            {"rate": "250.00"},
             format="json",
         )
         assert resp.status_code == 200
         li.refresh_from_db()
-        assert li.rate_usd == Decimal("250.00")
+        assert li.rate == Decimal("250.00")
 
     def test_cannot_update_rate_when_approved(self):
         maker = MakerFactory()
@@ -155,7 +155,7 @@ class TestCILineItemUpdate:
         li = CommercialInvoiceLineItemFactory(ci=ci)
         resp = auth_client(maker).patch(
             line_item_detail_url(li.pk),
-            {"rate_usd": "999.00"},
+            {"rate": "999.00"},
             format="json",
         )
         assert resp.status_code == 400
@@ -181,7 +181,7 @@ class TestCILineItemUpdate:
         li = CommercialInvoiceLineItemFactory(ci=ci)
         resp = auth_client(maker).patch(
             line_item_detail_url(li.pk),
-            {"rate_usd": "-10.00"},
+            {"rate": "-10.00"},
             format="json",
         )
         assert resp.status_code == 400

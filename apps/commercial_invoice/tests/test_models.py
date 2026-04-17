@@ -1,6 +1,6 @@
 """
 Model tests for apps.commercial_invoice (FR-14M).
-Covers: computed amount_usd, field defaults, __str__, constraint behaviour.
+Covers: computed amount, field defaults, __str__, constraint behaviour.
 """
 from decimal import Decimal
 
@@ -57,26 +57,26 @@ class TestCommercialInvoiceModel:
 
 @pytest.mark.django_db
 class TestCommercialInvoiceLineItemModel:
-    def test_amount_usd_computed_on_save(self):
+    def test_amount_computed_on_save(self):
         item = CommercialInvoiceLineItemFactory(
             total_quantity=Decimal("100.000"),
-            rate_usd=Decimal("5.50"),
+            rate=Decimal("5.50"),
         )
         item.refresh_from_db()
-        assert item.amount_usd == Decimal("550.00")
+        assert item.amount == Decimal("550.00")
 
-    def test_amount_usd_updates_on_resave(self):
+    def test_amount_updates_on_resave(self):
         item = CommercialInvoiceLineItemFactory(
             total_quantity=Decimal("10.000"),
-            rate_usd=Decimal("20.00"),
+            rate=Decimal("20.00"),
         )
         item.refresh_from_db()
-        assert item.amount_usd == Decimal("200.00")
+        assert item.amount == Decimal("200.00")
 
-        item.rate_usd = Decimal("25.00")
+        item.rate = Decimal("25.00")
         item.save()
         item.refresh_from_db()
-        assert item.amount_usd == Decimal("250.00")
+        assert item.amount == Decimal("250.00")
 
     def test_str_includes_ci_number_and_item_code(self):
         item = CommercialInvoiceLineItemFactory(item_code="PROD-X")

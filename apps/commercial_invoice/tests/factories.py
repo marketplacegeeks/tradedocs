@@ -37,7 +37,7 @@ class CommercialInvoiceLineItemFactory(factory.django.DjangoModelFactory):
     total_quantity = factory.Faker(
         "pydecimal", left_digits=4, right_digits=3, positive=True
     )
-    rate_usd = factory.Faker(
+    rate = factory.Faker(
         "pydecimal", left_digits=5, right_digits=2, positive=True
     )
-    # amount_usd is computed on save — do not set here
+    # amount is computed on save — do not set here
