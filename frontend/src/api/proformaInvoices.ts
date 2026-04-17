@@ -4,6 +4,12 @@ import axiosInstance from "./axiosInstance";
 
 // ---- Types ------------------------------------------------------------------
 
+export interface CurrencyDisplay {
+  id: number;
+  code: string;
+  name: string;
+}
+
 export interface ProformaInvoiceLineItem {
   id: number;
   hsn_code: string;
@@ -11,26 +17,33 @@ export interface ProformaInvoiceLineItem {
   description: string;
   quantity: string;
   uom: number | null;
-  rate_usd: string;
-  amount_usd: string;
+  uom_display?: any;
+  rate: string;
+  amount: string;
 }
 
 export interface ProformaInvoiceCharge {
   id: number;
   description: string;
-  amount_usd: string;
+  amount: string;
 }
 
 export interface ProformaInvoice {
   id: number;
   pi_number: string;
   pi_date: string;
+  status: string;
+
   exporter: number;
-  exporter_name: string;
+  exporter_display?: any;
   consignee: number;
-  consignee_name: string;
+  consignee_display?: any;
   buyer: number | null;
-  buyer_name: string | null;
+  buyer_display?: any;
+
+  currency: number;
+  currency_display?: CurrencyDisplay;
+
   buyer_order_no: string;
   buyer_order_date: string | null;
   other_references: string;
@@ -39,6 +52,8 @@ export interface ProformaInvoice {
   pre_carriage_by: number | null;
   place_of_receipt: number | null;
   vessel_flight_no: string;
+  kind_of_packages: string;
+  marks_and_nos: string;
   port_of_loading: number | null;
   port_of_discharge: number | null;
   final_destination: number | null;
@@ -71,7 +86,6 @@ export interface ProformaInvoice {
   linked_pl_number: string | null;
   line_items: ProformaInvoiceLineItem[];
   charges: ProformaInvoiceCharge[];
-  status: string;
   created_by: number;
   created_by_name: string;
   created_at: string;
@@ -89,10 +103,44 @@ export interface AuditLogEntry {
   performed_at: string;
 }
 
+export interface CreateProformaInvoicePayload {
+  exporter: number;
+  consignee: number;
+  buyer?: number | null;
+  currency: number;
+  pi_date?: string;
+  buyer_order_no?: string;
+  buyer_order_date?: string | null;
+  other_references?: string;
+  country_of_origin?: number | null;
+  country_of_final_destination?: number | null;
+  pre_carriage_by?: number | null;
+  place_of_receipt?: number | null;
+  vessel_flight_no?: string;
+  kind_of_packages?: string;
+  marks_and_nos?: string;
+  port_of_loading?: number | null;
+  port_of_discharge?: number | null;
+  final_destination?: number | null;
+  payment_terms?: number | null;
+  incoterms?: number | null;
+  bank?: number | null;
+  validity_for_acceptance?: string | null;
+  validity_for_shipment?: string | null;
+  partial_shipment?: string;
+  transshipment?: string;
+  tc_template?: number | null;
+  tc_content?: string;
+  freight?: string | null;
+  insurance_amount?: string | null;
+  import_duty?: string | null;
+  destination_charges?: string | null;
+}
+
 export type ProformaInvoicePayload = Partial<Omit<ProformaInvoice,
   "id" | "pi_number" | "status" | "created_by" | "created_by_name" | "created_at" | "updated_at"
   | "line_items" | "charges" | "line_items_total" | "charges_total" | "grand_total" | "invoice_total"
-  | "incoterms_code"
+  | "incoterms_code" | "exporter_display" | "consignee_display" | "buyer_display" | "currency_display"
 >>;
 
 // ---- API functions ----------------------------------------------------------
@@ -119,11 +167,11 @@ export function listLineItems(piId: number) {
   return axiosInstance.get<ProformaInvoiceLineItem[]>(`/proforma-invoices/${piId}/line-items/`).then(r => r.data);
 }
 
-export function createLineItem(piId: number, data: Omit<ProformaInvoiceLineItem, "id" | "amount_usd">) {
+export function createLineItem(piId: number, data: Omit<ProformaInvoiceLineItem, "id" | "amount">) {
   return axiosInstance.post<ProformaInvoiceLineItem>(`/proforma-invoices/${piId}/line-items/`, data).then(r => r.data);
 }
 
-export function updateLineItem(piId: number, lid: number, data: Partial<Omit<ProformaInvoiceLineItem, "id" | "amount_usd">>) {
+export function updateLineItem(piId: number, lid: number, data: Partial<Omit<ProformaInvoiceLineItem, "id" | "amount">>) {
   return axiosInstance.patch<ProformaInvoiceLineItem>(`/proforma-invoices/${piId}/line-items/${lid}/`, data).then(r => r.data);
 }
 
