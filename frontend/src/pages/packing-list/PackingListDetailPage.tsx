@@ -328,7 +328,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
   const [editingPkg, setEditingPkg] = useState<{ id: number; value: string } | null>(null);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { rate_usd?: string; packages_kind?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { rate?: string; packages_kind?: string } }) =>
       updateCILineItem(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", ciId] });
@@ -417,8 +417,8 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                           value={editingRate.value}
                           onChange={(e) => setEditingRate({ id: li.id, value: e.target.value })}
                           onBlur={() => {
-                            if (editingRate.value !== li.rate_usd) {
-                              updateMutation.mutate({ id: li.id, data: { rate_usd: editingRate.value } });
+                            if (editingRate.value !== li.rate) {
+                              updateMutation.mutate({ id: li.id, data: { rate: editingRate.value } });
                             }
                             setEditingRate(null);
                           }}
@@ -434,9 +434,9 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                       <span
                         style={{ cursor: isEditable ? "pointer" : "default", color: isEditable ? "var(--primary)" : "inherit" }}
                         title={isEditable ? "Click to edit rate" : undefined}
-                        onClick={() => isEditable && setEditingRate({ id: li.id, value: li.rate_usd })}
+                        onClick={() => isEditable && setEditingRate({ id: li.id, value: li.rate })}
                       >
-                        {fmtNum(li.rate_usd)}
+                        {fmtNum(li.rate)}
                         {li.uom_abbr && (
                           <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
                             / {li.uom_abbr}
@@ -445,7 +445,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ ...TD, fontWeight: 600 }}>{currencyCode} {fmtNum(li.amount_usd)}</td>
+                  <td style={{ ...TD, fontWeight: 600 }}>{currencyCode} {fmtNum(li.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -456,7 +456,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
       <div style={CARD}>
         {(() => {
           const incotermCode = pl.incoterms_display?.split("–")[0]?.trim() ?? null;
-          const itemTotal = ci.line_items.reduce((sum, li) => sum + (parseFloat(li.amount_usd as any) || 0), 0);
+          const itemTotal = ci.line_items.reduce((sum, li) => sum + (parseFloat(li.amount as any) || 0), 0);
           const freightAmt = parseFloat(ci.freight as any) || 0;
           const insuranceAmt = parseFloat(ci.insurance as any) || 0;
           // Invoice Total = line item amounts only (freight/insurance are reference figures on the CI PDF)

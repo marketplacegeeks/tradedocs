@@ -256,7 +256,7 @@ export default function PackingListEditPage() {
 
       // Save rates
       for (const [idStr, rate] of Object.entries(rateForm)) {
-        await updateCILineItem(Number(idStr), { rate_usd: rate });
+        await updateCILineItem(Number(idStr), { rate: rate });
       }
 
       queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
@@ -629,7 +629,7 @@ export default function PackingListEditPage() {
             </thead>
             <tbody>
               {ci.line_items.map((li) => {
-                const rate = rateForm[li.id] ?? li.rate_usd;
+                const rate = rateForm[li.id] ?? li.rate;
                 const amount = (parseFloat(li.total_quantity) * parseFloat(rate || "0")).toFixed(2);
                 return (
                   <tr key={li.id}>
