@@ -71,9 +71,9 @@ function exportToCsv(rows: ConsigneeSummaryRow[]) {
     "Consignee",
     "PI Count",
     "CI Count",
-    "Total PI Value (USD)",
-    "Total CI Value (USD)",
-    "Combined Total (USD)",
+    "Total PI Value",
+    "Total CI Value",
+    "Combined Total",
     "Latest Document Date",
   ];
 
@@ -238,7 +238,7 @@ export default function R05ConsigneeBusinessSummary({ selectedReport }: Props) {
       ),
     },
     {
-      title: "Total PI Value (USD)",
+      title: "Total PI Value",
       dataIndex: "total_pi_value",
       key: "total_pi_value",
       width: 175,
@@ -248,7 +248,7 @@ export default function R05ConsigneeBusinessSummary({ selectedReport }: Props) {
       render: (val: string) => fmtUSD(val),
     },
     {
-      title: "Total CI Value (USD)",
+      title: "Total CI Value",
       dataIndex: "total_ci_value",
       key: "total_ci_value",
       width: 175,
@@ -258,7 +258,7 @@ export default function R05ConsigneeBusinessSummary({ selectedReport }: Props) {
       render: (val: string) => fmtUSD(val),
     },
     {
-      title: "Combined Total (USD)",
+      title: "Combined Total",
       dataIndex: "total_value",
       key: "total_value",
       width: 185,

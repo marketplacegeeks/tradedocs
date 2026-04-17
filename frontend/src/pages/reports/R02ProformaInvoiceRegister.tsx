@@ -73,7 +73,7 @@ function exportToCsv(rows: ProformaInvoice[]) {
     "Country of Origin", "Country of Destination",
     "Port of Loading", "Port of Discharge",
     "Incoterms", "Payment Terms", "Buyer Order No",
-    "Grand Total (USD)", "Invoice Total (USD)",
+    "Grand Total", "Invoice Total",
     "Validity for Acceptance", "Validity for Shipment",
     "Linked PL Number", "Status", "Created By",
   ];
@@ -89,8 +89,9 @@ function exportToCsv(rows: ProformaInvoice[]) {
 
   const csvLines = [
     headers.join(","),
-    ...rows.map((pi) =>
-      [
+    ...rows.map((pi) => {
+      const currency = pi.currency_display?.code || "USD";
+      return [
         pi.pi_number,
         pi.pi_date,
         pi.exporter_name,
@@ -103,8 +104,8 @@ function exportToCsv(rows: ProformaInvoice[]) {
         pi.incoterms_code,
         pi.payment_terms_name,
         pi.buyer_order_no,
-        pi.grand_total,
-        pi.invoice_total,
+        `${currency} ${pi.grand_total}`,
+        `${currency} ${pi.invoice_total}`,
         pi.validity_for_acceptance,
         pi.validity_for_shipment,
         pi.linked_pl_number,
@@ -112,8 +113,8 @@ function exportToCsv(rows: ProformaInvoice[]) {
         pi.created_by_name,
       ]
         .map(escape)
-        .join(",")
-    ),
+        .join(",");
+    }),
   ];
 
   const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -288,25 +289,29 @@ export default function R02ProformaInvoiceRegister({ selectedReport }: Props) {
       render: (val: string) => val || "—",
     },
     {
-      title: "Grand Total (USD)",
+      title: "Grand Total",
       dataIndex: "grand_total",
       key: "grand_total",
       width: 150,
       sorter: (a: ProformaInvoice, b: ProformaInvoice) =>
         parseFloat(a.grand_total) - parseFloat(b.grand_total),
-      render: (val: string) =>
-        parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      render: (val: string, record: ProformaInvoice) => {
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {
-      title: "Invoice Total (USD)",
+      title: "Invoice Total",
       dataIndex: "invoice_total",
       key: "invoice_total",
       width: 155,
       sorter: (a: ProformaInvoice, b: ProformaInvoice) =>
         parseFloat(a.invoice_total) - parseFloat(b.invoice_total),
-      render: (val: string) =>
-        parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      render: (val: string, record: ProformaInvoice) => {
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {

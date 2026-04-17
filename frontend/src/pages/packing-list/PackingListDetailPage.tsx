@@ -2,8 +2,8 @@
 // Tabbed layout: Document Header | Containers & Items | Final Rates | Bank & Payment
 // Plus workflow action buttons, audit trail drawer.
 
-// Convert a USD amount to words, e.g. 1234.56 → "One Thousand Two Hundred Thirty-Four US Dollars and Fifty-Six Cents Only"
-function amountToWords(amount: number): string {
+// Convert an amount to words with currency name
+function amountToWords(amount: number, currencyName: string = "US Dollars"): string {
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
     "Eighteen", "Nineteen"];
@@ -23,7 +23,7 @@ function amountToWords(amount: number): string {
   const cents = Math.round((rounded - dollars) * 100);
   const dollarWords = dollars === 0 ? "Zero" : toWords(dollars);
   const centsText = cents > 0 ? ` and ${toWords(cents)} Cents` : "";
-  return `${dollarWords} US Dollars${centsText} Only`;
+  return `${dollarWords} ${currencyName}${centsText} Only`;
 }
 
 // Strip trailing zeros: 12.000 → "12", 12.500 → "12.5", 12.55 → "12.55"
@@ -493,7 +493,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
               </div>
 
               <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: ci.lc_details ? 16 : 0 }}>
-                <strong>Amount in Words:</strong> {amountToWords(invoiceTotal)}
+                <strong>Amount in Words:</strong> {amountToWords(invoiceTotal, ci.currency_display?.name ?? "US Dollars")}
               </div>
 
               {ci.lc_details && (

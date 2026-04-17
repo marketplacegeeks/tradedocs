@@ -103,6 +103,7 @@ class PackingListSerializer(serializers.ModelSerializer):
     ci_date = serializers.SerializerMethodField()
     bank_id = serializers.SerializerMethodField()
     bank_display = serializers.SerializerMethodField()
+    currency_display = serializers.SerializerMethodField()
     fob_rate = serializers.SerializerMethodField()
     freight = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
@@ -161,7 +162,7 @@ class PackingListSerializer(serializers.ModelSerializer):
             "payment_terms", "payment_terms_display",
             # CI fields (read-only here)
             "ci_id", "ci_number", "ci_status", "ci_date",
-            "bank_id", "bank_display",
+            "bank_id", "bank_display", "currency_display",
             "fob_rate", "freight", "insurance", "lc_details",
             # R-03 report computed fields
             "ci_total", "fob_value", "incoterms_code",
@@ -219,6 +220,13 @@ class PackingListSerializer(serializers.ModelSerializer):
         if ci and ci.bank_id:
             b = ci.bank
             return f"{b.bank_name} – {b.beneficiary_name}"
+        return None
+
+    def get_currency_display(self, obj):
+        """Return currency from linked PI via CI for display."""
+        pi = obj.proforma_invoice
+        if pi and pi.currency:
+            return {"id": pi.currency.id, "code": pi.currency.code, "name": pi.currency.name}
         return None
 
     def get_fob_rate(self, obj):

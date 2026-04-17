@@ -80,7 +80,7 @@ function exportToCsv(rows: CommoditySalesRow[]) {
     "Consignee", "Country of Destination",
     "HSN Code", "Item Code", "Description",
     "Quantity", "UOM",
-    "Rate (USD)", "Amount (USD)",
+    "Rate", "Amount",
     "Incoterms", "Port of Loading",
   ];
 
@@ -278,7 +278,7 @@ export default function R04CommoditySalesReport({ selectedReport }: Props) {
       render: (val: string | null) => val ?? "—",
     },
     {
-      title: "Rate (USD)",
+      title: "Rate",
       dataIndex: "rate_usd",
       key: "rate_usd",
       width: 115,
@@ -292,7 +292,7 @@ export default function R04CommoditySalesReport({ selectedReport }: Props) {
         }),
     },
     {
-      title: "Amount (USD)",
+      title: "Amount",
       dataIndex: "amount_usd",
       key: "amount_usd",
       width: 125,

@@ -98,7 +98,7 @@ function exportToCsv(rows: PackingList[]) {
     "Vessel / Flight No", "BL Number", "BL Date",
     "Incoterms", "Payment Terms",
     "Total Net Weight (MT)", "Total Gross Weight (MT)", "No. of Containers",
-    "CI Total (USD)", "FOB Value (USD)", "Freight (USD)", "Insurance (USD)",
+    "CI Total", "FOB Value", "Freight", "Insurance",
     "Status", "Created By",
   ];
 
@@ -113,8 +113,9 @@ function exportToCsv(rows: PackingList[]) {
 
   const csvLines = [
     headers.join(","),
-    ...rows.map((pl) =>
-      [
+    ...rows.map((pl) => {
+      const currency = pl.currency_display?.code || "USD";
+      return [
         pl.pl_number,
         pl.ci_number,
         pl.pi_number_display,
@@ -133,16 +134,16 @@ function exportToCsv(rows: PackingList[]) {
         totalNetWeight(pl),
         totalGrossWeight(pl),
         pl.containers.length,
-        pl.ci_total,
-        pl.fob_value,
-        pl.freight,
-        pl.insurance,
+        pl.ci_total ? `${currency} ${pl.ci_total}` : "",
+        pl.fob_value ? `${currency} ${pl.fob_value}` : "",
+        pl.freight ? `${currency} ${pl.freight}` : "",
+        pl.insurance ? `${currency} ${pl.insurance}` : "",
         DOCUMENT_STATUS_LABELS[pl.status as keyof typeof DOCUMENT_STATUS_LABELS] ?? pl.status,
         pl.created_by_name,
       ]
         .map(escape)
-        .join(",")
-    ),
+        .join(",");
+    }),
   ];
 
   const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -348,49 +349,53 @@ export default function R03ShipmentRegister({ selectedReport }: Props) {
       align: "right" as const,
     },
     {
-      title: "CI Total (USD)",
+      title: "CI Total",
       dataIndex: "ci_total",
       key: "ci_total",
       width: 135,
       sorter: (a: PackingList, b: PackingList) =>
         parseFloat(a.ci_total ?? "0") - parseFloat(b.ci_total ?? "0"),
-      render: (val: string | null) =>
-        val != null
-          ? parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "—",
+      render: (val: string | null, record: PackingList) => {
+        if (!val) return "—";
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {
-      title: "FOB Value (USD)",
+      title: "FOB Value",
       dataIndex: "fob_value",
       key: "fob_value",
       width: 140,
-      render: (val: string | null) =>
-        val != null
-          ? parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "—",
+      render: (val: string | null, record: PackingList) => {
+        if (!val) return "—";
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {
-      title: "Freight (USD)",
+      title: "Freight",
       dataIndex: "freight",
       key: "freight",
       width: 125,
-      render: (val: string | null) =>
-        val != null
-          ? parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "—",
+      render: (val: string | null, record: PackingList) => {
+        if (!val) return "—";
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {
-      title: "Insurance (USD)",
+      title: "Insurance",
       dataIndex: "insurance",
       key: "insurance",
       width: 135,
-      render: (val: string | null) =>
-        val != null
-          ? parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "—",
+      render: (val: string | null, record: PackingList) => {
+        if (!val) return "—";
+        const currency = record.currency_display?.code || "USD";
+        return `${currency} ${parseFloat(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      },
       align: "right" as const,
     },
     {

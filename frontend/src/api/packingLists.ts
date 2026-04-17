@@ -89,6 +89,7 @@ export interface PackingList {
   ci_date: string | null;
   bank_id: number | null;
   bank_display: string | null;
+  currency_display?: CurrencyDisplay;
   fob_rate: string | null;
   freight: string | null;
   insurance: string | null;
