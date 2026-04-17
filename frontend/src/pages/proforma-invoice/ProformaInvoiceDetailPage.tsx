@@ -310,7 +310,7 @@ export default function ProformaInvoiceDetailPage() {
             </colgroup>
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
-                {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM", "Rate (USD)", "Amount (USD)", canEdit ? "" : null]
+                {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM", `Rate (${currencyCode})`, `Amount (${currencyCode})`, canEdit ? "" : null]
                   .filter(Boolean)
                   .map((h) => (
                     <th key={h} style={{ ...TD, fontWeight: 600, fontSize: 11, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>

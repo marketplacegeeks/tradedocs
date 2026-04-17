@@ -347,6 +347,9 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
     );
   }
 
+  // Get the currency code from the CI (defaults to "USD" if not available)
+  const currencyCode = ci.currency_display?.code ?? "USD";
+
   return (
     <>
       <div style={CARD}>
@@ -365,8 +368,8 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                 <th style={TH}>No. & Kind of Pkgs</th>
                 <th style={TH}>Total Qty</th>
                 <th style={TH}>UOM</th>
-                <th style={TH}>Rate (USD)</th>
-                <th style={TH}>Amount (USD)</th>
+                <th style={TH}>Rate ({currencyCode})</th>
+                <th style={TH}>Amount ({currencyCode})</th>
               </tr>
             </thead>
             <tbody>
@@ -423,7 +426,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                         />
                         {li.uom_abbr && (
                           <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
-                            USD per {li.uom_abbr}
+                            {currencyCode} per {li.uom_abbr}
                           </div>
                         )}
                       </>
@@ -442,7 +445,7 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ ...TD, fontWeight: 600 }}>{fmtMoney(li.amount_usd)}</td>
+                  <td style={{ ...TD, fontWeight: 600 }}>{currencyCode} {fmtNum(li.amount_usd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -468,25 +471,25 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                 </p>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Invoice Value (Line Items)</span>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{currencyCode} {fmt(itemTotal)}</span>
                 </div>
                 {ci.freight && (
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(freightAmt)}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight ({currencyCode})</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{currencyCode} {fmt(freightAmt)}</span>
                   </div>
                 )}
                 {ci.insurance && (
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(insuranceAmt)}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance ({currencyCode})</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{currencyCode} {fmt(insuranceAmt)}</span>
                   </div>
                 )}
               </div>
 
               <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
-                <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>${fmt(invoiceTotal)}</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{currencyCode} {fmt(invoiceTotal)}</span>
               </div>
 
               <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: ci.lc_details ? 16 : 0 }}>
