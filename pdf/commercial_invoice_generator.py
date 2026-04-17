@@ -13,10 +13,10 @@ Field mapping summary (pdf1/ attribute → actual model field):
   invoice.pre_carriage       → invoice.packing_list.pre_carriage_by
   it.hs_code                 → it.hsn_code
   it.quantity                → it.total_quantity
-  it.unit_price_usd          → it.rate_usd
+  it.unit_price_usd          → it.rate
   it.unit (string)           → it.uom.abbreviation  (UOM FK)
   pitem.packages_number_and_kind → pitem.packages_kind
-  invoice.total_amount_usd   → computed: sum(li.amount_usd for li in ci.line_items.all())
+  invoice.total_amount_usd   → computed: sum(li.amount for li in ci.line_items.all())
   containers (is_active)     → no is_active on Container; use .all().order_by("id")
 
 Constraint #20: generate_commercial_invoice_pdf_bytes() returns bytes in-memory — never
@@ -248,6 +248,10 @@ def build_ci_story(ci, styles) -> list:
     cons = getattr(pl, "consignee", None) if pl else None
     buyer = getattr(pl, "buyer", None) if pl else None
     notify_party_org = getattr(pl, "notify_party", None) if pl else None
+
+    # Get currency from linked PI (mandatory - no fallback)
+    pi = getattr(pl, "proforma_invoice", None) if pl else None
+    currency_code = pi.currency.code if pi else "USD"  # Temporary fallback for safety
 
     story.append(Paragraph(safe(getattr(exp, "name", "")), style_company_header))
     story.append(Paragraph("COMMERCIAL INVOICE", style_title))
@@ -496,11 +500,11 @@ def build_ci_story(ci, styles) -> list:
         Paragraph("<b>Item Code</b>", style_table_header),
         Paragraph("<b>Description of Goods</b>", style_table_header),
         Paragraph("<b>Qty</b>", style_table_header),
-        Paragraph("<b>Rate (USD)</b>", style_table_header),
-        Paragraph("<b>Amount (USD)</b>", style_table_header),
+        Paragraph(f"<b>Rate ({currency_code})</b>", style_table_header),
+        Paragraph(f"<b>Amount ({currency_code})</b>", style_table_header),
     ]
     li_rows = [li_header]
-    total_amount_usd = Decimal("0.00")
+    line_items_total = Decimal("0.00")
 
     idx = 0
     for it in ci.line_items.all().order_by("id"):
@@ -511,12 +515,12 @@ def build_ci_story(ci, styles) -> list:
         uom_obj = getattr(it, "uom", None)
         uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
         qty_val = getattr(it, "total_quantity", None)
-        rate_val = getattr(it, "rate_usd", None)
-        amount_val = getattr(it, "amount_usd", None)
+        rate_val = getattr(it, "rate", None)
+        amount_val = getattr(it, "amount", None)
 
         if amount_val is not None:
             try:
-                total_amount_usd += Decimal(str(amount_val))
+                line_items_total += Decimal(str(amount_val))
             except Exception:
                 pass
 
@@ -597,7 +601,7 @@ def build_ci_story(ci, styles) -> list:
             show_insurance = True
         except Exception:
             pass
-    invoice_total = total_amount_usd + freight_amount + insurance_amount
+    invoice_total = line_items_total + freight_amount + insurance_amount
 
     # Build left cell: net/gross weight stacked, then optional L/C Details below
     left_inner_rows = [
@@ -626,17 +630,17 @@ def build_ci_story(ci, styles) -> list:
         # Header spans both sub-columns
         [Paragraph(f"<b>{breakdown_header}</b>", style_text), Paragraph("", style_text)],
         [Paragraph("FOB Value (Line Items):", style_text),
-         Paragraph(f"USD {_fmt_money(total_amount_usd)}", style_amt)],
+         Paragraph(f"{currency_code} {_fmt_money(line_items_total)}", style_amt)],
     ]
     if show_freight:
         breakdown_rows.append([
             Paragraph("Freight:", style_text),
-            Paragraph(f"USD {_fmt_money(freight_amount)}", style_amt),
+            Paragraph(f"{currency_code} {_fmt_money(freight_amount)}", style_amt),
         ])
     if show_insurance:
         breakdown_rows.append([
             Paragraph("Insurance Amount:", style_text),
-            Paragraph(f"USD {_fmt_money(insurance_amount)}", style_amt),
+            Paragraph(f"{currency_code} {_fmt_money(insurance_amount)}", style_amt),
         ])
 
     # Inner widths must fit inside the 90mm outer cell (12mm used by outer padding)
@@ -670,7 +674,7 @@ def build_ci_story(ci, styles) -> list:
     invoice_total_tbl = Table(
         [[
             Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
-            Paragraph(f"<b>${_fmt_money(invoice_total)}</b>", style_label),
+            Paragraph(f"<b>{currency_code} {_fmt_money(invoice_total)}</b>", style_label),
         ]],
         colWidths=[140 * mm, 40 * mm],
     )
@@ -689,7 +693,7 @@ def build_ci_story(ci, styles) -> list:
     story.append(invoice_total_tbl)
     story.append(Spacer(1, 6))
 
-    amount_in_words_str = _amount_to_words(invoice_total, currency="USD")
+    amount_in_words_str = _amount_to_words(invoice_total, currency=currency_code)
     if amount_in_words_str:
         style_text_center = ParagraphStyle(
             "CITextCenter", parent=style_text, alignment=TA_CENTER,
