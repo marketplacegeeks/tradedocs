@@ -636,26 +636,6 @@ function Step1({
         </div>
       </div>
 
-      {/* ── Incoterms & Payment Terms ── */}
-      <div style={CARD}>
-        <p style={SECTION_TITLE}>Incoterms &amp; Payment Terms</p>
-        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
-          <div>
-            <label style={LABEL}>Incoterms</label>
-            <Select allowClear showSearch style={{ width: "100%" }} value={form.incoterms}
-              onChange={(v) => setForm({ ...form, incoterms: v })}
-              options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
-              optionFilterProp="label" />
-          </div>
-          <div>
-            <label style={LABEL}>Payment Terms</label>
-            <Select allowClear showSearch style={{ width: "100%" }} value={form.payment_terms}
-              onChange={(v) => setForm({ ...form, payment_terms: v })}
-              options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))}
-              optionFilterProp="label" />
-          </div>
-        </div>
-      </div>
 
       {/* ── Countries ── */}
       <div style={CARD}>
@@ -1579,6 +1559,8 @@ function Step4({
   const [saving, setSaving] = useState(false);
 
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
+  const { data: incoterms = [] } = useQuery({ queryKey: ["incoterms"], queryFn: listIncoterms });
+  const { data: paymentTerms = [] } = useQuery({ queryKey: ["payment-terms"], queryFn: listPaymentTerms });
 
   const { data: ci } = useQuery({
     queryKey: ["commercial-invoice", pl.ci_id],
@@ -1597,6 +1579,9 @@ function Step4({
     insurance: "",
     lc_details: "",
   });
+  // Local state for incoterms and payment terms
+  const [selectedIncoterms, setSelectedIncoterms] = useState<number | null>(pl.incoterms ?? null);
+  const [selectedPaymentTerms, setSelectedPaymentTerms] = useState<number | null>(pl.payment_terms ?? null);
 
   // When CI line items load for the first time, seed pkgForm and uomForm with the auto-aggregated values.
   const ciLineItemsKey = ci?.line_items.map((li) => li.id).join(",") ?? "";
@@ -1644,6 +1629,11 @@ function Step4({
         freight: financials.freight || null,
         insurance_amount: financials.insurance || null,
       });
+      // Save incoterms and payment_terms on the PL
+      await updatePackingList(pl.id, {
+        incoterms: selectedIncoterms,
+        payment_terms: selectedPaymentTerms,
+      });
       queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
       queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
       message.success("Rates saved.");
@@ -1656,8 +1646,30 @@ function Step4({
   }
 
   return (
-    <div style={CARD}>
-      <p style={SECTION_TITLE}>Final Rates</p>
+    <>
+      {/* ── Incoterms & Payment Terms ── */}
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Incoterms &amp; Payment Terms</p>
+        <div style={{ ...FORM_ROW, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <label style={LABEL}>Incoterms</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={selectedIncoterms}
+              onChange={(v) => setSelectedIncoterms(v)}
+              options={incoterms.map((t: any) => ({ value: t.id, label: `${t.code} – ${t.full_name}` })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
+          </div>
+          <div>
+            <label style={LABEL}>Payment Terms</label>
+            <Select allowClear showSearch style={{ width: "100%" }} value={selectedPaymentTerms}
+              onChange={(v) => setSelectedPaymentTerms(v)}
+              options={paymentTerms.map((t: any) => ({ value: t.id, label: t.name })).sort((a, b) => a.label.localeCompare(b.label))}
+              optionFilterProp="label" />
+          </div>
+        </div>
+      </div>
+
+      <div style={CARD}>
+        <p style={SECTION_TITLE}>Final Rates</p>
 
       {!ci || ci.line_items.length === 0 ? (
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
@@ -1744,32 +1756,58 @@ function Step4({
         }, 0);
         const freightAmt = parseFloat(financials.freight) || 0;
         const insuranceAmt = parseFloat(financials.insurance) || 0;
-        // Invoice Total = line item amounts only (freight/insurance are reference figures on the CI PDF)
-        const invoiceTotal = itemTotal;
         const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Find the selected Incoterm to determine which fields to show
+        const selectedIncotermObj = incoterms.find((inc: any) => inc.id === selectedIncoterms);
+        const incotermCode = selectedIncotermObj?.code?.toUpperCase() || "";
+
+        // Determine which fields to show based on Incoterm code (FR-09.7.3)
+        const showFOB = incotermCode && incotermCode !== "EXW";
+        const showFreight = ["CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"].includes(incotermCode);
+        const showInsurance = ["CIF", "CIP", "DAP", "DPU", "DDP"].includes(incotermCode);
+        // Note: Import Duty and Destination Charges are not currently in the form
+        // They would be added here for DPU and DDP if needed in the future
+
+        // Calculate Invoice Total based on FR-09.7.4
+        // Invoice Total = FOB Value + every visible field the Maker has filled in
+        let invoiceTotal = itemTotal;
+        if (showFreight) invoiceTotal += freightAmt;
+        if (showInsurance) invoiceTotal += insuranceAmt;
 
         return (
           <>
-            <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10, marginTop: 24 }}>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
-                Cost Breakdown
-              </p>
-              {/* Invoice Value row — computed from line items, read-only */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Invoice Value (Line Items)</span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+            {incotermCode ? (
+              <div style={{ background: "var(--bg-base)", borderRadius: 8, padding: "12px 14px", marginBottom: 10, marginTop: 24 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
+                  Cost Breakdown {incotermCode ? `(${incotermCode})` : ""}
+                </p>
+
+                {/* FOB Value (line items) — shown for all Incoterms except EXW */}
+                {showFOB && (
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>${fmt(itemTotal)}</span>
+                  </div>
+                )}
+
+                {/* Freight — shown for CFR, CIF, CPT, CIP, DAP, DPU, DDP */}
+                {showFreight && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
+                    <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
+                  </div>
+                )}
+
+                {/* Insurance — shown for CIF, CIP, DAP, DPU, DDP */}
+                {showInsurance && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
+                    <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
+                  </div>
+                )}
               </div>
-              {/* Freight */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Freight (USD)</span>
-                <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.freight || ""} onChange={(e) => setFinancials({ ...financials, freight: e.target.value })} placeholder="0.00" />
-              </div>
-              {/* Insurance */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Insurance (USD)</span>
-                <input type="number" step="0.01" style={{ ...INPUT, width: 130, textAlign: "right" }} value={financials.insurance || ""} onChange={(e) => setFinancials({ ...financials, insurance: e.target.value })} placeholder="0.00" />
-              </div>
-            </div>
+            ) : null}
 
             {/* Invoice Total row */}
             <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1797,6 +1835,7 @@ function Step4({
         </button>
       </div>
     </div>
+    </>
   );
 }
 
