@@ -17,7 +17,7 @@ def rebuild_ci_line_items(packing_list):
 
     Groups items by (item_code, uom_id) across all containers. Creates new rows,
     updates existing ones, and deletes rows that no longer have a matching group.
-    Existing rate_usd values are preserved so the Maker doesn't lose entered rates.
+    Existing rate values are preserved so the Maker doesn't lose entered rates.
 
     Called whenever containers or container items are created, updated, or deleted.
     Must be called inside a transaction if the caller is already within one.
@@ -61,16 +61,16 @@ def rebuild_ci_line_items(packing_list):
         key = (item_code, uom_id)
         seen_keys.add(key)
         if key in existing:
-            # Update aggregate fields; preserve rate_usd.
+            # Update aggregate fields; preserve rate.
             li = existing[key]
             li.description = data["description"]
             li.hsn_code = data["hsn_code"]
             li.total_quantity = data["total_quantity"]
             # Recompute amount using existing rate.
-            li.amount_usd = li.total_quantity * li.rate_usd
-            li.save(update_fields=["description", "hsn_code", "total_quantity", "amount_usd"])
+            li.amount = li.total_quantity * li.rate
+            li.save(update_fields=["description", "hsn_code", "total_quantity", "amount"])
         else:
-            # New item group — create with rate_usd = 0 (Maker will fill it in Final Rates).
+            # New item group — create with rate = 0 (Maker will fill it in Final Rates).
             from decimal import Decimal
             CommercialInvoiceLineItem.objects.create(
                 ci=ci,
@@ -79,8 +79,8 @@ def rebuild_ci_line_items(packing_list):
                 hsn_code=data["hsn_code"],
                 uom_id=uom_id,
                 total_quantity=data["total_quantity"],
-                rate_usd=Decimal("0.00"),
-                amount_usd=Decimal("0.00"),
+                rate=Decimal("0.00"),
+                amount=Decimal("0.00"),
             )
 
     # Delete CI line items whose item_code+uom no longer exists in any container.
