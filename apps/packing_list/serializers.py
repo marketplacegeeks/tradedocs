@@ -307,7 +307,7 @@ class PackingListSerializer(serializers.ModelSerializer):
         if not ci:
             return None
         total = sum(
-            (item.amount_usd for item in ci.line_items.all()),
+            (item.amount for item in ci.line_items.all()),
             Decimal("0.00"),
         )
         return str(total)
