@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory, SuperAdminFactory
 from apps.master_data.tests.factories import (
-    IncotermFactory, OrganisationFactory, PaymentTermFactory,
+    CurrencyFactory, IncotermFactory, OrganisationFactory, PaymentTermFactory,
 )
 from apps.workflow.constants import DRAFT, PENDING_APPROVAL, APPROVED, REWORK, PERMANENTLY_REJECTED
 
@@ -117,9 +117,11 @@ class TestProformaInvoiceCreate:
     def _payload(self):
         exporter = OrganisationFactory()
         consignee = OrganisationFactory()
+        currency = CurrencyFactory()
         return {
             "exporter": exporter.pk,
             "consignee": consignee.pk,
+            "currency": currency.pk,
         }
 
     def test_maker_can_create(self):
@@ -275,22 +277,22 @@ class TestLineItems:
         payload = {
             "description": "Soybean Oil",
             "quantity": "100.000",
-            "rate_usd": "50.00",
+            "rate": "50.00",
         }
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
-        assert resp.data["amount_usd"] == "5000.00"
+        assert resp.data["amount"] == "5000.00"
 
     def test_checker_cannot_add_line_item(self):
         pi = ProformaInvoiceFactory(status=DRAFT)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "10.00"}
         resp = auth_client(CheckerFactory()).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 403
 
     def test_cannot_add_line_item_to_approved_pi(self):
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=APPROVED)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "10.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -304,7 +306,7 @@ class TestLineItems:
     def test_invalid_hsn_code_rejected(self):
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "10.00", "hsn_code": "12345"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "10.00", "hsn_code": "12345"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -317,14 +319,14 @@ class TestCharges:
     def test_maker_can_add_charge(self):
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        payload = {"description": "Bank Charges", "amount_usd": "150.00"}
+        payload = {"description": "Bank Charges", "amount": "150.00"}
         resp = auth_client(maker).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
         assert resp.data["description"] == "Bank Charges"
 
     def test_checker_cannot_add_charge(self):
         pi = ProformaInvoiceFactory(status=DRAFT)
-        payload = {"description": "X", "amount_usd": "50.00"}
+        payload = {"description": "X", "amount": "50.00"}
         resp = auth_client(CheckerFactory()).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 403
 
@@ -344,8 +346,8 @@ class TestSerializerTotals:
     def test_grand_total_includes_line_items_and_charges(self):
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("10.000"), rate_usd=Decimal("100.00"))
-        ProformaInvoiceChargeFactory(pi=pi, amount_usd=Decimal("50.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("10.000"), rate=Decimal("100.00"))
+        ProformaInvoiceChargeFactory(pi=pi, amount=Decimal("50.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         assert resp.status_code == 200
         assert Decimal(resp.data["grand_total"]) == Decimal("1050.00")
@@ -355,7 +357,7 @@ class TestSerializerTotals:
         maker = MakerFactory()
         exw = IncotermFactory(code="EXW")
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT, incoterms=exw)
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("5.000"), rate_usd=Decimal("200.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("5.000"), rate=Decimal("200.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         assert Decimal(resp.data["invoice_total"]) == Decimal(resp.data["grand_total"])
 
@@ -587,7 +589,7 @@ class TestIncotermSellerFields:
         from decimal import Decimal
         maker = MakerFactory()
         pi = self._pi_with_incoterm("CFR")
-        item = ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("2.000"), rate_usd=Decimal("100.00"))
+        item = ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("2.000"), rate=Decimal("100.00"))
         pi.freight = Decimal("50.00")
         pi.save(update_fields=["freight"])
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
@@ -685,6 +687,7 @@ class TestCompanyAdminPermissions:
         return {
             "exporter": OrganisationFactory().pk,
             "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
         }
 
     def test_admin_can_list_pis(self):
@@ -728,7 +731,7 @@ class TestCompanyAdminPermissions:
         """Company Admin can add line items to a PI they did not create (views.py:205)."""
         admin = CompanyAdminFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)
-        payload = {"description": "Admin Item", "quantity": "5.000", "rate_usd": "100.00"}
+        payload = {"description": "Admin Item", "quantity": "5.000", "rate": "100.00"}
         resp = auth_client(admin).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
@@ -736,7 +739,7 @@ class TestCompanyAdminPermissions:
         """Any MAKER can add line items to a DRAFT PI they did NOT create."""
         other_maker = MakerFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)   # created by a different Maker
-        payload = {"description": "Shared Item", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "Shared Item", "quantity": "1.000", "rate": "10.00"}
         resp = auth_client(other_maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
@@ -744,7 +747,7 @@ class TestCompanyAdminPermissions:
         """Any MAKER can add charges to a DRAFT PI they did NOT create."""
         other_maker = MakerFactory()
         pi = ProformaInvoiceFactory(status=DRAFT)
-        payload = {"description": "Shared Charge", "amount_usd": "50.00"}
+        payload = {"description": "Shared Charge", "amount": "50.00"}
         resp = auth_client(other_maker).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
@@ -977,7 +980,7 @@ class TestReworkStateEditability:
         """Line items can be added when PI is in REWORK state."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=REWORK)
-        payload = {"description": "Rework Item", "quantity": "3.000", "rate_usd": "75.00"}
+        payload = {"description": "Rework Item", "quantity": "3.000", "rate": "75.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
@@ -985,7 +988,7 @@ class TestReworkStateEditability:
         """Charges can be added when PI is in REWORK state."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=REWORK)
-        payload = {"description": "Revised Handling Fee", "amount_usd": "200.00"}
+        payload = {"description": "Revised Handling Fee", "amount": "200.00"}
         resp = auth_client(maker).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 201
 
@@ -1023,26 +1026,26 @@ class TestLineItemExtendedCoverage:
         assert len(resp.data) == 3
 
     def test_put_replaces_line_item(self):
-        """PUT updates all fields including recomputing amount_usd."""
+        """PUT updates all fields including recomputing amount."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
         item = ProformaInvoiceLineItemFactory(pi=pi)
         resp = auth_client(maker).put(
             pi_line_item_detail_url(pi.pk, item.pk),
-            {"description": "Updated Description", "quantity": "20.000", "rate_usd": "25.00"},
+            {"description": "Updated Description", "quantity": "20.000", "rate": "25.00"},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.data["description"] == "Updated Description"
         # 20 × 25 = 500
-        assert Decimal(resp.data["amount_usd"]) == Decimal("500.00")
+        assert Decimal(resp.data["amount"]) == Decimal("500.00")
 
     def test_patch_updates_line_item_partially(self):
-        """PATCH recomputes amount_usd after a quantity change."""
+        """PATCH recomputes amount after a quantity change."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
         item = ProformaInvoiceLineItemFactory(
-            pi=pi, quantity=Decimal("10.000"), rate_usd=Decimal("50.00")
+            pi=pi, quantity=Decimal("10.000"), rate=Decimal("50.00")
         )
         resp = auth_client(maker).patch(
             pi_line_item_detail_url(pi.pk, item.pk),
@@ -1051,7 +1054,7 @@ class TestLineItemExtendedCoverage:
         )
         assert resp.status_code == 200
         # 15 × 50 = 750
-        assert Decimal(resp.data["amount_usd"]) == Decimal("750.00")
+        assert Decimal(resp.data["amount"]) == Decimal("750.00")
 
     def test_checker_cannot_update_line_item(self):
         """Checkers have read-only access to content — cannot PATCH line items."""
@@ -1068,7 +1071,7 @@ class TestLineItemExtendedCoverage:
         """PENDING_APPROVAL is not an editable state — POST to /line-items/ returns 400."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "10.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -1084,7 +1087,7 @@ class TestLineItemExtendedCoverage:
         """PERMANENTLY_REJECTED is a terminal state — no modifications allowed."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=PERMANENTLY_REJECTED)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "10.00"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "10.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -1092,33 +1095,33 @@ class TestLineItemExtendedCoverage:
         """Quantity must be > 0 (serializer validate_quantity)."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        payload = {"description": "X", "quantity": "0.000", "rate_usd": "10.00"}
+        payload = {"description": "X", "quantity": "0.000", "rate": "10.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
     def test_negative_rate_rejected(self):
-        """Rate must be >= 0 (serializer validate_rate_usd)."""
+        """Rate must be >= 0 (serializer validate_rate)."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        payload = {"description": "X", "quantity": "1.000", "rate_usd": "-10.00"}
+        payload = {"description": "X", "quantity": "1.000", "rate": "-10.00"}
         resp = auth_client(maker).post(pi_line_item_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
-    def test_amount_usd_recalculated_on_patch(self):
-        """After PATCH, amount_usd on the DB record reflects the new rate."""
+    def test_amount_recalculated_on_patch(self):
+        """After PATCH, amount on the DB record reflects the new rate."""
         from apps.proforma_invoice.models import ProformaInvoiceLineItem
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
         item = ProformaInvoiceLineItemFactory(
-            pi=pi, quantity=Decimal("5.000"), rate_usd=Decimal("100.00")
+            pi=pi, quantity=Decimal("5.000"), rate=Decimal("100.00")
         )
         auth_client(maker).patch(
             pi_line_item_detail_url(pi.pk, item.pk),
-            {"rate_usd": "200.00"},
+            {"rate": "200.00"},
             format="json",
         )
         item.refresh_from_db()
-        assert item.amount_usd == Decimal("1000.00")  # 5 × 200
+        assert item.amount == Decimal("1000.00")  # 5 × 200
 
 
 # ---- Layer 4: Charges — CRUD in all states ----------------------------------
@@ -1142,32 +1145,32 @@ class TestChargesExtendedCoverage:
         charge = ProformaInvoiceChargeFactory(pi=pi)
         resp = auth_client(maker).put(
             pi_charge_detail_url(pi.pk, charge.pk),
-            {"description": "Revised Handling Fee", "amount_usd": "250.00"},
+            {"description": "Revised Handling Fee", "amount": "250.00"},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.data["description"] == "Revised Handling Fee"
-        assert Decimal(resp.data["amount_usd"]) == Decimal("250.00")
+        assert Decimal(resp.data["amount"]) == Decimal("250.00")
 
     def test_patch_updates_charge_amount_only(self):
-        """PATCH allows updating only amount_usd, keeping description intact."""
+        """PATCH allows updating only amount, keeping description intact."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
         charge = ProformaInvoiceChargeFactory(pi=pi, description="Inspection Fee")
         resp = auth_client(maker).patch(
             pi_charge_detail_url(pi.pk, charge.pk),
-            {"amount_usd": "999.00"},
+            {"amount": "999.00"},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.data["description"] == "Inspection Fee"
-        assert Decimal(resp.data["amount_usd"]) == Decimal("999.00")
+        assert Decimal(resp.data["amount"]) == Decimal("999.00")
 
     def test_cannot_add_charge_to_pending_approval_pi(self):
         """Charges cannot be added when PI is in PENDING_APPROVAL."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
-        payload = {"description": "Late Fee", "amount_usd": "50.00"}
+        payload = {"description": "Late Fee", "amount": "50.00"}
         resp = auth_client(maker).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -1180,10 +1183,10 @@ class TestChargesExtendedCoverage:
         assert resp.status_code == 400
 
     def test_negative_charge_amount_rejected(self):
-        """Charge amounts cannot be negative (serializer validate_amount_usd)."""
+        """Charge amounts cannot be negative (serializer validate_amount)."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-        payload = {"description": "Negative Fee", "amount_usd": "-10.00"}
+        payload = {"description": "Negative Fee", "amount": "-10.00"}
         resp = auth_client(maker).post(pi_charge_url(pi.pk), payload, format="json")
         assert resp.status_code == 400
 
@@ -1255,6 +1258,7 @@ class TestIncotermCostFieldValidation:
             {
                 "exporter": OrganisationFactory().pk,
                 "consignee": OrganisationFactory().pk,
+                "currency": CurrencyFactory().pk,
                 "incoterms": cif.pk,
                 # No freight or insurance_amount — must still succeed on create
             },
@@ -1290,7 +1294,7 @@ class TestIncotermComputedTotalsExtended:
         """When no incoterm is set, Invoice Total = Grand Total (serializers.py:277)."""
         maker = MakerFactory()
         pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT, incoterms=None)
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate_usd=Decimal("500.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate=Decimal("500.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         assert Decimal(resp.data["invoice_total"]) == Decimal(resp.data["grand_total"])
 
@@ -1302,7 +1306,7 @@ class TestIncotermComputedTotalsExtended:
             created_by=maker, status=DRAFT, incoterms=dap,
             freight=Decimal("100.00"), insurance_amount=Decimal("30.00"),
         )
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate_usd=Decimal("500.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate=Decimal("500.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         # grand_total=500, freight=100, insurance=30 → invoice_total=630
         assert Decimal(resp.data["invoice_total"]) == Decimal("630.00")
@@ -1318,7 +1322,7 @@ class TestIncotermComputedTotalsExtended:
             insurance_amount=Decimal("20.00"),
             destination_charges=Decimal("50.00"),
         )
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("2.000"), rate_usd=Decimal("200.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("2.000"), rate=Decimal("200.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         # grand_total=400, freight=80, insurance=20, dest=50 → invoice_total=550
         assert Decimal(resp.data["invoice_total"]) == Decimal("550.00")
@@ -1334,7 +1338,7 @@ class TestIncotermComputedTotalsExtended:
             import_duty=Decimal("50.00"),
             destination_charges=Decimal("40.00"),
         )
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate_usd=Decimal("1000.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate=Decimal("1000.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         # grand_total=1000, costs=215 → invoice_total=1215
         assert Decimal(resp.data["invoice_total"]) == Decimal("1215.00")
@@ -1347,7 +1351,7 @@ class TestIncotermComputedTotalsExtended:
             created_by=maker, status=DRAFT, incoterms=cip,
             freight=Decimal("60.00"), insurance_amount=Decimal("15.00"),
         )
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate_usd=Decimal("300.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate=Decimal("300.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         # grand_total=300, freight=60, insurance=15 → invoice_total=375
         assert Decimal(resp.data["invoice_total"]) == Decimal("375.00")
@@ -1361,7 +1365,7 @@ class TestIncotermComputedTotalsExtended:
             freight=Decimal("100.00"),
             insurance_amount=None,   # not yet entered
         )
-        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate_usd=Decimal("500.00"))
+        ProformaInvoiceLineItemFactory(pi=pi, quantity=Decimal("1.000"), rate=Decimal("500.00"))
         resp = auth_client(maker).get(pi_detail_url(pi.pk))
         # grand_total=500, freight=100, insurance excluded → invoice_total=600
         assert Decimal(resp.data["invoice_total"]) == Decimal("600.00")
@@ -1385,6 +1389,7 @@ class TestTCTemplateSnapshot:
             {
                 "exporter": OrganisationFactory().pk,
                 "consignee": OrganisationFactory().pk,
+                "currency": CurrencyFactory().pk,
                 "tc_template": template.pk,
             },
             format="json",
@@ -1421,6 +1426,7 @@ class TestTCTemplateSnapshot:
             {
                 "exporter": OrganisationFactory().pk,
                 "consignee": OrganisationFactory().pk,
+                "currency": CurrencyFactory().pk,
                 # No tc_template supplied
             },
             format="json",
@@ -1580,6 +1586,7 @@ class TestSuperAdminProformaInvoicePermissions:
         payload = {
             "exporter": OrganisationFactory().pk,
             "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
         }
         resp = auth_client(super_admin).post(PI_LIST_URL, payload, format="json")
         assert resp.status_code == 201

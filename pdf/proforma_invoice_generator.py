@@ -198,8 +198,8 @@
 #   invoice.port_loading.name         → invoice.port_of_loading.name
 #   invoice.port_discharge.name       → invoice.port_of_discharge.name
 #   invoice.pre_carriage.name         → invoice.pre_carriage_by.name
-#   invoice.marks_and_nos             → (no model field — cell left blank)
-#   invoice.kind_of_packages          → (no model field — cell left blank)
+#   invoice.marks_and_nos             → invoice.marks_and_nos (TextField)
+#   invoice.kind_of_packages          → invoice.kind_of_packages (CharField, max 100)
 #   invoice.bank_charges              → (no model field — omitted)
 #   invoice.terms_and_conditions      → invoice.tc_content
 #   invoice.partial_shipment          → CharField "ALLOWED"/"NOT_ALLOWED"

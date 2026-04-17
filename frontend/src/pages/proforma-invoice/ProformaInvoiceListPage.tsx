@@ -34,6 +34,7 @@ const COLUMNS: { label: string; key: SortKey | null }[] = [
   { label: "Date",        key: "pi_date" },
   { label: "Exporter",    key: "exporter" },
   { label: "Consignee",   key: "consignee" },
+  { label: "Total",       key: null },
   { label: "Status",      key: "status" },
   { label: "Created By",  key: "created_by" },
   { label: "",            key: null },
@@ -272,7 +273,7 @@ export default function ProformaInvoiceListPage() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{ padding: "48px 16px", textAlign: "center", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}
                   >
                     Loading…
@@ -280,7 +281,7 @@ export default function ProformaInvoiceListPage() {
                 </tr>
               ) : displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 16px", gap: 12 }}>
                       <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--pastel-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <FileText size={22} color="var(--pastel-blue-text)" strokeWidth={1.5} />
@@ -335,6 +336,11 @@ function PIRow({ pi, onClick }: { pi: ProformaInvoice; onClick: () => void }) {
       <td style={tdStyle}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>
           {pi.consignee_name}
+        </span>
+      </td>
+      <td style={{ ...tdStyle, textAlign: "right" }}>
+        <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+          {pi.currency_display?.code || "USD"} {parseFloat(pi.grand_total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </td>
       <td style={tdStyle}>

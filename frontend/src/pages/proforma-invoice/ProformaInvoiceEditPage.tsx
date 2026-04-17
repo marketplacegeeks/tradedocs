@@ -21,6 +21,7 @@ import {
 } from "../../api/referenceData";
 import { listBanks } from "../../api/banks";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
+import { listCurrencies } from "../../api/currencies";
 import { SHIPMENT_OPTION_LABELS, DOCUMENT_STATUS } from "../../utils/constants";
 import { extractApiError } from "../../utils/apiErrors";
 
@@ -30,6 +31,7 @@ const schema = z.object({
   exporter: z.number({ required_error: "Exporter is required" }),
   consignee: z.number({ required_error: "Consignee is required" }),
   buyer: z.number().nullable().optional(),
+  currency: z.number({ required_error: "Currency is required" }),
   pi_date: z.string().optional(),
   buyer_order_no: z.string().optional().default(""),
   buyer_order_date: z.string().nullable().optional(),
@@ -125,6 +127,7 @@ export default function ProformaInvoiceEditPage() {
   const { data: exporters = [] } = useQuery({ queryKey: ["organisations", "EXPORTER"], queryFn: () => listOrganisations("EXPORTER") });
   const { data: consignees = [] } = useQuery({ queryKey: ["organisations", "CONSIGNEE"], queryFn: () => listOrganisations("CONSIGNEE") });
   const { data: buyers = [] } = useQuery({ queryKey: ["organisations", "BUYER"], queryFn: () => listOrganisations("BUYER") });
+  const { data: currencies = [] } = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
   const { data: countries = [] } = useQuery({ queryKey: ["countries"], queryFn: listCountries });
   const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: listPorts });
   const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: listLocations });
@@ -150,6 +153,7 @@ export default function ProformaInvoiceEditPage() {
       exporter: pi.exporter,
       consignee: pi.consignee,
       buyer: pi.buyer ?? null,
+      currency: pi.currency,
       pi_date: pi.pi_date,
       buyer_order_no: pi.buyer_order_no ?? "",
       buyer_order_date: pi.buyer_order_date ?? null,
@@ -305,6 +309,28 @@ export default function ProformaInvoiceEditPage() {
               />
             </div>
             <div>
+              <label style={LABEL_STYLE}>Currency <span style={{ color: "#e53e3e" }}>*</span></label>
+              <Controller
+                name="currency"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    placeholder="Select currency"
+                    style={{ width: "100%" }}
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={pi.status !== DOCUMENT_STATUS.DRAFT}
+                    options={currencies.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}` })).sort((a, b) => a.label.localeCompare(b.label))}
+                  />
+                )}
+              />
+              <FieldError msg={errors.currency?.message} />
+            </div>
+          </div>
+
+          <div style={{ ...GRID2, marginBottom: 16 }}>
+            <div>
               <label style={LABEL_STYLE}>Proforma Invoice Date</label>
               <Controller
                 name="pi_date"
@@ -317,6 +343,9 @@ export default function ProformaInvoiceEditPage() {
                   />
                 )}
               />
+            </div>
+            <div style={{ visibility: "hidden" }}>
+              {/* Spacer for grid alignment */}
             </div>
           </div>
 

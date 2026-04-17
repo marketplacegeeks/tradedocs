@@ -21,6 +21,7 @@ import {
 } from "../../api/referenceData";
 import { listBanks } from "../../api/banks";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
+import { listCurrencies } from "../../api/currencies";
 import { SHIPMENT_OPTIONS, SHIPMENT_OPTION_LABELS } from "../../utils/constants";
 import { extractApiError } from "../../utils/apiErrors";
 
@@ -30,6 +31,7 @@ const schema = z.object({
   exporter: z.number({ required_error: "Exporter is required" }),
   consignee: z.number({ required_error: "Consignee is required" }),
   buyer: z.number().nullable().optional(),
+  currency: z.number({ required_error: "Currency is required" }),
   pi_date: z.string().optional(),
   buyer_order_no: z.string().optional().default(""),
   buyer_order_date: z.string().nullable().optional(),
@@ -128,6 +130,10 @@ export default function ProformaInvoiceCreatePage() {
     queryKey: ["organisations", "BUYER"],
     queryFn: () => listOrganisations("BUYER"),
   });
+  const { data: currencies = [] } = useQuery({
+    queryKey: ["currencies"],
+    queryFn: listCurrencies,
+  });
   const { data: countries = [] } = useQuery({
     queryKey: ["countries"],
     queryFn: listCountries,
@@ -169,7 +175,11 @@ export default function ProformaInvoiceCreatePage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { pi_date: dayjs().format("YYYY-MM-DD") },
+    defaultValues: {
+      pi_date: dayjs().format("YYYY-MM-DD"),
+      // Default to USD if available
+      currency: currencies.find((c: any) => c.code === "USD")?.id,
+    },
   });
 
   // Auto-populate TC content when a template is selected
@@ -288,6 +298,27 @@ export default function ProformaInvoiceCreatePage() {
               />
             </div>
             <div>
+              <label style={LABEL_STYLE}>Currency <span style={{ color: "#e53e3e" }}>*</span></label>
+              <Controller
+                name="currency"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    placeholder="Select currency"
+                    style={{ width: "100%" }}
+                    showSearch
+                    optionFilterProp="label"
+                    options={currencies.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}` })).sort((a, b) => a.label.localeCompare(b.label))}
+                  />
+                )}
+              />
+              <FieldError msg={errors.currency?.message} />
+            </div>
+          </div>
+
+          <div style={{ ...GRID2, marginBottom: 16 }}>
+            <div>
               <label style={LABEL_STYLE}>Proforma Invoice Date</label>
               <Controller
                 name="pi_date"
@@ -300,6 +331,9 @@ export default function ProformaInvoiceCreatePage() {
                   />
                 )}
               />
+            </div>
+            <div style={{ visibility: "hidden" }}>
+              {/* Spacer for grid alignment */}
             </div>
           </div>
 

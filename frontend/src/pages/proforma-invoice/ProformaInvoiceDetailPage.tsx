@@ -105,11 +105,11 @@ function LabelValue({ label, value }: { label: string; value?: string | null }) 
   );
 }
 
-function formatMoney(v: string | null | undefined) {
-  if (!v) return "$0";
+function formatMoney(v: string | null | undefined, currencyCode: string = "USD") {
+  if (!v) return `${currencyCode} 0`;
   const n = parseFloat(v);
-  // Strip trailing zeros: $12.00 → $12, $12.50 → $12.5, $12.55 → $12.55
-  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  // Format: USD 12.55, EUR 1,234.50
+  return `${currencyCode} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---- Line item form (inline) -----------------------------------------------
@@ -117,14 +117,14 @@ function formatMoney(v: string | null | undefined) {
 interface LineItemFormData {
   description: string;
   quantity: string;
-  rate_usd: string;
+  rate: string;
   hsn_code: string;
   item_code: string;
   uom: string;
 }
 
 const EMPTY_LINE_ITEM: LineItemFormData = {
-  description: "", quantity: "", rate_usd: "",
+  description: "", quantity: "", rate: "",
   hsn_code: "", item_code: "", uom: "",
 };
 
@@ -142,7 +142,7 @@ export default function ProformaInvoiceDetailPage() {
   const [editingLineItem, setEditingLineItem] = useState<ProformaInvoiceLineItem | null>(null);
   const [lineItemForm, setLineItemForm] = useState<LineItemFormData>(EMPTY_LINE_ITEM);
   const [addingCharge, setAddingCharge] = useState(false);
-  const [chargeForm, setChargeForm] = useState({ description: "", amount_usd: "" });
+  const [chargeForm, setChargeForm] = useState({ description: "", amount: "" });
 
   // Cost breakdown fields for Incoterm (FR-09.7)
   const [costFields, setCostFields] = useState<Record<string, string>>({
@@ -204,7 +204,7 @@ export default function ProformaInvoiceDetailPage() {
 
   const addChargeMutation = useMutation({
     mutationFn: (data: any) => createCharge(piId, data),
-    onSuccess: () => { invalidate(); setAddingCharge(false); setChargeForm({ description: "", amount_usd: "" }); },
+    onSuccess: () => { invalidate(); setAddingCharge(false); setChargeForm({ description: "", amount: "" }); },
     onError: (err: unknown) => message.error(extractApiError(err, "Failed to add charge.")),
   });
 
@@ -261,6 +261,7 @@ export default function ProformaInvoiceDetailPage() {
 
   const incotermsCode = pi.incoterms_code ?? "";
   const sellerFields = INCOTERM_SELLER_FIELDS[incotermsCode] ?? new Set<string>();
+  const currencyCode = pi.currency_display?.code || "USD";
 
   // Initialise cost fields from server data
   function initCostFields() {
@@ -350,8 +351,8 @@ export default function ProformaInvoiceDetailPage() {
                         type="number"
                         step="0.01"
                         style={INPUT}
-                        value={lineItemForm.rate_usd}
-                        onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
+                        value={lineItemForm.rate}
+                        onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate: e.target.value }))}
                         placeholder="0.00"
                       />
                     </td>
@@ -378,13 +379,13 @@ export default function ProformaInvoiceDetailPage() {
                     <td style={TD}>{item.description}</td>
                     <td style={{ ...TD, textAlign: "right" }}>{parseFloat(item.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
                     <td style={TD}>{uoms.find(u => u.id === (item.uom as any))?.abbreviation ?? "—"}</td>
-                    <td style={{ ...TD, textAlign: "right" }}>{formatMoney(item.rate_usd)}</td>
-                    <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(item.amount_usd)}</td>
+                    <td style={{ ...TD, textAlign: "right" }}>{formatMoney(item.rate, currencyCode)}</td>
+                    <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(item.amount, currencyCode)}</td>
                     {canEdit && (
                       <td style={TD}>
                         <div style={{ display: "flex", gap: 4 }}>
                           <button
-                            onClick={() => { setEditingLineItem(item); setLineItemForm({ description: item.description, quantity: item.quantity, rate_usd: item.rate_usd, hsn_code: item.hsn_code, item_code: item.item_code, uom: String((item.uom as any)?.id ?? item.uom ?? "") }); }}
+                            onClick={() => { setEditingLineItem(item); setLineItemForm({ description: item.description, quantity: item.quantity, rate: item.rate, hsn_code: item.hsn_code, item_code: item.item_code, uom: String((item.uom as any)?.id ?? item.uom ?? "") }); }}
                             style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
                           >
                             <Edit2 size={14} strokeWidth={1.5} />
@@ -433,8 +434,8 @@ export default function ProformaInvoiceDetailPage() {
                       type="number"
                       step="0.01"
                       style={INPUT}
-                      value={lineItemForm.rate_usd}
-                      onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate_usd: e.target.value }))}
+                      value={lineItemForm.rate}
+                      onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate: e.target.value }))}
                       placeholder="0.00"
                     />
                   </td>
@@ -456,7 +457,7 @@ export default function ProformaInvoiceDetailPage() {
               <tr style={{ background: "var(--bg-base)" }}>
                 <td colSpan={canEdit ? 7 : 6} style={{ ...TD, textAlign: "right", fontWeight: 600, fontSize: 13 }}>Item Total</td>
                 <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
-                  {formatMoney(pi.line_items_total)}
+                  {formatMoney(pi.line_items_total, currencyCode)}
                 </td>
                 {canEdit && <td style={TD} />}
               </tr>
@@ -480,7 +481,7 @@ export default function ProformaInvoiceDetailPage() {
                 {pi.charges.map((charge) => (
                   <tr key={charge.id}>
                     <td style={{ ...TD, width: "70%" }}>{charge.description}</td>
-                    <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(charge.amount_usd)}</td>
+                    <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(charge.amount, currencyCode)}</td>
                     {canEdit && (
                       <td style={{ ...TD, width: 40 }}>
                         <button
@@ -499,7 +500,7 @@ export default function ProformaInvoiceDetailPage() {
                       <input style={INPUT} value={chargeForm.description} onChange={(e) => setChargeForm((p) => ({ ...p, description: e.target.value }))} placeholder="Charge description" />
                     </td>
                     <td style={TD}>
-                      <input style={{ ...INPUT, textAlign: "right" }} value={chargeForm.amount_usd} onChange={(e) => setChargeForm((p) => ({ ...p, amount_usd: e.target.value }))} placeholder="0.00" />
+                      <input style={{ ...INPUT, textAlign: "right" }} value={chargeForm.amount} onChange={(e) => setChargeForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0.00" />
                     </td>
                     <td style={TD}>
                       <button
@@ -516,7 +517,7 @@ export default function ProformaInvoiceDetailPage() {
         )}
         {canEdit && !addingCharge && (
           <button
-            onClick={() => { setAddingCharge(true); setChargeForm({ description: "", amount_usd: "" }); }}
+            onClick={() => { setAddingCharge(true); setChargeForm({ description: "", amount: "" }); }}
             style={{
               display: "inline-flex", alignItems: "center", gap: 4,
               background: "transparent", border: "1px dashed var(--border-medium)",
@@ -549,12 +550,12 @@ export default function ProformaInvoiceDetailPage() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>Item Total</span>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>{formatMoney(pi.line_items_total)}</span>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600 }}>{formatMoney(pi.line_items_total, currencyCode)}</span>
             </div>
             {pi.charges.map((c) => (
               <div key={c.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>{c.description}</span>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(c.amount_usd)}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(c.amount, currencyCode)}</span>
               </div>
             ))}
           </>
@@ -564,7 +565,7 @@ export default function ProformaInvoiceDetailPage() {
         {!incotermsCode && (
           <div style={{ borderTop: pi.charges.length > 0 ? "1px solid var(--border-light)" : "none", paddingTop: pi.charges.length > 0 ? 8 : 0, marginTop: pi.charges.length > 0 ? 4 : 0, display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Grand Total Amount</span>
-            <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{formatMoney(pi.grand_total)}</span>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{formatMoney(pi.grand_total, currencyCode)}</span>
           </div>
         )}
 
@@ -575,7 +576,7 @@ export default function ProformaInvoiceDetailPage() {
             </p>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}>FOB Value (Item Cost+Additional Charges)</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(pi.grand_total)}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney(pi.grand_total, currencyCode)}</span>
             </div>
             {Array.from(sellerFields).map((field) => (
               <div key={field} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -603,7 +604,7 @@ export default function ProformaInvoiceDetailPage() {
                     placeholder="0.00"
                   />
                 ) : (
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney((pi as any)[field])}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{formatMoney((pi as any)[field], currencyCode)}</span>
                 )}
               </div>
             ))}
@@ -613,7 +614,7 @@ export default function ProformaInvoiceDetailPage() {
         {showInvoiceTotal && (
           <div style={{ borderTop: "2px solid var(--border-medium)", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Invoice Total (Amount Payable)</span>
-            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{formatMoney(pi.invoice_total)}</span>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{formatMoney(pi.invoice_total, currencyCode)}</span>
           </div>
         )}
       </div>
