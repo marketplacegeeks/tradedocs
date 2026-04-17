@@ -143,6 +143,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
             "country_of_origin", "country_of_final_destination",
             # Shipping
             "pre_carriage_by", "place_of_receipt", "place_of_receipt_by_pre_carrier", "vessel_flight_no",
+            "kind_of_packages", "marks_and_nos",
             "port_of_loading", "port_of_loading_name",
             "port_of_discharge", "port_of_discharge_name",
             "final_destination",
@@ -195,6 +196,7 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
                 "buyer_order_no", "buyer_order_date", "other_references",
                 "country_of_origin", "country_of_final_destination",
                 "pre_carriage_by", "place_of_receipt", "place_of_receipt_by_pre_carrier", "vessel_flight_no",
+                "kind_of_packages", "marks_and_nos",
                 "port_of_loading", "port_of_discharge", "final_destination",
                 "payment_terms", "incoterms", "bank",
                 "validity_for_acceptance", "validity_for_shipment",

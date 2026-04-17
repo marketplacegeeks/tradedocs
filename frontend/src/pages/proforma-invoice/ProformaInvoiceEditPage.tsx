@@ -40,6 +40,8 @@ const schema = z.object({
   place_of_receipt: z.number().nullable().optional(),
   place_of_receipt_by_pre_carrier: z.number().nullable().optional(),
   vessel_flight_no: z.string().optional().default(""),
+  kind_of_packages: z.string().optional().default(""),
+  marks_and_nos: z.string().optional().default(""),
   port_of_loading: z.number().nullable().optional(),
   port_of_discharge: z.number().nullable().optional(),
   final_destination: z.number().nullable().optional(),
@@ -158,6 +160,8 @@ export default function ProformaInvoiceEditPage() {
       place_of_receipt: pi.place_of_receipt ?? null,
       place_of_receipt_by_pre_carrier: pi.place_of_receipt_by_pre_carrier ?? null,
       vessel_flight_no: pi.vessel_flight_no ?? "",
+      kind_of_packages: pi.kind_of_packages ?? "",
+      marks_and_nos: pi.marks_and_nos ?? "",
       port_of_loading: pi.port_of_loading ?? null,
       port_of_discharge: pi.port_of_discharge ?? null,
       final_destination: pi.final_destination ?? null,
@@ -448,6 +452,17 @@ export default function ProformaInvoiceEditPage() {
               <label style={LABEL_STYLE}>Vessel / Flight No</label>
               <input {...register("vessel_flight_no")} style={INPUT_STYLE} placeholder="e.g. MV Pacific Star" />
             </div>
+            <div>
+              <label style={LABEL_STYLE}>No &amp; Kind of Packages</label>
+              <input {...register("kind_of_packages")} style={INPUT_STYLE} placeholder="e.g. 10 Boxes, 5 Pallets" maxLength={100} />
+            </div>
+            <div>
+              <label style={LABEL_STYLE}>Marks &amp; Nos / Container No</label>
+              <textarea {...register("marks_and_nos")} style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} placeholder="Enter marks and numbers" />
+            </div>
+          </div>
+
+          <div style={{ ...GRID3, marginBottom: 16 }}>
             <div>
               <label style={LABEL_STYLE}>Port of Loading</label>
               <Controller

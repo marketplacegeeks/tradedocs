@@ -642,8 +642,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 Paragraph(f"<b>Vessel/Flight No:</b><br/>{safe(invoice.vessel_flight_no)}", style_text),
             ],
             [
-                Paragraph("<b>No &amp; Kind of Packages</b><br/>", style_text),
-                Paragraph("<b>Marks &amp; Nos/Container No</b><br/>", style_text),
+                Paragraph(f"<b>No &amp; Kind of Packages</b><br/>{safe(invoice.kind_of_packages)}", style_text),
+                Paragraph(f"<b>Marks &amp; Nos/Container No</b><br/>{safe(invoice.marks_and_nos)}", style_text),
                 Paragraph(f"<b>Payment Terms:</b><br/>{payment_term_name}", style_text),
             ],
         ],

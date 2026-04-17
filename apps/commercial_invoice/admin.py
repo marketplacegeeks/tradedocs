@@ -6,7 +6,7 @@ from .models import CommercialInvoice, CommercialInvoiceLineItem
 class CommercialInvoiceLineItemInline(admin.TabularInline):
     model = CommercialInvoiceLineItem
     extra = 0
-    readonly_fields = ("amount_usd",)
+    readonly_fields = ("amount",)
 
 
 @admin.register(CommercialInvoice)
@@ -20,5 +20,5 @@ class CommercialInvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(CommercialInvoiceLineItem)
 class CommercialInvoiceLineItemAdmin(admin.ModelAdmin):
-    list_display = ("item_code", "ci", "total_quantity", "rate_usd", "amount_usd")
-    readonly_fields = ("amount_usd",)
+    list_display = ("item_code", "ci", "total_quantity", "rate", "amount")
+    readonly_fields = ("amount",)
