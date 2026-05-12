@@ -1618,6 +1618,18 @@ function Step4({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciLineItemsKey]);
 
+  // Pre-populate freight, insurance, and lc_details from the existing CI when editing.
+  useEffect(() => {
+    if (!ci) return;
+    setFinancials((prev) => ({
+      ...prev,
+      freight: prev.freight || (ci.freight ?? ""),
+      insurance: prev.insurance || (ci.insurance ?? ""),
+      lc_details: prev.lc_details || (ci.lc_details ?? ""),
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ci?.id]);
+
   async function handleSave() {
     if (!ci) return;
     setSaving(true);
@@ -1636,7 +1648,8 @@ function Step4({
       const { updateCommercialInvoice } = await import("../../api/packingLists");
       await updateCommercialInvoice(pl.ci_id!, {
         freight: financials.freight || null,
-        insurance_amount: financials.insurance || null,
+        insurance: financials.insurance || null,
+        lc_details: financials.lc_details || "",
       });
       // Save incoterms and payment_terms on the PL
       await updatePackingList(pl.id, {
@@ -1906,6 +1919,8 @@ export default function PackingListCreatePage() {
       other_references: fetchedPl.other_references,
       other_references_date: (fetchedPl as any).other_references_date ?? null,
       additional_description: fetchedPl.additional_description,
+      incoterms: fetchedPl.incoterms ?? null,
+      payment_terms: fetchedPl.payment_terms ?? null,
     });
   // Run only once when the PL first loads (id won't change mid-session)
   // eslint-disable-next-line react-hooks/exhaustive-deps
