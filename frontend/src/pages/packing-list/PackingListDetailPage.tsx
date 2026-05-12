@@ -491,9 +491,82 @@ function FinalRatesTab({ pl, ciId }: { pl: PackingList; ciId: number | null }) {
                 <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 700, color: "var(--primary)" }}>{currencyCode} {fmt(invoiceTotal)}</span>
               </div>
 
-              <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: ci.lc_details ? 16 : 0 }}>
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)", marginBottom: 16 }}>
                 <strong>Amount in Words:</strong> {amountToWords(invoiceTotal, ci.currency_display?.name ?? "US Dollars")}
               </div>
+
+              {/* Rate Calculation for Client Invoice — only shown when Incoterm is CIF */}
+              {incotermCode === "CIF" && (freightAmt > 0 || insuranceAmt > 0) && (() => {
+                // Aggregate net_material_weight per item_code across all containers
+                const weightMap = new Map<string, number>();
+                for (const container of pl.containers) {
+                  for (const cItem of container.items) {
+                    weightMap.set(
+                      cItem.item_code,
+                      (weightMap.get(cItem.item_code) ?? 0) + (parseFloat(cItem.net_material_weight) || 0),
+                    );
+                  }
+                }
+                const totalWeight = Array.from(weightMap.values()).reduce((s, w) => s + w, 0);
+
+                const calcRows = ci.line_items.map((li) => {
+                  const itemWeight = weightMap.get(li.item_code) ?? 0;
+                  const itemAmt = parseFloat(li.amount as any) || 0;
+                  const qty = parseFloat(li.total_quantity as any) || 1;
+                  // Freight: proportional to net weight
+                  const freightShare = totalWeight > 0 ? (itemWeight / totalWeight) * freightAmt : 0;
+                  // Insurance: proportional to line item value
+                  const insuranceShare = itemTotal > 0 ? (itemAmt / itemTotal) * insuranceAmt : 0;
+                  const rateCalc = parseFloat(li.rate as any) + (freightShare + insuranceShare) / qty;
+                  const amtCalc = itemAmt + freightShare + insuranceShare;
+                  return { li, qty, freightShare, insuranceShare, rateCalc, amtCalc };
+                });
+                const totalCalcAmt = calcRows.reduce((s, r) => s + r.amtCalc, 0);
+
+                return (
+                  <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: 14, marginBottom: 8 }}>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 0 }}>
+                      Rate Calculation for Client Invoice
+                    </p>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+                        <thead>
+                          <tr>
+                            {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM",
+                              `Rate Calculated (${currencyCode})`, `Amount (${currencyCode})`].map((h, i) => (
+                              <th key={i} style={{ ...TH, color: i === 6 ? "#e53e3e" : "var(--text-muted)" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {calcRows.map(({ li, qty, freightShare, insuranceShare, rateCalc, amtCalc }, idx) => (
+                            <tr key={li.id}>
+                              <td style={TD}>{idx + 1}</td>
+                              <td style={TD}>{li.hsn_code || "—"}</td>
+                              <td style={{ ...TD, fontWeight: 600, color: "var(--text-primary)" }}>{li.item_code}</td>
+                              <td style={TD}>{li.description}</td>
+                              <td style={{ ...TD, textAlign: "right" }}>{fmtQty(li.total_quantity)}</td>
+                              <td style={TD}>{li.uom_abbr ?? "—"}</td>
+                              <td style={{ ...TD, textAlign: "right", color: "#e53e3e", fontWeight: 600 }}>
+                                {fmt(rateCalc)}
+                                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 400, marginTop: 2, fontFamily: "var(--font-body)" }}>
+                                  {freightShare > 0 && <div>+{fmt(freightShare / qty)} freight</div>}
+                                  {insuranceShare > 0 && <div>+{fmt(insuranceShare / qty)} ins.</div>}
+                                </div>
+                              </td>
+                              <td style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmt(amtCalc)}</td>
+                            </tr>
+                          ))}
+                          <tr style={{ background: "var(--bg-base)" }}>
+                            <td colSpan={7} style={{ ...TD, textAlign: "right", fontWeight: 600, fontSize: 13 }}>CIF Total</td>
+                            <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: 14, color: "var(--primary)" }}>{currencyCode} {fmt(totalCalcAmt)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {ci.lc_details && (
                 <div style={{ marginTop: 16, borderTop: "1px solid var(--border-light)", paddingTop: 12 }}>
