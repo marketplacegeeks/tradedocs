@@ -56,6 +56,14 @@ def fmt_money(v: Any) -> str:
         return safe(v)
 
 
+def fmt_rate(v: Any) -> str:
+    """Format rate always showing exactly 4 decimal places."""
+    try:
+        return f"{float(v):,.4f}"
+    except Exception:
+        return safe(v)
+
+
 def fmt_qty(v: Any) -> str:
     """Format quantity with 3 decimal places."""
     try:
@@ -141,7 +149,7 @@ def _org_country_name(org) -> str:
 # MAIN PDF GENERATOR
 # ============================================================================
 
-def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
+def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     """
     Generate Proforma Invoice PDF with professional black and white design.
 
@@ -287,7 +295,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     exp_detail_html = "<br/>".join([exp_name] + exp_detail_parts)
 
     story.append(Paragraph(exp_name, style_company_header))
-    story.append(Paragraph("PROFORMA INVOICE CUM SALES CONTRACT", style_title))
+    doc_title = "CLIENT INVOICE" if client_invoice else "PROFORMA INVOICE CUM SALES CONTRACT"
+    story.append(Paragraph(doc_title, style_title))
 
     # Separator line
     line_table = Table([[""]], colWidths=[180 * mm])
@@ -487,10 +496,31 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     li_rows = [li_header]
     line_items_total = Decimal("0.00")
 
+    # For client invoice, pre-compute CIF-adjusted rate and amount per line item.
+    # Same formula used in the UI's renderCIFRateCalculation component.
+    cif_overrides = {}  # it.pk → (cif_rate: float, cif_amount: Decimal)
+    if client_invoice:
+        all_items = list(invoice.line_items.all().order_by("id"))
+        total_qty_all = sum(float(getattr(it, "quantity", 0) or 0) for it in all_items)
+        total_fob_all = sum(float(getattr(it, "amount", 0) or 0) for it in all_items)
+        total_freight = float(getattr(invoice, "freight", None) or 0)
+        total_insurance = float(getattr(invoice, "insurance_amount", None) or 0)
+        freight_per_unit = total_freight / total_qty_all if total_qty_all > 0 else 0
+        for it in all_items:
+            base_rate = float(getattr(it, "rate", None) or 0)
+            qty = float(getattr(it, "quantity", None) or 0)
+            ins_per_unit = (total_insurance * base_rate) / total_fob_all if total_fob_all > 0 else 0
+            cif_rate = base_rate + freight_per_unit + ins_per_unit
+            cif_overrides[it.pk] = (cif_rate, Decimal(str(round(cif_rate * qty, 2))))
+
     for idx, it in enumerate(invoice.line_items.all().order_by("id"), start=1):
         uom_obj = getattr(it, "uom", None)
         uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
-        amount = getattr(it, "amount", None)
+        if client_invoice and it.pk in cif_overrides:
+            display_rate, amount = cif_overrides[it.pk]
+        else:
+            display_rate = getattr(it, "rate", None)
+            amount = getattr(it, "amount", None)
         if amount is not None:
             try:
                 line_items_total += Decimal(str(amount))
@@ -502,7 +532,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             Paragraph(safe(it.item_code), style_text),
             Paragraph(safe(it.description), style_text),
             Paragraph(f"{fmt_qty(it.quantity)} {uom_display}".strip(), style_text),
-            Paragraph(fmt_money(it.rate), style_text),
+            Paragraph(fmt_rate(display_rate), style_text),
             Paragraph(fmt_money(amount), style_text),
         ])
 
@@ -557,7 +587,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         "destination_charges": "Destination Charges",
     }
     seller_fields = _SELLER_FIELDS.get(incoterm_disp, [])
-    show_cost_breakdown = bool(incoterm_disp) and incoterm_disp != "EXW"
+    # For client invoice, CIF rates already include freight & insurance — skip the cost breakdown.
+    show_cost_breakdown = bool(incoterm_disp) and incoterm_disp != "EXW" and not client_invoice
 
     invoice_total_pdf = grand_total
     for field in seller_fields:
@@ -568,7 +599,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             except Exception:
                 pass
 
-    final_total = invoice_total_pdf if incoterm_disp else grand_total
+    # Client invoice total is just the sum of CIF line amounts (no separate freight/ins rows).
+    final_total = grand_total if client_invoice else (invoice_total_pdf if incoterm_disp else grand_total)
 
     totals_rows = []
 
@@ -608,7 +640,12 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
                 Paragraph(f"{currency_code} {fmt_money(val)}", style_text),
             ])
 
-    if incoterm_disp:
+    if incoterm_disp and client_invoice:
+        totals_rows.append([
+            Paragraph("<b>Total CIF Amount (Payable)</b>", style_label),
+            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label),
+        ])
+    elif incoterm_disp:
         totals_rows.append([
             Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
             Paragraph(f"<b>{currency_code} {fmt_money(invoice_total_pdf)}</b>", style_label),
@@ -788,10 +825,10 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     return pdf_bytes
 
 
-def generate_pi_pdf(pi):
+def generate_pi_pdf(pi, client_invoice=False):
     """Wrapper used by the PI view — returns an in-memory BytesIO buffer."""
     import io
-    pdf_bytes = generate_proforma_invoice_pdf_bytes(pi)
+    pdf_bytes = generate_proforma_invoice_pdf_bytes(pi, client_invoice=client_invoice)
     buffer = io.BytesIO(pdf_bytes)
     buffer.seek(0)
     return buffer

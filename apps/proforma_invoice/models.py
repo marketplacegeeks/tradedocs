@@ -226,8 +226,8 @@ class ProformaInvoiceLineItem(models.Model):
         null=True,
         blank=True,
     )
-    # Constraint #5: 2 decimal places for monetary amounts
-    rate = models.DecimalField(max_digits=15, decimal_places=2)
+    # 4 decimal places to support fractional unit pricing
+    rate = models.DecimalField(max_digits=15, decimal_places=4)
     # Stored so PDF reads it directly without re-multiplying; updated on every save
     amount = models.DecimalField(max_digits=15, decimal_places=2, editable=False)
 

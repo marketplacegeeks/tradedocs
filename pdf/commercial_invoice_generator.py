@@ -91,16 +91,9 @@ def _fmt_money(v: Any) -> str:
 
 
 def _fmt_rate(v: Any) -> str:
-    """Format rate - show up to 4 decimal places, strip trailing zeros (e.g. 12.5121→12.5121, 12.50→12.5)."""
+    """Format rate always showing exactly 4 decimal places."""
     try:
-        num = Decimal(str(v))
-        if num == num.to_integral_value():
-            return f"{int(num):,}"
-        formatted = f"{num:.4f}".rstrip('0').rstrip('.')
-        if '.' in formatted:
-            int_part, dec_part = formatted.split('.')
-            return f"{int(int_part):,}.{dec_part}"
-        return f"{int(formatted):,}"
+        return f"{float(v):,.4f}"
     except Exception:
         return safe(v)
 
@@ -254,7 +247,7 @@ def _make_ci_styles():
     return style_company_header, style_title, style_label, style_text, style_small, style_table_header
 
 
-def build_ci_story(ci, styles) -> list:
+def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     style_company_header, style_title, style_label, style_text, style_small, style_table_header = styles
     story = []
 
@@ -521,6 +514,23 @@ def build_ci_story(ci, styles) -> list:
     li_rows = [li_header]
     line_items_total = Decimal("0.00")
 
+    # For client invoice, pre-compute CIF-adjusted rate/amount per line item using
+    # the linked PI's freight and insurance_amount values (same formula as the UI).
+    cif_overrides = {}  # it.pk → (cif_rate: float, cif_amount: Decimal)
+    if client_invoice and pi is not None:
+        all_ci_items = list(ci.line_items.all().order_by("id"))
+        total_qty_all = sum(float(getattr(it, "total_quantity", 0) or 0) for it in all_ci_items)
+        total_fob_all = sum(float(getattr(it, "amount", 0) or 0) for it in all_ci_items)
+        total_freight = float(getattr(pi, "freight", None) or 0)
+        total_insurance = float(getattr(pi, "insurance_amount", None) or 0)
+        freight_per_unit = total_freight / total_qty_all if total_qty_all > 0 else 0
+        for it in all_ci_items:
+            base_rate = float(getattr(it, "rate", None) or 0)
+            qty = float(getattr(it, "total_quantity", None) or 0)
+            ins_per_unit = (total_insurance * base_rate) / total_fob_all if total_fob_all > 0 else 0
+            cif_rate = base_rate + freight_per_unit + ins_per_unit
+            cif_overrides[it.pk] = (cif_rate, Decimal(str(round(cif_rate * qty, 2))))
+
     idx = 0
     for it in ci.line_items.all().order_by("id"):
         idx += 1
@@ -530,8 +540,11 @@ def build_ci_story(ci, styles) -> list:
         uom_obj = getattr(it, "uom", None)
         uom_display = safe(getattr(uom_obj, "abbreviation", "")) if uom_obj else ""
         qty_val = getattr(it, "total_quantity", None)
-        rate_val = getattr(it, "rate", None)
-        amount_val = getattr(it, "amount", None)
+        if client_invoice and it.pk in cif_overrides:
+            rate_val, amount_val = cif_overrides[it.pk]
+        else:
+            rate_val = getattr(it, "rate", None)
+            amount_val = getattr(it, "amount", None)
 
         if amount_val is not None:
             try:
@@ -601,22 +614,25 @@ def build_ci_story(ci, styles) -> list:
 
     freight_amount = Decimal("0.00")
     insurance_amount = Decimal("0.00")
-    # Only include freight/insurance if the field was actually filled in (not None)
+    # Only include freight/insurance if the field was actually filled in (not None).
+    # For client invoice, rates already include freight & insurance — skip separate rows.
     show_freight = False
     show_insurance = False
-    if "freight" in visible_fields and getattr(ci, "freight", None) is not None:
-        try:
-            freight_amount = Decimal(str(ci.freight))
-            show_freight = True
-        except Exception:
-            pass
-    if "insurance" in visible_fields and getattr(ci, "insurance", None) is not None:
-        try:
-            insurance_amount = Decimal(str(ci.insurance))
-            show_insurance = True
-        except Exception:
-            pass
-    invoice_total = line_items_total + freight_amount + insurance_amount
+    if not client_invoice:
+        if "freight" in visible_fields and getattr(ci, "freight", None) is not None:
+            try:
+                freight_amount = Decimal(str(ci.freight))
+                show_freight = True
+            except Exception:
+                pass
+        if "insurance" in visible_fields and getattr(ci, "insurance", None) is not None:
+            try:
+                insurance_amount = Decimal(str(ci.insurance))
+                show_insurance = True
+            except Exception:
+                pass
+    # For client invoice, line_items_total already is the CIF total.
+    invoice_total = line_items_total if client_invoice else line_items_total + freight_amount + insurance_amount
 
     # Build left cell: net/gross weight stacked, then optional L/C Details below
     left_inner_rows = [
@@ -686,9 +702,10 @@ def build_ci_story(ci, styles) -> list:
     ]))
     story.append(totals_charges_tbl)
 
+    invoice_total_label = "Total CIF Amount (Payable)" if client_invoice else "Invoice Total (Amount Payable)"
     invoice_total_tbl = Table(
         [[
-            Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
+            Paragraph(f"<b>{invoice_total_label}</b>", style_label),
             Paragraph(f"<b>{currency_code} {_fmt_money(invoice_total)}</b>", style_label),
         ]],
         colWidths=[140 * mm, 40 * mm],
