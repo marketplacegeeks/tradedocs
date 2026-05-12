@@ -1,7 +1,7 @@
 // Proforma Invoice detail page — FR-09.5 (line items), FR-09.7 (cost breakdown), FR-08 (workflow).
 // Shows header, editable line items + charges (in DRAFT/REWORK), cost breakdown, workflow buttons, PDF download.
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal, Tooltip } from "antd";
@@ -263,15 +263,17 @@ export default function ProformaInvoiceDetailPage() {
   const sellerFields = INCOTERM_SELLER_FIELDS[incotermsCode] ?? new Set<string>();
   const currencyCode = pi.currency_display?.code || "USD";
 
-  // Initialise cost fields from server data
-  function initCostFields() {
+  // Seed cost fields from server data once when PI first loads.
+  useEffect(() => {
+    if (!pi) return;
     setCostFields({
       freight: pi.freight ?? "",
       insurance_amount: pi.insurance_amount ?? "",
       import_duty: pi.import_duty ?? "",
       destination_charges: pi.destination_charges ?? "",
     });
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pi?.id]);
 
   // ---- Render: Line Items table -------------------------------------------
 
@@ -312,11 +314,19 @@ export default function ProformaInvoiceDetailPage() {
               <tr style={{ background: "var(--bg-base)" }}>
                 {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM", `Rate (${currencyCode})`, `Amount (${currencyCode})`, canEdit ? "" : null]
                   .filter(Boolean)
-                  .map((h) => (
-                    <th key={h} style={{ ...TD, fontWeight: 600, fontSize: 11, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>
-                      {h}
-                    </th>
-                  ))}
+                  .map((h) => {
+                    const isRateHeader = h === `Rate (${currencyCode})`;
+                    const isCIF = incotermsCode === "CIF";
+                    return (
+                      <th key={h as string} style={{ ...TD, fontWeight: 600, fontSize: 11, textTransform: "uppercase", color: isRateHeader && isCIF ? "#e53e3e" : "var(--text-muted)", letterSpacing: "0.04em" }}>
+                        {isRateHeader && isCIF ? (
+                          <Tooltip title="Ex works rate">
+                            <span style={{ cursor: "help" }}>{h}</span>
+                          </Tooltip>
+                        ) : h}
+                      </th>
+                    );
+                  })}
               </tr>
             </thead>
             <tbody>
