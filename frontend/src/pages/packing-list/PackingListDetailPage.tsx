@@ -264,7 +264,6 @@ function ContainersTab({ pl }: { pl: PackingList }) {
             <Field label="Container Ref" value={container.container_ref} />
             <Field label="Marks & Numbers" value={container.marks_numbers} />
             <Field label="Seal Number" value={container.seal_number} />
-            <Field label="Tare Weight" value={`${container.tare_weight} kg`} />
             <Field label="Gross Weight" value={`${container.gross_weight} kg`} />
           </div>
 
