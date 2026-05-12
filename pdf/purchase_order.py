@@ -405,6 +405,22 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(details_table)
+
+    internal_contract_number = _safe(getattr(po, "internal_contract_number", "")).strip()
+    if internal_contract_number:
+        icn_table = Table(
+            [[Paragraph(f"<b>Internal Contract Number:</b> {internal_contract_number}", style_text)]],
+            colWidths=[180 * mm],
+        )
+        icn_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(icn_table)
+
     story.append(Spacer(1, 10))
 
     # ========================================================================

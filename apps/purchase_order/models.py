@@ -101,6 +101,8 @@ class PurchaseOrder(models.Model):
 
     time_of_delivery = models.CharField(max_length=200, blank=True, default="")
 
+    internal_contract_number = models.CharField(max_length=200, blank=True, default="")
+
     # T&C snapshot — template FK + body copied at selection time
     tc_template = models.ForeignKey(
         "master_data.TCTemplate",

@@ -149,6 +149,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "country_of_origin",
             "transaction_type",
             "time_of_delivery",
+            "internal_contract_number",
             "tc_template",
             "tc_content",
             "line_item_remarks",

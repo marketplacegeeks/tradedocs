@@ -98,6 +98,7 @@ const schema = z.object({
   country_of_origin: z.number().nullable().optional(),
   transaction_type: z.string().min(1, "Transaction Type is required"),
   time_of_delivery: z.string().optional().default(""),
+  internal_contract_number: z.string().optional().default(""),
   tc_template: z.number().nullable().optional(),
   tc_content: z.string().optional().default(""),
   line_item_remarks: z.string().optional().default(""),
@@ -303,6 +304,7 @@ export default function PurchaseOrderFormPage() {
       country_of_origin: existingPO.country_of_origin,
       transaction_type: existingPO.transaction_type,
       time_of_delivery: existingPO.time_of_delivery,
+      internal_contract_number: existingPO.internal_contract_number,
       tc_template: existingPO.tc_template,
       tc_content: existingPO.tc_content,
       line_item_remarks: existingPO.line_item_remarks,
@@ -757,6 +759,17 @@ export default function PurchaseOrderFormPage() {
                 )}
               />
             </div>
+          </div>
+
+          {/* Row 5: Internal Contract Number */}
+          <div style={{ marginTop: 16 }}>
+            <label style={LABEL}>Internal Contract Number</label>
+            <input
+              {...register("internal_contract_number")}
+              style={INPUT}
+              placeholder="Internal contract reference"
+              disabled={!inEditableState}
+            />
           </div>
         </div>
 
