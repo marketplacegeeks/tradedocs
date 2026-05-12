@@ -112,8 +112,8 @@ class CommercialInvoiceLineItem(models.Model):
     )
     # Constraint #6: 3 decimal places for quantity
     total_quantity = models.DecimalField(max_digits=12, decimal_places=3)
-    # Constraint #5: 2 decimal places for monetary amounts
-    rate = models.DecimalField(max_digits=15, decimal_places=2)
+    # 4 decimal places to support fractional rates (e.g. 12.5121)
+    rate = models.DecimalField(max_digits=15, decimal_places=4)
     # Stored computed value: total_quantity × rate
     amount = models.DecimalField(
         max_digits=15, decimal_places=2, editable=False

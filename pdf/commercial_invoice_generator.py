@@ -90,6 +90,21 @@ def _fmt_money(v: Any) -> str:
         return safe(v)
 
 
+def _fmt_rate(v: Any) -> str:
+    """Format rate - show up to 4 decimal places, strip trailing zeros (e.g. 12.5121→12.5121, 12.50→12.5)."""
+    try:
+        num = Decimal(str(v))
+        if num == num.to_integral_value():
+            return f"{int(num):,}"
+        formatted = f"{num:.4f}".rstrip('0').rstrip('.')
+        if '.' in formatted:
+            int_part, dec_part = formatted.split('.')
+            return f"{int(int_part):,}.{dec_part}"
+        return f"{int(formatted):,}"
+    except Exception:
+        return safe(v)
+
+
 def _fmt_qty(v: Any) -> str:
     """Format quantity - show decimals only if non-zero (max 3 decimal places)."""
     try:
@@ -531,7 +546,7 @@ def build_ci_story(ci, styles) -> list:
             Paragraph(safe(it.item_code), style_text),
             Paragraph(safe(it.description), style_text),
             Paragraph(f"{_fmt_qty(qty_val)} {uom_display}".strip(), style_text),
-            Paragraph(_fmt_money(rate_val), style_text),
+            Paragraph(_fmt_rate(rate_val), style_text),
             Paragraph(_fmt_money(amount_val), style_text),
         ])
 

@@ -844,8 +844,8 @@ function Step3({
 
   async function savePendingContainer(idx: number) {
     const { _item, ...c } = pendingContainers[idx];
-    if (!c.container_ref || !c.marks_numbers || !c.seal_number || !c.tare_weight) {
-      message.error("Container Ref, Marks & Numbers, Seal Number, and Tare Weight are required.");
+    if (!c.container_ref || !c.marks_numbers || !c.seal_number) {
+      message.error("Container Ref, Marks & Numbers, and Seal Number are required.");
       return;
     }
     const item = _item as Record<string, any> | undefined;
@@ -856,7 +856,7 @@ function Step3({
         container_ref: c.container_ref,
         marks_numbers: c.marks_numbers,
         seal_number: c.seal_number,
-        tare_weight: c.tare_weight,
+        tare_weight: "0",
       });
       setPendingContainers((prev) => prev.filter((_, i) => i !== idx));
       if (itemReady && item) {
@@ -1046,20 +1046,13 @@ function Step3({
           </div>
 
           {/* Field label headers row 2 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
-            {["Tare Weight (kg) *", "Seal Number *", "Gross Weight (auto)"].map((h, i) => (
-              <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 2 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+            {["Seal Number *", "Gross Weight (auto)"].map((h, i) => (
+              <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 1 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
             ))}
           </div>
           {/* Field inputs row 2 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
-            <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
-              <input
-                style={{ ...INPUT, fontSize: 13 }}
-                defaultValue={c.tare_weight}
-                onBlur={(e) => updateContainer(c.id, { tare_weight: e.target.value }).then(invalidate)}
-              />
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
             <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
               <input
                 style={{ ...INPUT, fontSize: 13 }}
@@ -1339,21 +1332,13 @@ function Step3({
             </div>
 
             {/* Row 2 labels */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
-              {["Tare Weight (kg) *", "Seal Number *", "Gross Weight (auto)"].map((h, i) => (
-                <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 2 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+              {["Seal Number *", "Gross Weight (auto)"].map((h, i) => (
+                <div key={h} style={{ ...containerHeaderStyle, borderRight: i < 1 ? "1px solid var(--border-light)" : "none" }}>{h}</div>
               ))}
             </div>
             {/* Row 2 inputs */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
-              <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
-                <input type="number" style={{ ...INPUT, fontSize: 13 }} placeholder="0.000" value={data.tare_weight || ""}
-                  onChange={(e) => {
-                    const next = [...pendingContainers];
-                    next[pendingIdx] = { ...data, tare_weight: e.target.value };
-                    setPendingContainers(next);
-                  }} />
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
               <div style={{ padding: "6px 10px", borderRight: "1px solid var(--border-light)" }}>
                 <input style={{ ...INPUT, fontSize: 13 }} placeholder="e.g. SEAL-9901" value={data.seal_number || ""}
                   onChange={(e) => {
@@ -1364,12 +1349,11 @@ function Step3({
               </div>
               <div style={{ padding: "6px 10px" }}>
                 <input style={INPUT_READONLY} readOnly value={(() => {
-                  const tare = parseFloat(data.tare_weight || "0");
                   const nop = parseFloat(data._item?.no_of_packages || "0");
                   const qpp = parseFloat(data._item?.qty_per_package || "0");
                   const wpup = parseFloat(data._item?.weight_per_unit_packaging || "0");
                   const itemGross = nop * qpp + nop * wpup;
-                  return data.tare_weight ? (tare + itemGross).toFixed(3) : "—";
+                  return itemGross > 0 ? itemGross.toFixed(3) : "—";
                 })()} />
               </div>
             </div>
@@ -1750,7 +1734,7 @@ function Step4({
                   <td style={TD}>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       style={{ ...INPUT, width: 120 }}
                       value={rate}
                       onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })}

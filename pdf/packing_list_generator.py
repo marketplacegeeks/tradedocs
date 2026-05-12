@@ -535,7 +535,6 @@ def build_pl_story(packing_list, styles):
     story.append(Spacer(1, 12))
 
     total_net = Decimal("0.000")
-    total_tare = Decimal("0.000")
     total_gross = Decimal("0.000")
 
     for cont in packing_list.containers.all().order_by("id"):
@@ -561,7 +560,6 @@ def build_pl_story(packing_list, styles):
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
 
-        tare_val = getattr(cont, "tare_weight", None)
         gross_val = getattr(cont, "gross_weight", None)
 
         net_val = None
@@ -578,8 +576,6 @@ def build_pl_story(packing_list, styles):
         try:
             if net_val is not None:
                 total_net += Decimal(str(net_val))
-            if tare_val is not None:
-                total_tare += Decimal(str(tare_val))
             if gross_val is not None:
                 total_gross += Decimal(str(gross_val))
         except Exception:
@@ -589,10 +585,10 @@ def build_pl_story(packing_list, styles):
             [[
                 Paragraph("<b>Net Weight</b>", style_label),
                 Paragraph(f"{_fmt_decimal(net_val, 1)} KGS" if net_val is not None else "-", style_text),
-                Paragraph("<b>Tare Weight</b>", style_label),
-                Paragraph(f"{_fmt_decimal(tare_val, 1)} KGS" if tare_val is not None else "-", style_text),
+                "",  # merged into net weight value cell
                 Paragraph("<b>Gross Weight</b>", style_label),
                 Paragraph(f"{_fmt_decimal(gross_val, 1)} KGS" if gross_val is not None else "-", style_text),
+                "",  # merged into gross weight value cell
             ]],
             colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
         )
@@ -605,9 +601,10 @@ def build_pl_story(packing_list, styles):
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
-            ("ALIGN", (5, 0), (5, 0), "RIGHT"),
+            ("SPAN", (1, 0), (2, 0)),
+            ("SPAN", (4, 0), (5, 0)),
+            ("ALIGN", (1, 0), (2, 0), "RIGHT"),
+            ("ALIGN", (4, 0), (5, 0), "RIGHT"),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
         ]))
 
@@ -687,10 +684,10 @@ def build_pl_story(packing_list, styles):
         [[
             Paragraph("<b>Total Net Weight</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text),
-            Paragraph("<b>Total Tare Weight</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_tare, 1)} KGS", style_text),
+            "",  # merged into net weight value cell
             Paragraph("<b>Total Gross Weight</b>", style_label),
             Paragraph(f"{_fmt_decimal(total_gross, 1)} KGS", style_text),
+            "",  # merged into gross weight value cell
         ]],
         colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
     )
@@ -703,9 +700,10 @@ def build_pl_story(packing_list, styles):
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-        ("ALIGN", (3, 0), (3, 0), "RIGHT"),
-        ("ALIGN", (5, 0), (5, 0), "RIGHT"),
+        ("SPAN", (1, 0), (2, 0)),
+        ("SPAN", (4, 0), (5, 0)),
+        ("ALIGN", (1, 0), (2, 0), "RIGHT"),
+        ("ALIGN", (4, 0), (5, 0), "RIGHT"),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
     ]))
     story.append(totals_tbl)

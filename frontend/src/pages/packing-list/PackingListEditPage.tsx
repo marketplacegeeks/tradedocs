@@ -568,8 +568,8 @@ export default function PackingListEditPage() {
                 }}><Trash2 size={12} /></button>
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-              {[["container_ref", "Container Ref *"], ["marks_numbers", "Marks & Numbers *"], ["seal_number", "Seal Number *"], ["tare_weight", "Tare Weight (kg) *"]].map(([field, label]) => (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+              {[["container_ref", "Container Ref *"], ["marks_numbers", "Marks & Numbers *"], ["seal_number", "Seal Number *"]].map(([field, label]) => (
                 <div key={field}>
                   <label style={LABEL}>{label}</label>
                   <input style={INPUT} defaultValue={(c as any)[field]} onBlur={(e) => {
@@ -664,7 +664,7 @@ export default function PackingListEditPage() {
                     <td style={TD}>{li.total_quantity}</td>
                     <td style={TD}>{li.uom_abbr ?? "—"}</td>
                     <td style={TD}>
-                      <input type="number" step="0.01" style={{ ...INPUT, width: 120 }} value={rate}
+                      <input type="number" step="0.0001" style={{ ...INPUT, width: 120 }} value={rate}
                         onChange={(e) => setRateForm({ ...rateForm, [li.id]: e.target.value })} />
                     </td>
                     <td style={{ ...TD, fontWeight: 600 }}>{getCurrencySymbol(ci.currency_display?.code)}{amount}</td>
