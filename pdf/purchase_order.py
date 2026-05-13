@@ -308,23 +308,8 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     country_obj = getattr(po, "country_of_origin", None)
     country_name = _safe(getattr(country_obj, "name", "")) if country_obj else "—"
 
-    internal_contact = getattr(po, "internal_contact", None)
-    contact_name = _safe(getattr(internal_contact, "get_full_name", lambda: "")()) if internal_contact else "—"
-    contact_email = _safe(getattr(internal_contact, "email", "")) if internal_contact else ""
-    contact_phone = ""
-    if internal_contact:
-        cc = _safe(getattr(internal_contact, "phone_country_code", ""))
-        ph = _safe(getattr(internal_contact, "phone_number", ""))
-        if cc and ph:
-            contact_phone = f"{cc} {ph}"
-
-    # Build buyer contact block: Name + Email + Phone
-    buyer_contact_parts = [f"<b>Buyer Contact:</b> {contact_name}"]
-    if contact_email:
-        buyer_contact_parts.append(f"<b>Email:</b> {contact_email}")
-    if contact_phone:
-        buyer_contact_parts.append(f"<b>Phone:</b> {contact_phone}")
-    buyer_contact_html = "<br/>".join(buyer_contact_parts)
+    contact_name = _safe(getattr(po, "internal_contact", "")) or "—"
+    buyer_contact_html = f"<b>Buyer Contact:</b> {contact_name}"
 
     # Delivery address: prepend organisation name if available
     delivery_addr = getattr(po, "delivery_address", None)

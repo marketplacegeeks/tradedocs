@@ -51,11 +51,10 @@ def make_po_payload(vendor=None, delivery_address=None, currency=None, uom=None)
         delivery_address = DeliveryAddressFactory(organisation=vendor)
     if currency is None:
         currency = CurrencyFactory()
-    internal_contact = MakerFactory()
     return {
         "po_date": "2026-03-22",
         "vendor": vendor.pk,
-        "internal_contact": internal_contact.pk,
+        "internal_contact": "Test Contact",
         "delivery_address": delivery_address.pk,
         "currency": currency.pk,
         "transaction_type": "ZERO_RATED",

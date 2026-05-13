@@ -112,7 +112,7 @@ function exportToCsv(rows: PurchaseOrder[]) {
         po.buyer_name ?? "",
         po.vendor_name,
         po.customer_no,
-        po.internal_contact_name,
+        po.internal_contact,
         po.delivery_city_country,
         po.currency_code,
         txLabel[po.transaction_type] ?? po.transaction_type,
@@ -196,7 +196,6 @@ export default function R06PurchaseOrderRegister({ selectedReport }: Props) {
     if (applied.buyer) p.buyer = Number(applied.buyer);
     if (applied.currency) p.currency = Number(applied.currency);
     if (applied.transaction_type) p.transaction_type = applied.transaction_type;
-    if (applied.internal_contact) p.internal_contact = Number(applied.internal_contact);
     if (applied.country_of_origin) p.country_of_origin = Number(applied.country_of_origin);
     if (applied.dateFrom) p.po_date_after = applied.dateFrom;
     if (applied.dateTo) p.po_date_before = applied.dateTo;
@@ -263,8 +262,8 @@ export default function R06PurchaseOrderRegister({ selectedReport }: Props) {
     },
     {
       title: "Internal Contact",
-      dataIndex: "internal_contact_name",
-      key: "internal_contact_name",
+      dataIndex: "internal_contact",
+      key: "internal_contact",
       width: 160,
       ellipsis: true,
       render: (val: string | null) => val ?? "—",
@@ -490,26 +489,6 @@ export default function R06PurchaseOrderRegister({ selectedReport }: Props) {
               options={TX_TYPE_OPTIONS}
               value={staged.transaction_type || ""}
               onChange={(val) => setStaged((prev) => ({ ...prev, transaction_type: val }))}
-            />
-          </div>
-
-          {/* Internal Contact */}
-          <div>
-            <div style={labelStyle}>Internal Contact</div>
-            <Select
-              style={{ width: "100%" }}
-              placeholder="All contacts"
-              allowClear
-              showSearch
-              value={staged.internal_contact || undefined}
-              onChange={(val) => setStaged((prev) => ({ ...prev, internal_contact: val ?? "" }))}
-              options={users.filter((u) => u.is_active).map((u) => ({
-                value: String(u.id),
-                label: u.full_name,
-              }))}
-              filterOption={(input, option) =>
-                (option?.label as string ?? "").toLowerCase().includes(input.toLowerCase())
-              }
             />
           </div>
 

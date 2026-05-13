@@ -44,12 +44,8 @@ class PurchaseOrder(models.Model):
         db_index=True,
     )
 
-    # The user who is the internal point of contact for this PO
-    internal_contact = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="purchase_orders_as_contact",
-    )
+    # Free-text name of the internal point of contact for this PO
+    internal_contact = models.CharField(max_length=200, blank=True, default="")
 
     # Optional buyer organisation — tagged as BUYER
     buyer = models.ForeignKey(

@@ -376,12 +376,8 @@ export default function PurchaseOrderDetailPage() {
           {po.buyer_name && <LabelValue label="Buyer" value={po.buyer_name} />}
           <LabelValue label="Delivery Address" value={po.delivery_address_detail} />
           <LabelValue label="Customer No" value={po.customer_no} />
-          <LabelValue label="Buyer Contact" value={po.internal_contact_name} />
-          {po.internal_contact_email && (
-            <LabelValue label="Contact Email" value={po.internal_contact_email} />
-          )}
-          {po.internal_contact_phone && (
-            <LabelValue label="Contact Phone" value={po.internal_contact_phone} />
+          {po.internal_contact && (
+            <LabelValue label="Internal Contact" value={po.internal_contact} />
           )}
         </div>
       </div>

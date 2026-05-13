@@ -35,7 +35,7 @@ class PurchaseOrderFilterSet(django_filters.FilterSet):
         model = PurchaseOrder
         fields = [
             "status", "created_by", "vendor", "buyer",
-            "currency", "transaction_type", "internal_contact", "country_of_origin",
+            "currency", "transaction_type", "country_of_origin",
             "po_number",
         ]
 
@@ -64,7 +64,6 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             .select_related(
                 "vendor",
                 "buyer",
-                "internal_contact",
                 "delivery_address",
                 "delivery_address__country",
                 "bank",

@@ -29,7 +29,6 @@ import { listBanks } from "../../api/banks";
 import { listPaymentTerms, listUOMs } from "../../api/referenceData";
 import { listCountries } from "../../api/countries";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
-import { listUsers } from "../../api/users";
 import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABELS } from "../../utils/constants";
 import { extractApiError } from "../../utils/apiErrors";
 
@@ -90,7 +89,7 @@ const schema = z.object({
   customer_no: z.string().optional().default(""),
   vendor: z.number({ required_error: "Vendor is required" }),
   buyer: z.number().nullable().optional(),
-  internal_contact: z.number({ required_error: "Internal Contact is required" }),
+  internal_contact: z.string().optional().default(""),
   delivery_address: z.number({ required_error: "Delivery Address is required" }),
   bank: z.number().nullable().optional(),
   currency: z.number({ required_error: "Currency is required" }),
@@ -218,9 +217,6 @@ export default function PurchaseOrderFormPage() {
   const [deliveryAddresses, setDeliveryAddresses] = useState<OrgAddress[]>([]);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
 
-  // ---- Contact phone display
-  const [contactPhone, setContactPhone] = useState("");
-
   // ---- Header form
   const {
     control,
@@ -240,7 +236,6 @@ export default function PurchaseOrderFormPage() {
 
   const watchedVendor = watch("vendor");
   const watchedBuyer = watch("buyer");
-  const watchedContact = watch("internal_contact");
   const watchedTxType = watch("transaction_type");
 
   // ---- Master data queries
@@ -276,11 +271,6 @@ export default function PurchaseOrderFormPage() {
     queryKey: ["tc-templates"],
     queryFn: listTCTemplates,
   });
-  const { data: users = [] } = useQuery({
-    queryKey: ["users"],
-    queryFn: listUsers,
-  });
-
   // ---- Load existing PO in edit mode
   const { data: existingPO } = useQuery({
     queryKey: ["purchase-orders", Number(id)],
@@ -342,17 +332,6 @@ export default function PurchaseOrderFormPage() {
       .finally(() => setDeliveryLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedBuyer, watchedVendor]);
-
-  // ---- Update contact phone display when contact changes
-  useEffect(() => {
-    if (!watchedContact) { setContactPhone(""); return; }
-    const u = users.find((u) => u.id === watchedContact);
-    if (u?.phone_country_code && u?.phone_number) {
-      setContactPhone(`${u.phone_country_code} ${u.phone_number}`);
-    } else {
-      setContactPhone("");
-    }
-  }, [watchedContact, users]);
 
   // ---- Auto-populate TC content when template is selected
   const { data: selectedTemplate } = useQuery({
@@ -618,32 +597,13 @@ export default function PurchaseOrderFormPage() {
               />
             </div>
             <div>
-              <label style={LABEL}>Internal Contact <span style={{ color: "#e53e3e" }}>*</span></label>
-              <Controller
-                name="internal_contact"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    showSearch
-                    optionFilterProp="label"
-                    placeholder="Select contact…"
-                    style={{ width: "100%" }}
-                    disabled={!inEditableState}
-                    options={users
-                      .filter((u) => u.is_active)
-                      .map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` }))
-                      .sort((a, b) => a.label.localeCompare(b.label))
-                    }
-                  />
-                )}
+              <label style={LABEL}>Internal Contact</label>
+              <input
+                {...register("internal_contact")}
+                style={INPUT}
+                placeholder="Contact name"
+                disabled={!inEditableState}
               />
-              <FieldError msg={errors.internal_contact?.message} />
-              {contactPhone && (
-                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-                  📞 {contactPhone}
-                </p>
-              )}
             </div>
           </div>
 

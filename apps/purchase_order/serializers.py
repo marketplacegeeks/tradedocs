@@ -109,9 +109,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     buyer_name = serializers.CharField(source="buyer.name", allow_null=True, read_only=True)
     currency_code = serializers.CharField(source="currency.code", read_only=True)
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
-    internal_contact_name = serializers.CharField(source="internal_contact.get_full_name", read_only=True)
-    internal_contact_email = serializers.EmailField(source="internal_contact.email", read_only=True)
-    internal_contact_phone = serializers.SerializerMethodField()
     payment_terms_name = serializers.CharField(source="payment_terms.name", allow_null=True, read_only=True)
     country_of_origin_name = serializers.CharField(source="country_of_origin.name", allow_null=True, read_only=True)
     bank_name = serializers.SerializerMethodField()
@@ -138,9 +135,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "buyer",
             "buyer_name",
             "internal_contact",
-            "internal_contact_name",
-            "internal_contact_email",
-            "internal_contact_phone",
             "delivery_address",
             "bank",
             "currency",
@@ -225,13 +219,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if getattr(addr, "country", None):
             parts.append(addr.country.name)
         return ", ".join(parts)
-
-    def get_internal_contact_phone(self, obj):
-        """Return formatted phone string or empty string."""
-        user = obj.internal_contact
-        if user.phone_country_code and user.phone_number:
-            return f"{user.phone_country_code} {user.phone_number}"
-        return ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

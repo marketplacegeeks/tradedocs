@@ -34,7 +34,7 @@ class PurchaseOrderFactory(factory.django.DjangoModelFactory):
     po_number = factory.Sequence(lambda n: f"PO-2026-{n + 1:04d}")
     po_date = factory.Faker("date_object")
     vendor = factory.SubFactory(VendorOrganisationFactory)
-    internal_contact = factory.SubFactory(MakerFactory)
+    internal_contact = factory.Faker("name")
     delivery_address = factory.LazyAttribute(
         lambda obj: DeliveryAddressFactory(organisation=obj.vendor)
     )

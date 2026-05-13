@@ -36,10 +36,7 @@ export interface PurchaseOrder {
   vendor_name: string;
   buyer: number | null;
   buyer_name: string | null;
-  internal_contact: number;
-  internal_contact_name: string;
-  internal_contact_email: string;
-  internal_contact_phone: string;
+  internal_contact: string;
   delivery_address: number;
   bank: number | null;
   currency: number;
@@ -78,7 +75,7 @@ export interface PurchaseOrderCreatePayload {
   customer_no?: string;
   vendor: number;
   buyer?: number | null;
-  internal_contact: number;
+  internal_contact?: string;
   delivery_address: number;
   bank?: number | null;
   currency: number;
@@ -116,7 +113,6 @@ export interface PurchaseOrderFilters {
   buyer?: number;
   currency?: number;
   transaction_type?: string;
-  internal_contact?: number;
   country_of_origin?: number;
   po_number?: string;
   po_date_after?: string;
@@ -144,7 +140,6 @@ export async function listPurchaseOrdersReport(filters: PurchaseOrderFilters = {
   if (filters.buyer) params.set("buyer", String(filters.buyer));
   if (filters.currency) params.set("currency", String(filters.currency));
   if (filters.transaction_type) params.set("transaction_type", filters.transaction_type);
-  if (filters.internal_contact) params.set("internal_contact", String(filters.internal_contact));
   if (filters.country_of_origin) params.set("country_of_origin", String(filters.country_of_origin));
   if (filters.po_date_after) params.set("po_date_after", filters.po_date_after);
   if (filters.po_date_before) params.set("po_date_before", filters.po_date_before);
