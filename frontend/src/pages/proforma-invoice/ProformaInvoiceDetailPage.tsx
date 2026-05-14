@@ -19,7 +19,6 @@ import {
   deleteCharge,
   triggerWorkflowAction,
   downloadPiPdf,
-  downloadPiClientPdf,
   getAuditLog,
   uploadSignedCopy,
   hardDeleteProformaInvoice,
@@ -113,13 +112,6 @@ function formatMoney(v: string | null | undefined, currencyCode: string = "USD")
   return `${currencyCode} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// Rates can have up to 4 decimal places — show them if the user entered them.
-function formatRate(v: string | null | undefined, currencyCode: string = "USD") {
-  if (!v) return `${currencyCode} 0.00`;
-  const n = parseFloat(v);
-  return `${currencyCode} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
-}
-
 // ---- Line item form (inline) -----------------------------------------------
 
 interface LineItemFormData {
@@ -146,7 +138,6 @@ export default function ProformaInvoiceDetailPage() {
   const { user } = useAuth();
 
   const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
-  const [cifDownloadModalOpen, setCifDownloadModalOpen] = useState(false);
   const [addingLineItem, setAddingLineItem] = useState(false);
   const [editingLineItem, setEditingLineItem] = useState<ProformaInvoiceLineItem | null>(null);
   const [lineItemForm, setLineItemForm] = useState<LineItemFormData>(EMPTY_LINE_ITEM);
@@ -255,19 +246,6 @@ export default function ProformaInvoiceDetailPage() {
     });
   }
 
-  // Seed cost fields from server data once when PI first loads.
-  // Must be called before any early return to satisfy React's rules of hooks.
-  useEffect(() => {
-    if (!pi) return;
-    setCostFields({
-      freight: pi.freight ?? "",
-      insurance_amount: pi.insurance_amount ?? "",
-      import_duty: pi.import_duty ?? "",
-      destination_charges: pi.destination_charges ?? "",
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pi?.id]);
-
   if (isLoading || !pi) {
     return (
       <div style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-body)" }}>
@@ -284,6 +262,18 @@ export default function ProformaInvoiceDetailPage() {
   const incotermsCode = pi.incoterms_code ?? "";
   const sellerFields = INCOTERM_SELLER_FIELDS[incotermsCode] ?? new Set<string>();
   const currencyCode = pi.currency_display?.code || "USD";
+
+  // Seed cost fields from server data once when PI first loads.
+  useEffect(() => {
+    if (!pi) return;
+    setCostFields({
+      freight: pi.freight ?? "",
+      insurance_amount: pi.insurance_amount ?? "",
+      import_duty: pi.import_duty ?? "",
+      destination_charges: pi.destination_charges ?? "",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pi?.id]);
 
   // ---- Render: Line Items table -------------------------------------------
 
@@ -369,7 +359,7 @@ export default function ProformaInvoiceDetailPage() {
                     <td style={TD}>
                       <input
                         type="number"
-                        step="0.0001"
+                        step="0.01"
                         style={INPUT}
                         value={lineItemForm.rate}
                         onChange={(e) => setLineItemForm((prev) => ({ ...prev, rate: e.target.value }))}
@@ -399,7 +389,7 @@ export default function ProformaInvoiceDetailPage() {
                     <td style={TD}>{item.description}</td>
                     <td style={{ ...TD, textAlign: "right" }}>{parseFloat(item.quantity).toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
                     <td style={TD}>{uoms.find(u => u.id === (item.uom as any))?.abbreviation ?? "—"}</td>
-                    <td style={{ ...TD, textAlign: "right" }}>{formatRate(item.rate, currencyCode)}</td>
+                    <td style={{ ...TD, textAlign: "right" }}>{formatMoney(item.rate, currencyCode)}</td>
                     <td style={{ ...TD, textAlign: "right", fontWeight: 600 }}>{formatMoney(item.amount, currencyCode)}</td>
                     {canEdit && (
                       <td style={TD}>
@@ -641,118 +631,6 @@ export default function ProformaInvoiceDetailPage() {
     );
   }
 
-  // ---- Render: CIF Rate Calculation for Client Invoice --------------------
-
-  function renderCIFRateCalculation() {
-    try {
-    if (incotermsCode !== "CIF") return null;
-    if (!pi.line_items || pi.line_items.length === 0) return null;
-
-    const totalFreight = parseFloat(pi.freight ?? "0") || 0;
-    const totalInsurance = parseFloat(pi.insurance_amount ?? "0") || 0;
-
-    const totalQty = pi.line_items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-    const totalFOB = pi.line_items.reduce((sum, item) => sum + parseFloat(String(item.amount ?? "0")), 0);
-
-    // Freight per unit: flat across all items (Total Freight / Total Qty)
-    const freightPerUnit = totalQty > 0 ? totalFreight / totalQty : 0;
-
-    const rows = pi.line_items.map((item, idx) => {
-      const qty = parseFloat(item.quantity);
-      const rate = parseFloat(item.rate);
-      // Insurance per unit: scaled by item rate relative to total FOB per unit
-      const insurancePerUnit = totalFOB > 0 ? (totalInsurance * rate) / totalFOB : 0;
-      const rateCalculated = rate + freightPerUnit + insurancePerUnit;
-      const amountCalculated = rateCalculated * qty;
-      return { idx, item, qty, rate, freightPerUnit, insurancePerUnit, rateCalculated, amountCalculated };
-    });
-
-    const totalAmountCalculated = rows.reduce((sum, r) => sum + r.amountCalculated, 0);
-
-    const fmt = (n: number) =>
-      n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-
-    return (
-      <div style={CARD}>
-        <h2 style={SECTION_TITLE}>Rate Calculation for Client Invoice</h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700, tableLayout: "fixed" }}>
-            <colgroup>
-              <col style={{ width: 40 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 110 }} />
-              <col />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 210 }} />
-              <col style={{ width: 155 }} />
-            </colgroup>
-            <thead>
-              <tr style={{ background: "var(--bg-base)" }}>
-                {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM",
-                  `Rate Calculated (${currencyCode})`, `Amount (${currencyCode})`].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      ...TD,
-                      fontWeight: 600,
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      color: h.startsWith("Rate Calculated") ? "#e53e3e" : "var(--text-muted)",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ idx, item, qty, rate, freightPerUnit: fpu, insurancePerUnit: ipu, rateCalculated, amountCalculated }) => (
-                <tr key={item.id}>
-                  <td style={TD}>{idx + 1}</td>
-                  <td style={TD}>{item.hsn_code || "—"}</td>
-                  <td style={TD}>{item.item_code || "—"}</td>
-                  <td style={TD}>{item.description}</td>
-                  <td style={{ ...TD, textAlign: "right" }}>
-                    {qty.toLocaleString("en-US", { maximumFractionDigits: 3 })}
-                  </td>
-                  <td style={TD}>{uoms.find((u) => u.id === (item.uom as any))?.abbreviation ?? "—"}</td>
-                  <td style={TD}>
-                    <span style={{ fontWeight: 700, color: "#e53e3e", display: "block" }}>
-                      {currencyCode} {fmt(rateCalculated)}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginTop: 2, lineHeight: 1.6 }}>
-                      Base: {fmt(rate)} + Freight: {fmt(fpu)} + Ins: {fmt(ipu)}
-                    </span>
-                  </td>
-                  <td style={{ ...TD, textAlign: "right", fontWeight: 600, color: "#e53e3e" }}>
-                    {currencyCode} {fmt(amountCalculated)}
-                  </td>
-                </tr>
-              ))}
-              <tr style={{ background: "var(--bg-base)" }}>
-                <td
-                  colSpan={7}
-                  style={{ ...TD, textAlign: "right", fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}
-                >
-                  Total CIF Amount
-                </td>
-                <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: 14, color: "#e53e3e" }}>
-                  {currencyCode} {fmt(totalAmountCalculated)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-    } catch (e) {
-      console.error("CIF rate calculation render error:", e);
-      return null;
-    }
-  }
-
   // ---- Render: Signed copy (FR-08.4) — visible only when Approved ----------
 
   function renderSignedCopy() {
@@ -874,23 +752,19 @@ export default function ProformaInvoiceDetailPage() {
           </button>
           <button
             onClick={() => {
-              if (incotermsCode === "CIF") {
-                setCifDownloadModalOpen(true);
-              } else {
-                const today = new Date();
-                const dd = String(today.getDate()).padStart(2, "0");
-                const mm = String(today.getMonth() + 1).padStart(2, "0");
-                const yyyy = today.getFullYear();
-                const dateStr = `${dd}${mm}${yyyy}`;
-                const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
-                const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
-                const filename = isDraft
-                  ? `${dateStr}_Draft_ProformaInvoice_${consigneeName}.pdf`
-                  : `${dateStr}_ProformaInvoice_${consigneeName}.pdf`;
-                downloadPiPdf(piId, filename).catch(() =>
-                  message.error("PDF download failed. Please try again.")
-                );
-              }
+              const today = new Date();
+              const dd = String(today.getDate()).padStart(2, "0");
+              const mm = String(today.getMonth() + 1).padStart(2, "0");
+              const yyyy = today.getFullYear();
+              const dateStr = `${dd}${mm}${yyyy}`;
+              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+              const filename = isDraft
+                ? `${dateStr}_Draft_ProformaInvoice_${consigneeName}.pdf`
+                : `${dateStr}_ProformaInvoice_${consigneeName}.pdf`;
+              downloadPiPdf(piId, filename).catch(() =>
+                message.error("PDF download failed. Please try again.")
+              );
             }}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
@@ -1003,8 +877,6 @@ export default function ProformaInvoiceDetailPage() {
 
       {renderTotals()}
 
-      {renderCIFRateCalculation()}
-
       {/* Signed copy upload (FR-08.4) */}
       {renderSignedCopy()}
 
@@ -1025,58 +897,6 @@ export default function ProformaInvoiceDetailPage() {
         entries={auditLogs}
         title="Audit Log"
       />
-
-      {/* CIF download type selection modal */}
-      <Modal
-        title="Download Invoice PDF"
-        open={cifDownloadModalOpen}
-        onCancel={() => setCifDownloadModalOpen(false)}
-        footer={null}
-      >
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)", marginBottom: 20 }}>
-          This is a CIF shipment. Choose the invoice type to download.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button
-            onClick={() => {
-              setCifDownloadModalOpen(false);
-              const today = new Date();
-              const dd = String(today.getDate()).padStart(2, "0");
-              const mm = String(today.getMonth() + 1).padStart(2, "0");
-              const yyyy = today.getFullYear();
-              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
-              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
-              const filename = isDraft
-                ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}.pdf`
-                : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}.pdf`;
-              downloadPiPdf(piId, filename).catch(() => message.error("PDF download failed."));
-            }}
-            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
-          >
-            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Government Invoice</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Standard Proforma Invoice with FOB rates + cost breakdown</span>
-          </button>
-          <button
-            onClick={() => {
-              setCifDownloadModalOpen(false);
-              const today = new Date();
-              const dd = String(today.getDate()).padStart(2, "0");
-              const mm = String(today.getMonth() + 1).padStart(2, "0");
-              const yyyy = today.getFullYear();
-              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
-              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
-              const filename = isDraft
-                ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}_Client.pdf`
-                : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}_Client.pdf`;
-              downloadPiClientPdf(piId, filename).catch(() => message.error("PDF download failed."));
-            }}
-            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--primary)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
-          >
-            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--primary)" }}>Client Invoice</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>CIF-adjusted rates with freight &amp; insurance allocated per line item</span>
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }
