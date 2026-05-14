@@ -74,6 +74,7 @@ import {
   getCommercialInvoice,
   updateCILineItem,
   downloadPackingListPDF,
+  downloadClientInvoicePDF,
   uploadPlSignedCopy,
   uploadCiSignedCopy,
   hardDeletePackingList,
@@ -644,6 +645,7 @@ export default function PackingListDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Document Header");
   const [auditOpen, setAuditOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [cifDownloadModalOpen, setCifDownloadModalOpen] = useState(false);
 
   const { data: pl, isLoading } = useQuery({
     queryKey: ["packing-list", Number(id)],
@@ -729,6 +731,7 @@ export default function PackingListDetailPage() {
   const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;
   // FR-08.3: PDF available to all roles in all states (DRAFT watermark shown on non-Approved).
   const canDownloadPDF = true;
+  const isCIF = pl.incoterms_code === "CIF";
 
   return (
     <div style={{ padding: 32, background: "var(--bg-base)", minHeight: "100vh" }}>
@@ -792,11 +795,15 @@ export default function PackingListDetailPage() {
 
           {canDownloadPDF && (
             <button
-              onClick={() =>
-                downloadPackingListPDF(pl.id, `${pl.pl_number}.pdf`).catch(() =>
-                  message.error("Could not download PDF.")
-                )
-              }
+              onClick={() => {
+                if (isCIF) {
+                  setCifDownloadModalOpen(true);
+                } else {
+                  downloadPackingListPDF(pl.id, `${pl.pl_number}.pdf`).catch(() =>
+                    message.error("Could not download PDF.")
+                  );
+                }
+              }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "#fff" }}
             >
               <FileDown size={14} /> Download PDF
@@ -922,6 +929,44 @@ export default function PackingListDetailPage() {
         onClose={() => setAuditOpen(false)}
         entries={auditLog}
       />
+
+      {/* CIF download type selection modal */}
+      <Modal
+        title="Download Invoice PDF"
+        open={cifDownloadModalOpen}
+        onCancel={() => setCifDownloadModalOpen(false)}
+        footer={null}
+      >
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)", marginBottom: 20 }}>
+          This is a CIF shipment. Choose the invoice type to download.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <button
+            onClick={() => {
+              setCifDownloadModalOpen(false);
+              downloadPackingListPDF(pl.id, `${pl.pl_number}_Government.pdf`).catch(() =>
+                message.error("Could not download PDF.")
+              );
+            }}
+            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
+          >
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Government Invoice</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Standard Commercial Invoice with FOB rates + cost breakdown</span>
+          </button>
+          <button
+            onClick={() => {
+              setCifDownloadModalOpen(false);
+              downloadClientInvoicePDF(pl.id, `${pl.pl_number}_Client.pdf`).catch(() =>
+                message.error("Could not download PDF.")
+              );
+            }}
+            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--primary)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
+          >
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--primary)" }}>Client Invoice</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>CIF-adjusted rates with freight &amp; insurance allocated per line item</span>
+          </button>
+        </div>
+      </Modal>
 
       {/* Delete confirmation modal */}
       <Modal

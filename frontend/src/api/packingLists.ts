@@ -171,11 +171,28 @@ export interface AuditEntry {
   performed_at: string;
 }
 
+// ---- Paginated response shape -----------------------------------------------
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export const PL_PAGE_SIZE = 25;
+
 // ---- Packing List endpoints -------------------------------------------------
 
 export function listPackingLists(params?: Record<string, string>) {
   return axiosInstance
     .get<PackingList[]>("/packing-lists/", { params })
+    .then((r) => r.data);
+}
+
+export function listPackingListsPaginated(params: Record<string, string> = {}, page = 1) {
+  return axiosInstance
+    .get<PaginatedResponse<PackingList>>("/packing-lists/", { params: { ...params, page: String(page) } })
     .then((r) => r.data);
 }
 
@@ -216,6 +233,21 @@ export function getPlAuditLog(id: number) {
 // Downloads the combined PL+CI PDF and triggers a browser save-as dialog.
 export async function downloadPackingListPDF(id: number, filename: string) {
   const response = await axiosInstance.get(`/packing-lists/${id}/pdf/`, {
+    responseType: "blob",
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+// Downloads the CIF-adjusted client invoice version of the PL+CI PDF.
+export async function downloadClientInvoicePDF(id: number, filename: string) {
+  const response = await axiosInstance.get(`/packing-lists/${id}/pdf/?variant=client`, {
     responseType: "blob",
   });
   const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));

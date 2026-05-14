@@ -143,10 +143,27 @@ export type ProformaInvoicePayload = Partial<Omit<ProformaInvoice,
   | "incoterms_code" | "exporter_display" | "consignee_display" | "buyer_display" | "currency_display"
 >>;
 
+// ---- Paginated response shape (used by list pages) --------------------------
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export const PI_PAGE_SIZE = 25;
+
 // ---- API functions ----------------------------------------------------------
 
 export function listProformaInvoices(params?: Record<string, string>) {
   return axiosInstance.get<ProformaInvoice[]>("/proforma-invoices/", { params }).then(r => r.data);
+}
+
+export function listProformaInvoicesPaginated(params: Record<string, string> = {}, page = 1) {
+  return axiosInstance
+    .get<PaginatedResponse<ProformaInvoice>>("/proforma-invoices/", { params: { ...params, page: String(page) } })
+    .then(r => r.data);
 }
 
 export function getProformaInvoice(id: number) {
@@ -225,6 +242,18 @@ export function uploadSignedCopy(piId: number, file: File) {
 
 export async function downloadPiPdf(piId: number, filename: string) {
   const response = await axiosInstance.get(`/proforma-invoices/${piId}/pdf/`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadPiClientPdf(piId: number, filename: string) {
+  const response = await axiosInstance.get(`/proforma-invoices/${piId}/pdf/?variant=client`, {
     responseType: "blob",
   });
   const url = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));

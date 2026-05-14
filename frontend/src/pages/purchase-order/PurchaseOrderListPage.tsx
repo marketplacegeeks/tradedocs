@@ -8,9 +8,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Select } from "antd";
 import { Plus, ShoppingBag, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
-import { listPurchaseOrders } from "../../api/purchaseOrders";
+import { listPurchaseOrdersPaginated, PO_PAGE_SIZE } from "../../api/purchaseOrders";
 import type { PurchaseOrder } from "../../api/purchaseOrders";
 import { listOrganisations } from "../../api/organisations";
+import PaginationBar from "../../components/common/Pagination";
 import { useAuth } from "../../store/AuthContext";
 import {
   ROLES,
@@ -83,24 +84,40 @@ export default function PurchaseOrderListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("po_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   // All roles see all POs — no created_by filter applied
   const apiFilters = useMemo(() => {
-    const f: Record<string, unknown> = {};
+    const f: Record<string, string | number> = {};
     if (activeStatus) f.status = activeStatus;
     if (vendorFilter) f.vendor = vendorFilter;
     return f;
   }, [activeStatus, vendorFilter]);
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["purchase-orders", apiFilters],
-    queryFn: () => listPurchaseOrders(apiFilters),
+  const { data, isLoading } = useQuery({
+    queryKey: ["purchase-orders", apiFilters, currentPage],
+    queryFn: () => listPurchaseOrdersPaginated({ status: activeStatus || undefined, vendor: vendorFilter || undefined }, currentPage),
   });
+
+  const orders = data?.results ?? [];
+  const totalCount = data?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / PO_PAGE_SIZE);
 
   // Vendor dropdown options (VENDOR-tagged orgs only)
   const { data: vendors = [] } = useQuery({
     queryKey: ["organisations", "VENDOR"],
     queryFn: () => listOrganisations("VENDOR"),
   });
+
+  function handleStatusChange(key: string) {
+    setActiveStatus(key);
+    setCurrentPage(1);
+  }
+
+  function handleVendorChange(v: number | null) {
+    setVendorFilter(v);
+    setCurrentPage(1);
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -167,7 +184,7 @@ export default function PurchaseOrderListPage() {
             Purchase Orders
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {displayed.length} of {orders.length} order{orders.length !== 1 ? "s" : ""}
+            {totalCount} order{totalCount !== 1 ? "s" : ""}
             {activeStatus ? ` · ${DOCUMENT_STATUS_LABELS[activeStatus] ?? activeStatus}` : ""}
           </p>
         </div>
@@ -208,7 +225,7 @@ export default function PurchaseOrderListPage() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveStatus(tab.key)}
+              onClick={() => handleStatusChange(tab.key)}
               style={{
                 padding: "9px 16px",
                 border: "none",
@@ -278,7 +295,7 @@ export default function PurchaseOrderListPage() {
           allowClear
           placeholder="All vendors"
           value={vendorFilter ?? undefined}
-          onChange={(v) => setVendorFilter(v ?? null)}
+          onChange={(v) => handleVendorChange(v ?? null)}
           style={{ width: 200, fontFamily: "var(--font-body)", fontSize: 13 }}
           options={vendors.map((v) => ({ value: v.id, label: v.name }))}
         />
@@ -440,6 +457,13 @@ export default function PurchaseOrderListPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PO_PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

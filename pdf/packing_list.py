@@ -19,18 +19,24 @@ from reportlab.platypus import PageBreak, SimpleDocTemplate
 from reportlab.pdfgen import canvas
 
 
-def generate_pl_ci_pdf(pl) -> io.BytesIO:
+def generate_pl_ci_pdf(pl, client_invoice=False) -> io.BytesIO:
     """
     Generate a combined Commercial Invoice + Packing List PDF.
     Returns an in-memory BytesIO buffer — constraint #20: never writes to disk.
 
     Section 1 — Commercial Invoice (starts at page 1)
     Section 2 — Packing List (starts on a new page after the CI)
+
+    When client_invoice=True, CI line item rates are CIF-adjusted using the
+    linked Proforma Invoice's freight and insurance_amount values.
     """
     try:
         ci = pl.commercial_invoice
     except Exception:
         ci = None
+
+    # Resolve the linked PI for CIF rate calculation (used when client_invoice=True)
+    pi = getattr(pl, "proforma_invoice", None)
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -50,7 +56,7 @@ def generate_pl_ci_pdf(pl) -> io.BytesIO:
         try:
             from pdf.commercial_invoice_generator import _make_ci_styles, build_ci_story
             ci_styles = _make_ci_styles()
-            story = build_ci_story(ci, ci_styles)
+            story = build_ci_story(ci, ci_styles, client_invoice=client_invoice, pi=pi)
         except ImportError:
             pass
 

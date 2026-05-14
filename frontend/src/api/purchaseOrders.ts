@@ -121,6 +121,17 @@ export interface PurchaseOrderFilters {
 
 // ---- API functions ----------------------------------------------------------
 
+// ---- Paginated response shape -----------------------------------------------
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export const PO_PAGE_SIZE = 25;
+
 /** Fetch all purchase orders, optionally filtered. */
 export async function listPurchaseOrders(filters: PurchaseOrderFilters = {}): Promise<PurchaseOrder[]> {
   const params = new URLSearchParams();
@@ -129,6 +140,19 @@ export async function listPurchaseOrders(filters: PurchaseOrderFilters = {}): Pr
   if (filters.vendor) params.set("vendor", String(filters.vendor));
   if (filters.po_number) params.set("po_number", filters.po_number);
   const { data } = await api.get<PurchaseOrder[]>(`/purchase-orders/?${params.toString()}`);
+  return data;
+}
+
+/** Fetch a paginated page of purchase orders for the list view. */
+export async function listPurchaseOrdersPaginated(
+  filters: PurchaseOrderFilters = {},
+  page = 1
+): Promise<PaginatedResponse<PurchaseOrder>> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.vendor) params.set("vendor", String(filters.vendor));
+  params.set("page", String(page));
+  const { data } = await api.get<PaginatedResponse<PurchaseOrder>>(`/purchase-orders/?${params.toString()}`);
   return data;
 }
 

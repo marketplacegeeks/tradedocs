@@ -5,8 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, FileText, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
-import { listProformaInvoices } from "../../api/proformaInvoices";
+import { listProformaInvoicesPaginated, PI_PAGE_SIZE } from "../../api/proformaInvoices";
 import type { ProformaInvoice } from "../../api/proformaInvoices";
+import PaginationBar from "../../components/common/Pagination";
 import { useAuth } from "../../store/AuthContext";
 import {
   ROLES,
@@ -62,12 +63,23 @@ export default function ProformaInvoiceListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("pi_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ["proforma-invoices", activeStatus],
-    queryFn: () => listProformaInvoices(activeStatus ? { status: activeStatus } : {}),
+  const { data, isLoading } = useQuery({
+    queryKey: ["proforma-invoices", activeStatus, currentPage],
+    queryFn: () => listProformaInvoicesPaginated(activeStatus ? { status: activeStatus } : {}, currentPage),
   });
+
+  const invoices = data?.results ?? [];
+  const totalCount = data?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / PI_PAGE_SIZE);
+
+  function handleStatusChange(key: string) {
+    setActiveStatus(key);
+    setCurrentPage(1);
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -122,7 +134,7 @@ export default function ProformaInvoiceListPage() {
             Proforma Invoices
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {displayed.length} of {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+            {totalCount} invoice{totalCount !== 1 ? "s" : ""}
             {activeStatus ? ` · ${DOCUMENT_STATUS_LABELS[activeStatus] ?? activeStatus}` : ""}
           </p>
         </div>
@@ -165,7 +177,7 @@ export default function ProformaInvoiceListPage() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveStatus(tab.key)}
+              onClick={() => handleStatusChange(tab.key)}
               style={{
                 padding: "9px 16px",
                 border: "none",
@@ -231,7 +243,7 @@ export default function ProformaInvoiceListPage() {
         }}
       >
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }} aria-label="Proforma Invoices">
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
                 {COLUMNS.map((col) => (
@@ -303,6 +315,13 @@ export default function ProformaInvoiceListPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PI_PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

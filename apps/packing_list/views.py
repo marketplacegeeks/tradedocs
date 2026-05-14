@@ -20,6 +20,8 @@ from apps.workflow.models import AuditLog
 from apps.workflow.serializers import AuditLogSerializer
 from apps.workflow.services import WorkflowService
 
+from tradetocs.pagination import StandardPageNumberPagination
+
 from .models import Container, ContainerItem, PackingList
 from .serializers import (
     ContainerItemSerializer,
@@ -68,6 +70,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
     GET  /packing-lists/{id}/audit-log/ — audit history
     """
     permission_classes = [IsAnyRole]
+    pagination_class = StandardPageNumberPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = PackingListFilterSet
     ordering_fields = ["created_at", "pl_date", "pl_number"]
@@ -270,8 +273,9 @@ class PackingListViewSet(viewsets.ModelViewSet):
         from apps.workflow.constants import APPROVED
 
         pl = self.get_object()
+        variant = request.query_params.get("variant", "government")
 
-        buffer = generate_pl_ci_pdf(pl)
+        buffer = generate_pl_ci_pdf(pl, client_invoice=(variant == "client"))
 
         today = date.today().strftime("%d%m%Y")
         consignee_name = ""
@@ -279,6 +283,38 @@ class PackingListViewSet(viewsets.ModelViewSet):
             consignee_name = "_" + pl.consignee.name.replace(" ", "")
         draft_part = "" if pl.status == APPROVED else "_draft"
         filename = f"{today}{draft_part}_PL&CI{consignee_name}.pdf"
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
+        )
+
+    # ---- Client Invoice PDF endpoint (CIF-adjusted rates) -------------------
+
+    @action(detail=True, methods=["get"], url_path="client-invoice-pdf", permission_classes=[IsAnyRole])
+    def client_invoice_pdf(self, request, pk=None):
+        """
+        GET /packing-lists/{id}/client-invoice-pdf/
+        Streams a CIF-adjusted Client Invoice + Packing List PDF.
+        Freight is allocated by net weight; insurance by FOB value.
+        Constraint #20: generated in-memory and streamed; never written to disk.
+        """
+        from django.http import FileResponse
+        from pdf.cif_client_invoice_generator import generate_cif_client_invoice_pdf
+        from datetime import date
+        from apps.workflow.constants import APPROVED
+
+        pl = self.get_object()
+
+        buffer = generate_cif_client_invoice_pdf(pl)
+
+        today = date.today().strftime("%d%m%Y")
+        consignee_name = ""
+        if pl.consignee:
+            consignee_name = "_" + pl.consignee.name.replace(" ", "")
+        draft_part = "" if pl.status == APPROVED else "_draft"
+        filename = f"{today}{draft_part}_ClientInvoice{consignee_name}.pdf"
         return FileResponse(
             buffer,
             as_attachment=True,

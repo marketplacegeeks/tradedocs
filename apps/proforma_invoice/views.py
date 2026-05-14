@@ -24,6 +24,8 @@ from apps.workflow.constants import APPROVED, EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
 
+from tradetocs.pagination import StandardPageNumberPagination
+
 from .models import ProformaInvoice, ProformaInvoiceCharge, ProformaInvoiceLineItem
 from .serializers import (
     AuditLogSerializer,
@@ -70,6 +72,7 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
     """
     # Constraint #29: explicit permission_classes
     permission_classes = [IsAnyRole]
+    pagination_class = StandardPageNumberPagination
     serializer_class = ProformaInvoiceSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = ProformaInvoiceFilterSet
@@ -150,7 +153,8 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
         from pdf.proforma_invoice import generate_pi_pdf  # local import; pdf/ package
 
         pi = self.get_object()
-        pdf_buffer = generate_pi_pdf(pi)
+        variant = request.query_params.get("variant", "government")
+        pdf_buffer = generate_pi_pdf(pi, client_invoice=(variant == "client"))
         response = FileResponse(
             pdf_buffer,
             content_type="application/pdf",

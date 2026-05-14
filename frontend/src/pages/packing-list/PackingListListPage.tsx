@@ -5,8 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Package, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
-import { listPackingLists } from "../../api/packingLists";
+import { listPackingListsPaginated, PL_PAGE_SIZE } from "../../api/packingLists";
 import type { PackingList } from "../../api/packingLists";
+import PaginationBar from "../../components/common/Pagination";
 import { useAuth } from "../../store/AuthContext";
 import {
   ROLES,
@@ -63,12 +64,23 @@ export default function PackingListListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("pl_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const canCreate = user?.role === ROLES.MAKER || user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
 
-  const { data: packingLists = [], isLoading } = useQuery({
-    queryKey: ["packing-lists", activeStatus],
-    queryFn: () => listPackingLists(activeStatus ? { status: activeStatus } : undefined),
+  const { data, isLoading } = useQuery({
+    queryKey: ["packing-lists", activeStatus, currentPage],
+    queryFn: () => listPackingListsPaginated(activeStatus ? { status: activeStatus } : {}, currentPage),
   });
+
+  const packingLists = data?.results ?? [];
+  const totalCount = data?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / PL_PAGE_SIZE);
+
+  function handleStatusChange(key: string) {
+    setActiveStatus(key);
+    setCurrentPage(1);
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -124,7 +136,7 @@ export default function PackingListListPage() {
             Packing List &amp; Commercial Invoice
           </h1>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)" }}>
-            {displayed.length} of {packingLists.length} document{packingLists.length !== 1 ? "s" : ""}
+            {totalCount} document{totalCount !== 1 ? "s" : ""}
             {activeStatus ? ` · ${DOCUMENT_STATUS_LABELS[activeStatus] ?? activeStatus}` : ""}
           </p>
         </div>
@@ -167,7 +179,7 @@ export default function PackingListListPage() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveStatus(tab.key)}
+              onClick={() => handleStatusChange(tab.key)}
               style={{
                 padding: "9px 16px",
                 border: "none",
@@ -233,7 +245,7 @@ export default function PackingListListPage() {
         }}
       >
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }} aria-label="Packing Lists">
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
                 {COLUMNS.map((col) => (
@@ -305,6 +317,13 @@ export default function PackingListListPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PL_PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

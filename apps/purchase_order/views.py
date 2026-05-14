@@ -20,6 +20,8 @@ from apps.workflow.constants import EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
 
+from tradetocs.pagination import StandardPageNumberPagination
+
 from .models import PurchaseOrder, PurchaseOrderLineItem
 from .serializers import AuditLogSerializer, PurchaseOrderLineItemSerializer, PurchaseOrderSerializer
 
@@ -52,6 +54,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
     PUT/PATCH  /purchase-orders/{id}/ — update header (only in DRAFT/REWORK, by creator)
     """
     permission_classes = [IsAnyRole]  # Constraint #29
+    pagination_class = StandardPageNumberPagination
     serializer_class = PurchaseOrderSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = PurchaseOrderFilterSet
