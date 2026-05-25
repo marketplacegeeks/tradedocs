@@ -830,9 +830,6 @@ def build_pl_story(packing_list, styles):
     except Exception:
         pass
 
-    story.append(Spacer(1, 6))
-    story.append(Paragraph("Quantities and UOM as per container item details.", style_small))
-
     return story
 
 
