@@ -97,6 +97,56 @@ class PurchaseOrder(models.Model):
 
     time_of_delivery = models.CharField(max_length=200, blank=True, default="")
 
+    # Shipment / logistics fields
+    partial_shipment = models.CharField(
+        max_length=3,
+        choices=[("YES", "Yes"), ("NO", "No")],
+        blank=True,
+        default="",
+    )
+
+    incoterms = models.ForeignKey(
+        "master_data.Incoterm",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_orders",
+    )
+
+    port_of_loading = models.ForeignKey(
+        "master_data.Port",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_orders_as_loading",
+    )
+
+    port_of_discharge = models.ForeignKey(
+        "master_data.Port",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_orders_as_discharge",
+    )
+
+    port_of_final_destination = models.ForeignKey(
+        "master_data.Port",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_orders_as_final_destination",
+    )
+
+    type_of_package = models.ForeignKey(
+        "master_data.TypeOfPackage",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_orders",
+    )
+
+    transport_instruction = models.TextField(blank=True, default="")
+
     internal_contract_number = models.CharField(max_length=200, blank=True, default="")
 
     # T&C snapshot — template FK + body copied at selection time

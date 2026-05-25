@@ -111,6 +111,11 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
     payment_terms_name = serializers.CharField(source="payment_terms.name", allow_null=True, read_only=True)
     country_of_origin_name = serializers.CharField(source="country_of_origin.name", allow_null=True, read_only=True)
+    incoterms_code = serializers.CharField(source="incoterms.code", allow_null=True, read_only=True)
+    port_of_loading_name = serializers.CharField(source="port_of_loading.name", allow_null=True, read_only=True)
+    port_of_discharge_name = serializers.CharField(source="port_of_discharge.name", allow_null=True, read_only=True)
+    port_of_final_destination_name = serializers.CharField(source="port_of_final_destination.name", allow_null=True, read_only=True)
+    type_of_package_name = serializers.CharField(source="type_of_package.name", allow_null=True, read_only=True)
     bank_name = serializers.SerializerMethodField()
     delivery_address_detail = serializers.SerializerMethodField()
 
@@ -143,6 +148,18 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "country_of_origin",
             "transaction_type",
             "time_of_delivery",
+            "partial_shipment",
+            "incoterms",
+            "incoterms_code",
+            "port_of_loading",
+            "port_of_loading_name",
+            "port_of_discharge",
+            "port_of_discharge_name",
+            "port_of_final_destination",
+            "port_of_final_destination_name",
+            "type_of_package",
+            "type_of_package_name",
+            "transport_instruction",
             "internal_contract_number",
             "tc_template",
             "tc_content",

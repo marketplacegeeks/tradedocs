@@ -26,7 +26,7 @@ import { listOrganisations, getOrganisation } from "../../api/organisations";
 import type { OrgAddress } from "../../api/organisations";
 import { listCurrencies } from "../../api/currencies";
 import { listBanks } from "../../api/banks";
-import { listPaymentTerms, listUOMs } from "../../api/referenceData";
+import { listPaymentTerms, listUOMs, listIncoterms, listPorts, listTypeOfPackages } from "../../api/referenceData";
 import { listCountries } from "../../api/countries";
 import { listTCTemplates, getTCTemplate } from "../../api/tcTemplates";
 import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABELS } from "../../utils/constants";
@@ -98,6 +98,13 @@ const schema = z.object({
   transaction_type: z.string().min(1, "Transaction Type is required"),
   time_of_delivery: z.string().optional().default(""),
   internal_contract_number: z.string().optional().default(""),
+  partial_shipment: z.string().optional().default(""),
+  incoterms: z.number().nullable().optional(),
+  port_of_loading: z.number().nullable().optional(),
+  port_of_discharge: z.number().nullable().optional(),
+  port_of_final_destination: z.number().nullable().optional(),
+  type_of_package: z.number().nullable().optional(),
+  transport_instruction: z.string().optional().default(""),
   tc_template: z.number().nullable().optional(),
   tc_content: z.string().optional().default(""),
   line_item_remarks: z.string().optional().default(""),
@@ -271,6 +278,18 @@ export default function PurchaseOrderFormPage() {
     queryKey: ["tc-templates"],
     queryFn: listTCTemplates,
   });
+  const { data: incoterms = [] } = useQuery({
+    queryKey: ["incoterms"],
+    queryFn: listIncoterms,
+  });
+  const { data: ports = [] } = useQuery({
+    queryKey: ["ports"],
+    queryFn: listPorts,
+  });
+  const { data: typeOfPackages = [] } = useQuery({
+    queryKey: ["type-of-packages"],
+    queryFn: listTypeOfPackages,
+  });
   // ---- Load existing PO in edit mode
   const { data: existingPO } = useQuery({
     queryKey: ["purchase-orders", Number(id)],
@@ -295,6 +314,13 @@ export default function PurchaseOrderFormPage() {
       transaction_type: existingPO.transaction_type,
       time_of_delivery: existingPO.time_of_delivery,
       internal_contract_number: existingPO.internal_contract_number,
+      partial_shipment: existingPO.partial_shipment,
+      incoterms: existingPO.incoterms,
+      port_of_loading: existingPO.port_of_loading,
+      port_of_discharge: existingPO.port_of_discharge,
+      port_of_final_destination: existingPO.port_of_final_destination,
+      type_of_package: existingPO.type_of_package,
+      transport_instruction: existingPO.transport_instruction,
       tc_template: existingPO.tc_template,
       tc_content: existingPO.tc_content,
       line_item_remarks: existingPO.line_item_remarks,
@@ -721,7 +747,160 @@ export default function PurchaseOrderFormPage() {
             </div>
           </div>
 
-          {/* Row 5: Internal Contract Number */}
+          {/* Row 5: Partial Shipment | Incoterms | Port of Loading | Port of Discharge */}
+          <div style={{ ...GRID4, marginTop: 16 }}>
+            <div>
+              <label style={LABEL}>Partial Shipment Allowed?</label>
+              <Controller
+                name="partial_shipment"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    placeholder="Select…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={[
+                      { value: "YES", label: "Yes" },
+                      { value: "NO", label: "No" },
+                    ]}
+                    onChange={(val) => field.onChange(val ?? "")}
+                  />
+                )}
+              />
+            </div>
+            <div>
+              <label style={LABEL}>Incoterms</label>
+              <Controller
+                name="incoterms"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select incoterms…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={incoterms
+                      .filter((i) => i.is_active)
+                      .map((i) => ({ value: i.id, label: `${i.code} – ${i.full_name}` }))
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => field.onChange(val ?? null)}
+                  />
+                )}
+              />
+            </div>
+            <div>
+              <label style={LABEL}>Port of Loading</label>
+              <Controller
+                name="port_of_loading"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select port…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={ports
+                      .filter((p) => p.is_active)
+                      .map((p) => ({ value: p.id, label: `${p.name} (${p.code})` }))
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => field.onChange(val ?? null)}
+                  />
+                )}
+              />
+            </div>
+            <div>
+              <label style={LABEL}>Port of Discharge</label>
+              <Controller
+                name="port_of_discharge"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select port…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={ports
+                      .filter((p) => p.is_active)
+                      .map((p) => ({ value: p.id, label: `${p.name} (${p.code})` }))
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => field.onChange(val ?? null)}
+                  />
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Row 6: Port of Final Destination | Packaging Type | Transport Instruction */}
+          <div style={{ ...GRID4, marginTop: 16 }}>
+            <div>
+              <label style={LABEL}>Port of Final Destination</label>
+              <Controller
+                name="port_of_final_destination"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select port…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={ports
+                      .filter((p) => p.is_active)
+                      .map((p) => ({ value: p.id, label: `${p.name} (${p.code})` }))
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => field.onChange(val ?? null)}
+                  />
+                )}
+              />
+            </div>
+            <div>
+              <label style={LABEL}>Packaging Type</label>
+              <Controller
+                name="type_of_package"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select package type…"
+                    style={{ width: "100%" }}
+                    disabled={!inEditableState}
+                    options={typeOfPackages
+                      .filter((t) => t.is_active)
+                      .map((t) => ({ value: t.id, label: t.name }))
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    onChange={(val) => field.onChange(val ?? null)}
+                  />
+                )}
+              />
+            </div>
+            <div style={{ gridColumn: "span 2" }}>
+              <label style={LABEL}>Transport Instruction</label>
+              <textarea
+                {...register("transport_instruction")}
+                style={{ ...INPUT, resize: "vertical", minHeight: 60 }}
+                placeholder="e.g. Ship via sea freight, FCL 20' container…"
+                disabled={!inEditableState}
+              />
+            </div>
+          </div>
+
+          {/* Row 7: Internal Contract Number */}
           <div style={{ marginTop: 16 }}>
             <label style={LABEL}>Internal Contract Number</label>
             <input

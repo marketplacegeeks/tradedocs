@@ -373,12 +373,47 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     }
     tx_display = tx_labels.get(tx_type, tx_type or "—")
 
-    details_data = [[
-        Paragraph(f"<b>Payment Terms:</b><br/>{payment_terms_name}", style_text),
-        Paragraph(f"<b>Country of Origin:</b><br/>{country_name}", style_text),
-        Paragraph(f"<b>Time of Delivery:</b><br/>{_safe(po.time_of_delivery) or '—'}", style_text),
-        Paragraph(f"<b>Transaction Type:</b><br/>{tx_display}", style_text),
-    ]]
+    # New shipment/logistics field values
+    pol_obj = getattr(po, "port_of_loading", None)
+    pol_name = _safe(getattr(pol_obj, "name", "")) if pol_obj else "—"
+
+    pod_obj = getattr(po, "port_of_discharge", None)
+    pod_name = _safe(getattr(pod_obj, "name", "")) if pod_obj else "—"
+
+    pofd_obj = getattr(po, "port_of_final_destination", None)
+    pofd_name = _safe(getattr(pofd_obj, "name", "")) if pofd_obj else "—"
+
+    pkg_obj = getattr(po, "type_of_package", None)
+    pkg_name = _safe(getattr(pkg_obj, "name", "")) if pkg_obj else "—"
+
+    partial_raw = _safe(getattr(po, "partial_shipment", "")).strip()
+    partial_display = {"YES": "Yes", "NO": "No"}.get(partial_raw, "—")
+
+    transport_instr = _safe(getattr(po, "transport_instruction", "")).strip() or "—"
+
+    details_data = [
+        # Row 1 (existing)
+        [
+            Paragraph(f"<b>Payment Terms:</b><br/>{payment_terms_name}", style_text),
+            Paragraph(f"<b>Country of Origin:</b><br/>{country_name}", style_text),
+            Paragraph(f"<b>Time of Delivery:</b><br/>{_safe(po.time_of_delivery) or '—'}", style_text),
+            Paragraph(f"<b>Transaction Type:</b><br/>{tx_display}", style_text),
+        ],
+        # Row 2: port and packaging fields
+        [
+            Paragraph(f"<b>Port of Loading:</b><br/>{pol_name}", style_text),
+            Paragraph(f"<b>Port of Discharge:</b><br/>{pod_name}", style_text),
+            Paragraph(f"<b>Port of Final Destination:</b><br/>{pofd_name}", style_text),
+            Paragraph(f"<b>Packaging Type:</b><br/>{pkg_name}", style_text),
+        ],
+        # Row 3: partial shipment (col 0) | transport instruction (cols 1-3 merged)
+        [
+            Paragraph(f"<b>Partial Shipment Allowed:</b><br/>{partial_display}", style_text),
+            Paragraph(f"<b>Transport Instruction:</b><br/>{transport_instr}", style_text),
+            "",
+            "",
+        ],
+    ]
     details_table = Table(details_data, colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm])
     details_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -388,6 +423,8 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        # Merge cols 1-3 in row 2 (Transport Instruction)
+        ("SPAN", (1, 2), (3, 2)),
     ]))
     story.append(details_table)
 
