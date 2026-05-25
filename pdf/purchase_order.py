@@ -162,6 +162,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         leading=11,
         fontName="Helvetica-Bold",
         alignment=TA_CENTER,
+        textColor=colors.white,
     )
     style_right = ParagraphStyle(
         "PORight",
@@ -212,6 +213,9 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
                 self.restoreState()
 
             self.saveState()
+            self.setStrokeColor(colors.HexColor("#CCCCCC"))
+            self.setLineWidth(0.5)
+            self.line(15 * mm, 17 * mm, A4[0] - 15 * mm, 17 * mm)
             self.setFont("Helvetica", 8)
             self.drawCentredString(
                 A4[0] / 2, 12 * mm,
@@ -618,7 +622,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     li_rows.append(totals_row)
 
     cmds = [
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
         ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
@@ -630,7 +634,8 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         # Totals row background
-        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8E8E8")),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#1A2B4B")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
     ]
     for c in right_cols:
         cmds.append(("ALIGN", (c, 1), (c, -1), "RIGHT"))
@@ -709,7 +714,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             ("LINEBELOW",  (0, -1), (-1, -1), 1.2, colors.black),
             ("LINEBEFORE", (0, 0),  (0, -1),  1.2, colors.black),
             ("LINEAFTER",  (-1, 0), (-1, -1), 1.2, colors.black),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F5F5F5")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
             ("RIGHTPADDING", (0, 0), (-1, -1), 8),
@@ -752,7 +757,8 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         )
         tc_header.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
             ("RIGHTPADDING", (0, 0), (-1, -1), 8),
             ("TOPPADDING", (0, 0), (-1, -1), 6),

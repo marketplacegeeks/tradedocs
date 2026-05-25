@@ -221,6 +221,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         leading=11,
         fontName="Helvetica-Bold",
         alignment=TA_CENTER,
+        textColor=colors.white,
     )
 
     # Check if document is draft
@@ -259,6 +260,9 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
 
             # Draw footer
             self.saveState()
+            self.setStrokeColor(colors.HexColor("#CCCCCC"))
+            self.setLineWidth(0.5)
+            self.line(15 * mm, 17 * mm, A4[0] - 15 * mm, 17 * mm)
             self.setFont("Helvetica", 8)
             self.drawCentredString(
                 A4[0] / 2, 12 * mm,
@@ -543,7 +547,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     li_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("ALIGN", (4, 1), (6, -1), "RIGHT"),
@@ -662,6 +666,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#1A2B4B")),
+            ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
         ]))
         story.append(totals_table)
         story.append(Spacer(1, 6))
@@ -806,7 +812,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         )
         tc_header.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 6),

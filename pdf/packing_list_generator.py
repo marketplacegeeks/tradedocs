@@ -433,7 +433,8 @@ def build_pl_story(packing_list, styles):
     header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
     header_tbl.setStyle(TableStyle(_GRID_STYLE + [
         ("SPAN", (0, 0), (1, 0)),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
     header_tbl.hAlign = "LEFT"
     story.append(header_tbl)
@@ -562,7 +563,8 @@ def build_pl_story(packing_list, styles):
         cont_header.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -615,7 +617,7 @@ def build_pl_story(packing_list, styles):
             ("SPAN", (4, 0), (5, 0)),
             ("ALIGN", (1, 0), (2, 0), "RIGHT"),
             ("ALIGN", (4, 0), (5, 0), "RIGHT"),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0F0F0")),
         ]))
 
         # Two-row layout per item
@@ -683,7 +685,7 @@ def build_pl_story(packing_list, styles):
             # Span description across 6 columns in row1 (cols 3-8)
             table_style.append(("SPAN", (3, i), (8, i)))
             # Background for row1
-            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#F5F5F5")))
+            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#EEF1FF")))
 
         items_table.setStyle(TableStyle(table_style))
 
@@ -714,7 +716,8 @@ def build_pl_story(packing_list, styles):
         ("SPAN", (4, 0), (5, 0)),
         ("ALIGN", (1, 0), (2, 0), "RIGHT"),
         ("ALIGN", (4, 0), (5, 0), "RIGHT"),
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E8E8E8")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
     story.append(totals_tbl)
 
@@ -827,6 +830,9 @@ def generate_packing_list_pdf_bytes(packing_list) -> bytes:
 
     def add_footer(canvas, _doc):
         canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor("#CCCCCC"))
+        canvas.setLineWidth(0.5)
+        canvas.line(15 * mm, 17 * mm, A4[0] - 15 * mm, 17 * mm)
         canvas.setFont("Helvetica", 8)
         canvas.drawCentredString(
             A4[0] / 2, 12 * mm,
