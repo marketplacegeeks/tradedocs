@@ -258,7 +258,29 @@ def _make_pl_styles():
         "PLSmall", parent=base["Normal"],
         fontSize=8, leading=11,
     )
-    return style_company_header, style_title, style_label, style_label_center, style_text, style_small
+    style_label_white = ParagraphStyle(
+        "PLLabelWhite", parent=base["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        textColor=colors.white,
+    )
+    style_text_white = ParagraphStyle(
+        "PLTextWhite", parent=base["Normal"],
+        fontSize=9, leading=12,
+        textColor=colors.white,
+    )
+    style_label_white_center = ParagraphStyle(
+        "PLLabelWhiteCenter", parent=base["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    style_text_white_center = ParagraphStyle(
+        "PLTextWhiteCenter", parent=base["Normal"],
+        fontSize=9, leading=12,
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    return (style_company_header, style_title, style_label, style_label_center,
+            style_text, style_small, style_label_white, style_text_white,
+            style_label_white_center, style_text_white_center)
 
 
 _GRID_STYLE = [
@@ -285,7 +307,9 @@ def build_pl_story(packing_list, styles):
     """
     (style_company_header, style_title,
      style_label, style_label_center,
-     style_text, style_small) = styles
+     style_text, style_small,
+     style_label_white, style_text_white,
+     style_label_white_center, style_text_white_center) = styles
 
     story = []
 
@@ -425,10 +449,10 @@ def build_pl_story(packing_list, styles):
             ci_number_with_date = ci_number
 
     header_data = [[
-        Paragraph("<b>Exporter</b>", style_label),
+        Paragraph("<b>Exporter</b>", style_label_white_center),
         "",
-        Paragraph(f"<b>Packing List No.</b><br/>{pl_number_with_date}", style_text),
-        Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text),
+        Paragraph(f"<b>Packing List No.</b><br/>{pl_number_with_date}", style_text_white_center),
+        Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text_white_center),
     ]]
     header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
     header_tbl.setStyle(TableStyle(_GRID_STYLE + [
@@ -554,8 +578,8 @@ def build_pl_story(packing_list, styles):
 
         cont_header = Table(
             [[
-                Paragraph(f"<b>Container:</b> {cont_ref}", style_text),
-                Paragraph(f"<b>Marks &amp; Numbers:</b> {marks}", style_text),
+                Paragraph(f"<b>Container:</b> {cont_ref}", style_text_white_center),
+                Paragraph(f"<b>Marks &amp; Numbers:</b> {marks}", style_text_white_center),
             ]],
             colWidths=[col_2, col_2],
         )
@@ -694,11 +718,11 @@ def build_pl_story(packing_list, styles):
 
     totals_tbl = Table(
         [[
-            Paragraph("<b>Total Net Weight</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text),
+            Paragraph("<b>Total Net Weight</b>", style_label_white),
+            Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text_white),
             "",  # merged into net weight value cell
-            Paragraph("<b>Total Gross Weight</b>", style_label),
-            Paragraph(f"{_fmt_decimal(total_gross, 1)} KGS", style_text),
+            Paragraph("<b>Total Gross Weight</b>", style_label_white),
+            Paragraph(f"{_fmt_decimal(total_gross, 1)} KGS", style_text_white),
             "",  # merged into gross weight value cell
         ]],
         colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
@@ -719,7 +743,7 @@ def build_pl_story(packing_list, styles):
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
-    story.append(totals_tbl)
+    story.append(KeepTogether([totals_tbl]))
 
     # Cost breakdown from CI: FOB Value, Freight, Insurance Amount
     # Visibility of freight/insurance follows the same incoterm rules as the CI PDF.
@@ -802,8 +826,7 @@ def build_pl_story(packing_list, styles):
                     ("TOPPADDING",    (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ]))
-                story.append(Spacer(1, 6))
-                story.append(breakdown_tbl)
+                story.append(KeepTogether([Spacer(1, 6), breakdown_tbl]))
     except Exception:
         pass
 

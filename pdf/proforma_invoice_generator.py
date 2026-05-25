@@ -233,6 +233,7 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
+    KeepTogether,
 )
 
 
@@ -394,6 +395,11 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     style_small = ParagraphStyle(
         "PISmall", parent=styles["Normal"],
         fontSize=8, leading=10,
+    )
+    style_header = ParagraphStyle(
+        "PIHeader", parent=styles["Normal"],
+        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
     )
 
     # Determine if this is a non-approved document (needs DRAFT watermark, FR-08.3)
@@ -669,13 +675,13 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
 
     # ---- Line items table -----------------------------------------------------
     li_header = [
-        Paragraph("<b>Sr.</b>", style_label),
-        Paragraph("<b>HSN Code</b>", style_label),
-        Paragraph("<b>Item Code</b>", style_label),
-        Paragraph("<b>Description of Goods</b>", style_label),
-        Paragraph("<b>Qty</b>", style_label),
-        Paragraph(f"<b>Rate ({currency_code})</b>", style_label),
-        Paragraph(f"<b>Amount ({currency_code})</b>", style_label),
+        Paragraph("<b>Sr.</b>", style_header),
+        Paragraph("<b>HSN Code</b>", style_header),
+        Paragraph("<b>Item Code</b>", style_header),
+        Paragraph("<b>Description of Goods</b>", style_header),
+        Paragraph("<b>Qty</b>", style_header),
+        Paragraph(f"<b>Rate ({currency_code})</b>", style_header),
+        Paragraph(f"<b>Amount ({currency_code})</b>", style_header),
     ]
     li_rows = [li_header]
     total_amount_usd = Decimal("0.00")
@@ -709,6 +715,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
         ("BACKGROUND",   (0, 0), (-1, 0), colors.white),
         ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN",        (0, 0), (-1, 0), "CENTER"),
         ("ALIGN",        (4, 1), (6, -1), "RIGHT"),
         ("LEFTPADDING",  (0, 0), (-1, -1), 4),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -829,8 +836,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             ("TOPPADDING",    (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
-        story.append(totals_table)
-        story.append(Spacer(1, 4))
+        story.append(KeepTogether([totals_table, Spacer(1, 4)]))
 
     # Amount in words — reflects the final payable total
     story.append(Paragraph(
@@ -860,8 +866,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("TOPPADDING",   (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
     ]))
-    story.append(validity_table)
-    story.append(Spacer(1, 10))
+    story.append(KeepTogether([validity_table, Spacer(1, 10)]))
 
     # ---- Declaration -----------------------------------------------------------
     decl_text = (

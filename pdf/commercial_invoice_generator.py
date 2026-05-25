@@ -32,6 +32,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
+    KeepTogether,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -244,11 +245,31 @@ def _make_ci_styles():
         fontSize=9, leading=11, fontName="Helvetica-Bold",
         alignment=TA_CENTER, textColor=colors.white,
     )
-    return style_company_header, style_title, style_label, style_text, style_small, style_table_header
+    style_label_white = ParagraphStyle(
+        "CILabelWhite", parent=base["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        textColor=colors.white,
+    )
+    style_text_white = ParagraphStyle(
+        "CITextWhite", parent=base["Normal"],
+        fontSize=9, leading=12,
+        textColor=colors.white,
+    )
+    style_label_white_center = ParagraphStyle(
+        "CILabelWhiteCenter", parent=base["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    style_text_white_center = ParagraphStyle(
+        "CITextWhiteCenter", parent=base["Normal"],
+        fontSize=9, leading=12,
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    return style_company_header, style_title, style_label, style_text, style_small, style_table_header, style_label_white, style_text_white, style_label_white_center, style_text_white_center
 
 
 def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
-    style_company_header, style_title, style_label, style_text, style_small, style_table_header = styles
+    style_company_header, style_title, style_label, style_text, style_small, style_table_header, style_label_white, style_text_white, style_label_white_center, style_text_white_center = styles
     story = []
 
     pl = getattr(ci, "packing_list", None)
@@ -395,10 +416,10 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
 
     header_tbl = Table(
         [[
-            Paragraph("<b>Exporter</b>", style_label),
+            Paragraph("<b>Exporter</b>", style_label_white_center),
             "",
-            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number_with_date}", style_text),
-            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text),
+            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number_with_date}", style_text_white_center),
+            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text_white_center),
         ]],
         colWidths=[col_4, col_4, col_4, col_4],
     )
@@ -406,7 +427,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     header_tbl.setStyle(TableStyle(_GRID + [
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
     story.append(header_tbl)
 
@@ -701,13 +721,11 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("TOPPADDING",   (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
     ]))
-    story.append(totals_charges_tbl)
-
     invoice_total_label = "Total CIF Amount (Payable)" if client_invoice else "Invoice Total (Amount Payable)"
     invoice_total_tbl = Table(
         [[
-            Paragraph(f"<b>{invoice_total_label}</b>", style_label),
-            Paragraph(f"<b>{currency_code} {_fmt_money(invoice_total)}</b>", style_label),
+            Paragraph(f"<b>{invoice_total_label}</b>", style_label_white),
+            Paragraph(f"<b>{currency_code} {_fmt_money(invoice_total)}</b>", style_label_white),
         ]],
         colWidths=[140 * mm, 40 * mm],
     )
@@ -724,8 +742,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
         ("TEXTCOLOR",     (0, 0), (-1, -1), colors.white),
     ]))
-    story.append(invoice_total_tbl)
-    story.append(Spacer(1, 6))
+    story.append(KeepTogether([totals_charges_tbl, invoice_total_tbl, Spacer(1, 6)]))
 
     amount_in_words_str = _amount_to_words(invoice_total, currency=currency_code)
     if amount_in_words_str:

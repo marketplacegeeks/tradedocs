@@ -23,6 +23,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
+    KeepTogether,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -99,7 +100,7 @@ def build_cif_client_story(ci, styles) -> list:
     Identical layout to the standard CI but with CIF-adjusted rates/amounts:
     freight allocated by weight, insurance allocated by FOB value.
     """
-    style_company_header, style_title, style_label, style_text, style_small, style_table_header = styles
+    style_company_header, style_title, style_label, style_text, style_small, style_table_header, style_label_white, style_text_white, style_label_white_center, style_text_white_center = styles
     story = []
 
     pl = getattr(ci, "packing_list", None)
@@ -200,10 +201,10 @@ def build_cif_client_story(ci, styles) -> list:
 
     header_tbl = Table(
         [[
-            Paragraph("<b>Exporter</b>", style_label),
+            Paragraph("<b>Exporter</b>", style_label_white_center),
             "",
-            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number_with_date}", style_text),
-            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text),
+            Paragraph(f"<b>Proforma Invoice No.</b><br/>{pi_number_with_date}", style_text_white_center),
+            Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text_white_center),
         ]],
         colWidths=[col_4, col_4, col_4, col_4],
     )
@@ -211,7 +212,6 @@ def build_cif_client_story(ci, styles) -> list:
     header_tbl.setStyle(TableStyle(_GRID + [
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
     story.append(header_tbl)
 
@@ -508,12 +508,10 @@ def build_cif_client_story(ci, styles) -> list:
         ("TOPPADDING",   (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
     ]))
-    story.append(totals_charges_tbl)
-
     cif_total_tbl = Table(
         [[
-            Paragraph("<b>CIF Total (Amount Payable)</b>", style_label),
-            Paragraph(f"<b>{currency_code} {_fmt_money(cif_total)}</b>", style_label),
+            Paragraph("<b>CIF Total (Amount Payable)</b>", style_label_white),
+            Paragraph(f"<b>{currency_code} {_fmt_money(cif_total)}</b>", style_label_white),
         ]],
         colWidths=[140 * mm, 40 * mm],
     )
@@ -530,8 +528,7 @@ def build_cif_client_story(ci, styles) -> list:
         ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
         ("TEXTCOLOR",     (0, 0), (-1, -1), colors.white),
     ]))
-    story.append(cif_total_tbl)
-    story.append(Spacer(1, 6))
+    story.append(KeepTogether([totals_charges_tbl, cif_total_tbl, Spacer(1, 6)]))
 
     amount_in_words_str = _amount_to_words(cif_total, currency=currency_code)
     if amount_in_words_str:
