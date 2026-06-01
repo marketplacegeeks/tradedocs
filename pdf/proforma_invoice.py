@@ -630,8 +630,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
 
     if not incoterm_disp:
         totals_rows.append([
-            Paragraph("<b>Grand Total Amount</b>", style_label),
-            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label),
+            Paragraph("<b>Grand Total Amount</b>", style_label_white),
+            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label_white),
         ])
 
     if show_cost_breakdown:
@@ -655,8 +655,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
 
     if incoterm_disp and client_invoice:
         totals_rows.append([
-            Paragraph("<b>Total CIF Amount (Payable)</b>", style_label),
-            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label),
+            Paragraph("<b>Total CIF Amount (Payable)</b>", style_label_white),
+            Paragraph(f"<b>{currency_code} {fmt_money(grand_total)}</b>", style_label_white),
         ])
     elif incoterm_disp:
         totals_rows.append([
@@ -816,7 +816,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         story.append(PageBreak())
 
         tc_header = Table(
-            [[Paragraph("<b>Additional Terms &amp; Conditions</b>", style_label)]],
+            [[Paragraph("<b>Additional Terms &amp; Conditions</b>", style_label_white)]],
             colWidths=[180 * mm],
         )
         tc_header.setStyle(TableStyle([

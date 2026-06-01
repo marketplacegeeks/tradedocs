@@ -770,7 +770,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     if tc_content:
         story.append(PageBreak())
         tc_header = Table(
-            [[Paragraph("<b>Terms &amp; Conditions</b>", style_label)]],
+            [[Paragraph("<b>Terms &amp; Conditions</b>", style_label_white)]],
             colWidths=[180 * mm],
         )
         tc_header.setStyle(TableStyle([
