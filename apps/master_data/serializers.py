@@ -6,6 +6,7 @@ from rest_framework import serializers
 from .models import (
     Bank, Country, Currency, Incoterm, Location, Organisation, OrganisationAddress,
     OrganisationTag, Port, PaymentTerm, PreCarriageBy, TCTemplate, TypeOfPackage, UOM,
+    Product, ProductGrade, TestParameter, TestMethod, ProductTestTemplate, ProductTestTemplateRow,
 )
 
 
@@ -382,3 +383,62 @@ class TCTemplateSerializer(serializers.ModelSerializer):
                 "At least one organisation must be associated with this template."
             )
         return value
+
+
+# ---------------------------------------------------------------------------
+# COA Master Data serializers
+# ---------------------------------------------------------------------------
+
+class ProductGradeSerializer(serializers.ModelSerializer):
+    """Used nested in ProductSerializer and standalone for the grades sub-resource."""
+    class Meta:
+        model = ProductGrade
+        fields = ["id", "product", "grade", "is_active"]
+        read_only_fields = ["id", "product"]
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    # Inline list of grades so the frontend can populate a grade dropdown without a second request.
+    grades = ProductGradeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = ["id", "name", "cas_number", "is_active", "grades"]
+
+
+class TestParameterSerializer(serializers.ModelSerializer):
+    # Expose the unit abbreviation read-only so the frontend can display it without a join.
+    default_unit_abbreviation = serializers.CharField(
+        source="default_unit.abbreviation", read_only=True, default=None
+    )
+
+    class Meta:
+        model = TestParameter
+        fields = ["id", "name", "default_unit", "default_unit_abbreviation", "is_active"]
+
+
+class TestMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestMethod
+        fields = ["id", "code", "description", "is_active"]
+
+
+class ProductTestTemplateRowSerializer(serializers.ModelSerializer):
+    """Used for both GET and PUT of a product test template's rows."""
+    class Meta:
+        model = ProductTestTemplateRow
+        fields = [
+            "id", "s_no", "parameter", "parameter_label",
+            "unit", "spec_type",
+            "spec_min", "spec_max", "spec_description",
+            "test_method", "test_method_label",
+        ]
+
+
+class ProductTestTemplateSerializer(serializers.ModelSerializer):
+    rows = ProductTestTemplateRowSerializer(many=True)
+
+    class Meta:
+        model = ProductTestTemplate
+        fields = ["id", "product_grade", "updated_at", "rows"]
+        read_only_fields = ["id", "updated_at", "product_grade"]

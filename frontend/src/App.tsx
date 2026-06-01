@@ -28,6 +28,11 @@ import PurchaseOrderDetailPage from "./pages/purchase-order/PurchaseOrderDetailP
 import ReportsPage from "./pages/reports/ReportsPage";
 import TrainingPage from "./pages/training/TrainingPage";
 
+import COAListPage from "./pages/coa/COAListPage";
+import COAFormPage from "./pages/coa/COAFormPage";
+import COADetailPage from "./pages/coa/COADetailPage";
+import ProductTestTemplatePage from "./pages/master-data/ProductTestTemplatePage";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import { ROLES } from "./utils/constants";
@@ -122,6 +127,14 @@ export default function App() {
 
         {/* Reference Data — readable by all, writable by Checker/Admin */}
         <Route path="/master-data/reference-data" element={<ReferenceDataPage />} />
+        <Route
+          path="/master-data/products/:productId/grades/:gradeId/template"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
+              <ProductTestTemplatePage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Proforma Invoice — all roles can read; Maker can create/edit */}
         <Route path="/proforma-invoices" element={<ProformaInvoiceListPage />} />
@@ -159,6 +172,26 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
               <PackingListCreatePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Certificate of Analysis — all roles can read; Maker/Admin can create/edit */}
+        <Route path="/coas" element={<COAListPage />} />
+        <Route
+          path="/coas/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
+              <COAFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/coas/:id" element={<COADetailPage />} />
+        <Route
+          path="/coas/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.MAKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
+              <COAFormPage />
             </ProtectedRoute>
           }
         />
