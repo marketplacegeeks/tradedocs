@@ -179,6 +179,24 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         fontName="Helvetica-Bold",
         alignment=TA_RIGHT,
     )
+    # White-text variants used for the Grand Total row (navy background).
+    style_label_white = ParagraphStyle(
+        "POLabelWhite",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        fontName="Helvetica-Bold",
+        textColor=colors.white,
+    )
+    style_right_bold_white = ParagraphStyle(
+        "PORightBoldWhite",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        fontName="Helvetica-Bold",
+        alignment=TA_RIGHT,
+        textColor=colors.white,
+    )
 
     from apps.workflow.constants import APPROVED
     is_draft = getattr(po, "status", None) != APPROVED
@@ -602,22 +620,22 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     # Single totals row: label in Description column, column totals in every amount column.
     n_cols = len(headers)
     totals_row = [Paragraph("", style_text)] * n_cols
-    totals_row[1] = Paragraph("<b>Grand Total</b>", style_label)
+    totals_row[1] = Paragraph("<b>Grand Total</b>", style_label_white)
 
     if tx_type == "IGST":
         # Columns from opt_start: Qty | UnitPrice | TaxableAmt | IGST% | IGSTAmt | Total
-        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold)
-        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_igst, cur_sym)}</b>", style_right_bold)
-        totals_row[opt_start + 5] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_igst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 5] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
     elif tx_type == "CGST_SGST":
         # Columns from opt_start: Qty | UnitPrice | TaxableAmt | CGST% | CGSTAmt | SGST% | SGSTAmt | Total
-        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold)
-        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_cgst, cur_sym)}</b>", style_right_bold)
-        totals_row[opt_start + 6] = Paragraph(f"<b>{_fmt_cur(total_sgst, cur_sym)}</b>", style_right_bold)
-        totals_row[opt_start + 7] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_cgst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 6] = Paragraph(f"<b>{_fmt_cur(total_sgst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 7] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
     else:
         # ZERO_RATED — Columns from opt_start: Qty | UnitPrice | Total
-        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold)
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
 
     li_rows.append(totals_row)
 
@@ -673,7 +691,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     line_item_remarks = _safe(getattr(po, "line_item_remarks", "")).strip()
     if line_item_remarks:
         li_remarks_box = Table(
-            [[Paragraph(line_item_remarks, style_text)]],
+            [[Paragraph(f"<b>Remark:</b> {line_item_remarks}", style_text)]],
             colWidths=[180 * mm],
         )
         li_remarks_box.setStyle(TableStyle([
@@ -731,7 +749,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     remarks = _safe(getattr(po, "remarks", "")).strip()
     if remarks:
         remarks_box = Table(
-            [[Paragraph(remarks, style_text)]],
+            [[Paragraph(f"<b>Remark:</b> {remarks}", style_text)]],
             colWidths=[180 * mm],
         )
         remarks_box.setStyle(TableStyle([
