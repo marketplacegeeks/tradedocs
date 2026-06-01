@@ -36,10 +36,11 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${data.access}`;
           return api(original);
         } catch {
-          // Refresh failed — clear tokens so the app redirects to login.
+          // Refresh failed — clear tokens and force redirect to login.
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
           localStorage.removeItem("auth_user");
+          window.location.href = "/login";
         }
       }
     }

@@ -200,6 +200,15 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         fontName="Helvetica-Bold",
     )
 
+    style_label_white = ParagraphStyle(
+        "LabelWhite",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        fontName="Helvetica-Bold",
+        textColor=colors.white,
+    )
+
     style_text = ParagraphStyle(
         "Text",
         parent=styles["Normal"],
@@ -651,8 +660,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         ])
     elif incoterm_disp:
         totals_rows.append([
-            Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label),
-            Paragraph(f"<b>{currency_code} {fmt_money(invoice_total_pdf)}</b>", style_label),
+            Paragraph("<b>Invoice Total (Amount Payable)</b>", style_label_white),
+            Paragraph(f"<b>{currency_code} {fmt_money(invoice_total_pdf)}</b>", style_label_white),
         ])
 
     if totals_rows:
