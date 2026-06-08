@@ -219,6 +219,8 @@ class WorkflowService:
             return PLCI_TRANSITIONS
         if document_type == "purchase_order":
             return PO_TRANSITIONS
+        if document_type == "certificate_of_analysis":
+            return PI_TRANSITIONS  # same state machine as PI
         raise ValueError(f"Unknown document type: '{document_type}'.")
 
     @staticmethod
@@ -232,6 +234,8 @@ class WorkflowService:
             return document.ci_number
         if document_type == "purchase_order":
             return document.po_number
+        if document_type == "certificate_of_analysis":
+            return document.coa_number
         return str(document.pk)
 
     @staticmethod

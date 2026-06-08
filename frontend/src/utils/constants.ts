@@ -195,3 +195,16 @@ export const WORKFLOW_ACTION_LABELS: Record<string, string> = {
   REWORK: "Sent for Rework",
   PERMANENTLY_REJECT: "Permanently Rejected",
 };
+
+// COA test parameter specification types.
+export const SPEC_TYPES = {
+  QUANTITATIVE: "QUANTITATIVE",
+  QUALITATIVE: "QUALITATIVE",
+} as const;
+
+export type SpecType = (typeof SPEC_TYPES)[keyof typeof SPEC_TYPES];
+
+export const SPEC_TYPE_LABELS: Record<SpecType, string> = {
+  QUANTITATIVE: "Quantitative",
+  QUALITATIVE: "Qualitative",
+};

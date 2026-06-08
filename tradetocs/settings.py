@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.packing_list",
     "apps.commercial_invoice",
     "apps.purchase_order",
+    "apps.certificate_of_analysis",
 ]
 
 MIDDLEWARE = [

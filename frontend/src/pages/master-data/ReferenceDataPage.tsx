@@ -3,7 +3,6 @@
 // All authenticated users can view.
 
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal, Select, message } from "antd";
 import { Plus, Pencil, Trash2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
@@ -33,13 +32,6 @@ import type {
 } from "../../api/referenceData";
 import { listCurrencies, createCurrency, updateCurrency, deleteCurrency } from "../../api/currencies";
 import type { Currency, CurrencyPayload } from "../../api/currencies";
-import {
-  listProducts, createProduct, updateProduct, deleteProduct,
-  listTestParameters, createTestParameter, updateTestParameter, deleteTestParameter,
-  listTestMethods, createTestMethod, updateTestMethod, deleteTestMethod,
-  createProductGrade, updateProductGrade,
-} from "../../api/coa";
-import type { Product, TestParameter, TestMethod } from "../../api/coa";
 
 // ---- Tab definitions --------------------------------------------------------
 
@@ -53,9 +45,6 @@ const TABS = [
   { key: "pre-carriage",     label: "Pre-Carriage By" },
   { key: "currency",         label: "Currency" },
   { key: "type-of-packages", label: "Type of Package" },
-  { key: "products",         label: "Products" },
-  { key: "test-parameters",  label: "Test Parameters" },
-  { key: "test-methods",     label: "Test Methods" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -72,9 +61,6 @@ const TAB_SORT_KEY: Record<TabKey, string> = {
   "pre-carriage":     "name",
   "currency":         "code",
   "type-of-packages": "name",
-  "products":         "name",
-  "test-parameters":  "name",
-  "test-methods":     "code",
 };
 
 // Which fields to search within for each tab
@@ -92,12 +78,6 @@ function matchesSearch(r: Record<string, unknown>, tab: TabKey, q: string): bool
       return ["name", "country_name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
     case "currency":
       return ["code", "name"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
-    case "products":
-      return ["name", "cas_number"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
-    case "test-parameters":
-      return String(r["name"] ?? "").toLowerCase().includes(q);
-    case "test-methods":
-      return ["code", "description"].some((k) => String(r[k] ?? "").toLowerCase().includes(q));
     default:
       return String(r["name"] ?? "").toLowerCase().includes(q);
   }
@@ -317,10 +297,6 @@ export default function ReferenceDataPage() {
   // Generic form state for each tab's add/edit modal
   const [form, setForm] = useState<Record<string, string>>({});
 
-  // Product grade management: which product's grades are expanded inline
-  const [managingGradesFor, setManagingGradesFor] = useState<number | null>(null);
-  const [gradeForm, setGradeForm] = useState<{ id: number | null; grade: string }>({ id: null, grade: "" });
-
   // Search and sort — both reset when switching tabs
   const [searchQuery, setSearchQuery] = useState("");
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -372,9 +348,6 @@ export default function ReferenceDataPage() {
     "pre-carriage":     listPreCarriageBy,
     "currency":         listCurrencies,
     "type-of-packages": listTypeOfPackages,
-    "products":         () => listProducts().then((r) => r.data),
-    "test-parameters":  () => listTestParameters().then((r) => r.data),
-    "test-methods":     () => listTestMethods().then((r) => r.data),
   };
 
   const { data: records = [], isLoading } = useQuery({
@@ -420,9 +393,6 @@ export default function ReferenceDataPage() {
         if (activeTab === "pre-carriage")     return createPreCarriageBy(payload as PreCarriageByPayload);
         if (activeTab === "currency")         return createCurrency(payload as CurrencyPayload);
         if (activeTab === "type-of-packages") return createTypeOfPackage(payload as TypeOfPackagePayload);
-        if (activeTab === "products")         return createProduct({ name: payload.name as string, cas_number: payload.cas_number as string });
-        if (activeTab === "test-parameters")  return createTestParameter({ name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null });
-        if (activeTab === "test-methods")     return createTestMethod({ code: payload.code as string, description: payload.description as string });
       } else if (typeof modal === "number") {
         if (activeTab === "countries")        return updateCountry(modal, payload as Partial<CountryPayload>);
         if (activeTab === "incoterms")        return updateIncoterm(modal, payload as Partial<IncotermPayload>);
@@ -433,9 +403,6 @@ export default function ReferenceDataPage() {
         if (activeTab === "pre-carriage")     return updatePreCarriageBy(modal, payload as Partial<PreCarriageByPayload>);
         if (activeTab === "currency")         return updateCurrency(modal, payload as Partial<CurrencyPayload>);
         if (activeTab === "type-of-packages") return updateTypeOfPackage(modal, payload as Partial<TypeOfPackagePayload>);
-        if (activeTab === "products")         return updateProduct(modal, { name: payload.name as string, cas_number: payload.cas_number as string });
-        if (activeTab === "test-parameters")  return updateTestParameter(modal, { name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null });
-        if (activeTab === "test-methods")     return updateTestMethod(modal, { code: payload.code as string, description: payload.description as string });
       }
     },
     onSuccess: () => {
@@ -459,9 +426,6 @@ export default function ReferenceDataPage() {
       if (activeTab === "pre-carriage")     return deletePreCarriageBy(id);
       if (activeTab === "currency")         return deleteCurrency(id);
       if (activeTab === "type-of-packages") return deleteTypeOfPackage(id);
-      if (activeTab === "products")         return deleteProduct(id);
-      if (activeTab === "test-parameters")  return deleteTestParameter(id);
-      if (activeTab === "test-methods")     return deleteTestMethod(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -685,135 +649,6 @@ export default function ReferenceDataPage() {
             </>
           )}
 
-          {activeTab === "products" && (
-            <>
-              <thead>
-                <tr style={{ background: "var(--bg-base)" }}>
-                  <SortableTh label="Product Name" active={true} dir={sortDir} onClick={toggleSort} />
-                  <StaticTh label="CAS Number" />
-                  <StaticTh label="Grades" />
-                  <StaticTh label="Status" />
-                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
-                </tr>
-              </thead>
-              <tbody>
-                {(rows as Product[]).map((r) => (
-                  <>
-                    <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
-                      <td style={tdStyle}>{r.name}</td>
-                      <td style={tdMutedStyle}>{r.cas_number || "—"}</td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {(r.grades ?? []).filter((g) => g.is_active).map((g) => (
-                            <span key={g.id} className="chip chip-purple" style={{ fontSize: 11 }}>{g.grade}</span>
-                          ))}
-                          {(r.grades ?? []).filter((g) => g.is_active).length === 0 && (
-                            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)" }}>No grades</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <span className={r.is_active ? "chip-green" : "chip-pink"} style={{ fontSize: 11 }}>
-                          {r.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "13px 16px", borderBottom: "1px solid var(--border-light)", textAlign: "right" }}>
-                        {canWrite && (
-                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button
-                              onClick={() => openEdit(r as unknown as Record<string, unknown>)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "transparent", border: "1px solid var(--border-medium)", borderRadius: 6, fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", cursor: "pointer" }}
-                              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")}
-                              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                            >Edit</button>
-                            <button
-                              onClick={() => setManagingGradesFor(managingGradesFor === r.id ? null : r.id)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "transparent", border: "1px solid var(--border-medium)", borderRadius: 6, fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", cursor: "pointer" }}
-                              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)")}
-                              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                            >Manage Grades</button>
-                            <button
-                              onClick={() => setDeletingId(r.id)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "transparent", border: "1px solid var(--border-medium)", borderRadius: 6, fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 500, color: "var(--pastel-pink-text)", cursor: "pointer" }}
-                              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--pastel-pink)")}
-                              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                            >Deactivate</button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                    {managingGradesFor === r.id && (
-                      <tr key={`grades-${r.id}`}>
-                        <td colSpan={5} style={{ padding: "0 16px 16px 32px", borderBottom: "1px solid var(--border-light)", background: "var(--bg-base)" }}>
-                          <GradeManager
-                            product={r}
-                            gradeForm={gradeForm}
-                            setGradeForm={setGradeForm}
-                            canWrite={canWrite}
-                            onSaved={() => queryClient.invalidateQueries({ queryKey })}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))}
-              </tbody>
-            </>
-          )}
-
-          {activeTab === "test-parameters" && (
-            <>
-              <thead>
-                <tr style={{ background: "var(--bg-base)" }}>
-                  <SortableTh label="Parameter Name" active={true} dir={sortDir} onClick={toggleSort} />
-                  <StaticTh label="Default Unit" />
-                  <StaticTh label="Status" />
-                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
-                </tr>
-              </thead>
-              <tbody>
-                {(rows as TestParameter[]).map((r) => (
-                  <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
-                    <td style={tdStyle}>{r.name}</td>
-                    <td style={tdMutedStyle}>{r.default_unit_abbreviation || "—"}</td>
-                    <td style={tdStyle}>
-                      <span className={r.is_active ? "chip-green" : "chip-pink"} style={{ fontSize: 11 }}>
-                        {r.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <ActionCell canWrite={canWrite} onEdit={() => openEdit(r as unknown as Record<string, unknown>)} onDelete={() => setDeletingId(r.id)} />
-                  </tr>
-                ))}
-              </tbody>
-            </>
-          )}
-
-          {activeTab === "test-methods" && (
-            <>
-              <thead>
-                <tr style={{ background: "var(--bg-base)" }}>
-                  <SortableTh label="Code" active={true} dir={sortDir} onClick={toggleSort} />
-                  <StaticTh label="Description" />
-                  <StaticTh label="Status" />
-                  <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
-                </tr>
-              </thead>
-              <tbody>
-                {(rows as TestMethod[]).map((r) => (
-                  <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
-                    <td style={tdStyle}><span className="chip chip-blue">{r.code}</span></td>
-                    <td style={tdMutedStyle}>{r.description || "—"}</td>
-                    <td style={tdStyle}>
-                      <span className={r.is_active ? "chip-green" : "chip-pink"} style={{ fontSize: 11 }}>
-                        {r.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <ActionCell canWrite={canWrite} onEdit={() => openEdit(r as unknown as Record<string, unknown>)} onDelete={() => setDeletingId(r.id)} />
-                  </tr>
-                ))}
-              </tbody>
-            </>
-          )}
         </table>
       </div>
     );
@@ -826,15 +661,8 @@ export default function ReferenceDataPage() {
     queryFn: listCountries,
   });
 
-  // UOM options — used in the test-parameters modal for default unit
-  const { data: allUOMs = [] } = useQuery({
-    queryKey: ["uoms"],
-    queryFn: listUOMs,
-  });
-
   function renderModalFields() {
     const countryOptions = (allCountries as Country[]).map((c) => ({ value: String(c.id), label: `${c.name} (${c.iso2})` }));
-    const uomOptions = (allUOMs as UOM[]).filter((u) => u.is_active).map((u) => ({ value: String(u.id), label: `${u.name} (${u.abbreviation})` }));
 
     switch (activeTab) {
       case "countries":
@@ -925,39 +753,6 @@ export default function ReferenceDataPage() {
           <div style={{ paddingTop: 8 }}>
             {fieldLabel("Package Type Name")}
             <TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Drums, Cartons, Bags" />
-          </div>
-        );
-      case "products":
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 8 }}>
-            <div>{fieldLabel("Product Name")}<TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Sodium Chloride" /></div>
-            <div>{fieldLabel("CAS Number (optional)")}<TextInput value={form.cas_number ?? ""} onChange={(v) => setForm((f) => ({ ...f, cas_number: v }))} placeholder="e.g. 7647-14-5" /></div>
-          </div>
-        );
-      case "test-parameters":
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 8 }}>
-            <div>{fieldLabel("Parameter Name")}<TextInput value={form.name ?? ""} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Assay (as NaCl)" /></div>
-            <div>
-              {fieldLabel("Default Unit (optional)")}
-              <Select
-                value={form.default_unit || undefined}
-                onChange={(v) => setForm((f) => ({ ...f, default_unit: v ?? "" }))}
-                allowClear
-                showSearch
-                filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
-                placeholder="Select unit"
-                style={{ width: "100%" }}
-                options={uomOptions}
-              />
-            </div>
-          </div>
-        );
-      case "test-methods":
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 8 }}>
-            <div>{fieldLabel("Method Code")}<TextInput value={form.code ?? ""} onChange={(v) => setForm((f) => ({ ...f, code: v.toUpperCase() }))} placeholder="e.g. IP-105" /></div>
-            <div>{fieldLabel("Description (optional)")}<TextAreaInput value={form.description ?? ""} onChange={(v) => setForm((f) => ({ ...f, description: v }))} placeholder="Brief description of the test method…" /></div>
           </div>
         );
     }
@@ -1129,189 +924,3 @@ export default function ReferenceDataPage() {
   );
 }
 
-// ---- GradeManager: inline grade panel for a single product -----------------
-
-function GradeManager({
-  product,
-  gradeForm,
-  setGradeForm,
-  canWrite,
-  onSaved,
-}: {
-  product: Product;
-  gradeForm: { id: number | null; grade: string };
-  setGradeForm: React.Dispatch<React.SetStateAction<{ id: number | null; grade: string }>>;
-  canWrite: boolean;
-  onSaved: () => void;
-}) {
-  const [saving, setSaving] = useState(false);
-  const navigate = useNavigate();
-
-  async function handleSaveGrade() {
-    if (!gradeForm.grade.trim()) {
-      message.error("Grade name is required.");
-      return;
-    }
-    setSaving(true);
-    try {
-      if (gradeForm.id) {
-        await updateProductGrade(product.id, gradeForm.id, { grade: gradeForm.grade });
-        message.success("Grade updated.");
-      } else {
-        await createProductGrade(product.id, { grade: gradeForm.grade });
-        message.success("Grade added.");
-      }
-      setGradeForm({ id: null, grade: "" });
-      onSaved();
-    } catch (err: unknown) {
-      message.error(extractApiError(err, "Failed to save grade."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDeactivateGrade(gradeId: number) {
-    setSaving(true);
-    try {
-      await updateProductGrade(product.id, gradeId, { is_active: false });
-      message.success("Grade deactivated.");
-      onSaved();
-    } catch (err: unknown) {
-      message.error(extractApiError(err, "Failed to deactivate grade."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={{ paddingTop: 12 }}>
-      <div
-        style={{
-          fontFamily: "var(--font-body)",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          marginBottom: 10,
-        }}
-      >
-        Grades for {product.name}
-      </div>
-
-      {/* Grade list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-        {product.grades.length === 0 && (
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-            No grades defined yet.
-          </p>
-        )}
-        {product.grades.map((g) => (
-          <div
-            key={g.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "6px 10px",
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border-light)",
-              borderRadius: 6,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-primary)" }}>
-                {g.grade}
-              </span>
-              {!g.is_active && (
-                <span className="chip-pink" style={{ fontSize: 10 }}>Inactive</span>
-              )}
-            </div>
-            {canWrite && g.is_active && (
-              <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  onClick={() => setGradeForm({ id: g.id ?? null, grade: g.grade })}
-                  style={{
-                    padding: "3px 8px", background: "transparent",
-                    border: "1px solid var(--border-medium)", borderRadius: 5,
-                    fontFamily: "var(--font-body)", fontSize: 11, cursor: "pointer",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => navigate(`/master-data/products/${product.id}/grades/${g.id}/template`)}
-                  style={{
-                    padding: "3px 8px", background: "transparent",
-                    border: "1px solid var(--border-medium)", borderRadius: 5,
-                    fontFamily: "var(--font-body)", fontSize: 11, cursor: "pointer",
-                    color: "var(--pastel-blue-text)",
-                  }}
-                >
-                  Edit Template
-                </button>
-                <button
-                  onClick={() => g.id && handleDeactivateGrade(g.id)}
-                  disabled={saving}
-                  style={{
-                    padding: "3px 8px", background: "transparent",
-                    border: "1px solid var(--border-medium)", borderRadius: 5,
-                    fontFamily: "var(--font-body)", fontSize: 11, cursor: "pointer",
-                    color: "var(--pastel-pink-text)",
-                  }}
-                >
-                  Deactivate
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Add / edit grade form */}
-      {canWrite && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="text"
-            value={gradeForm.grade}
-            onChange={(e) => setGradeForm((f) => ({ ...f, grade: e.target.value }))}
-            placeholder="Grade name, e.g. LR Grade"
-            style={{
-              flex: 1, padding: "7px 10px", borderRadius: 6,
-              border: "1px solid var(--border-medium)", fontFamily: "var(--font-body)",
-              fontSize: 13, color: "var(--text-primary)", background: "var(--bg-surface)",
-              outline: "none",
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSaveGrade(); }}
-          />
-          <button
-            onClick={handleSaveGrade}
-            disabled={saving}
-            style={{
-              padding: "7px 14px", background: "var(--primary)", color: "#fff",
-              border: "none", borderRadius: 6, fontFamily: "var(--font-body)",
-              fontSize: 13, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer",
-              opacity: saving ? 0.6 : 1,
-            }}
-          >
-            {gradeForm.id ? "Update" : "Add Grade"}
-          </button>
-          {gradeForm.id && (
-            <button
-              onClick={() => setGradeForm({ id: null, grade: "" })}
-              style={{
-                padding: "7px 10px", background: "transparent",
-                border: "1px solid var(--border-medium)", borderRadius: 6,
-                fontFamily: "var(--font-body)", fontSize: 13, cursor: "pointer",
-                color: "var(--text-secondary)",
-              }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}

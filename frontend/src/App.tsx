@@ -32,6 +32,7 @@ import COAListPage from "./pages/coa/COAListPage";
 import COAFormPage from "./pages/coa/COAFormPage";
 import COADetailPage from "./pages/coa/COADetailPage";
 import ProductTestTemplatePage from "./pages/master-data/ProductTestTemplatePage";
+import COAMasterPage from "./pages/master-data/COAMasterPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -127,6 +128,14 @@ export default function App() {
 
         {/* Reference Data — readable by all, writable by Checker/Admin */}
         <Route path="/master-data/reference-data" element={<ReferenceDataPage />} />
+        <Route
+          path="/master-data/coa-master"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN]}>
+              <COAMasterPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/master-data/products/:productId/grades/:gradeId/template"
           element={

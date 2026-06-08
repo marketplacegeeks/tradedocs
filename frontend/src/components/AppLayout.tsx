@@ -8,7 +8,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
   FileText, Package, Database, Users, BarChart2,
-  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard, GraduationCap,
+  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard, GraduationCap, FlaskConical,
 } from "lucide-react";
 
 import { useAuth } from "../store/AuthContext";
@@ -43,6 +43,12 @@ const NAV_ITEMS = [
     roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {
+    key: "/coas",
+    icon: FlaskConical,
+    label: "Certificate of Analysis",
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
     key: "/master-data",
     icon: Database,
     label: "Master Data",
@@ -52,6 +58,7 @@ const NAV_ITEMS = [
       { key: "/master-data/banks", label: "Banks" },
       { key: "/master-data/tc-templates", label: "T&C Templates" },
       { key: "/master-data/reference-data", label: "Reference Data" },
+      { key: "/master-data/coa-master", label: "COA Master" },
     ],
   },
   {
