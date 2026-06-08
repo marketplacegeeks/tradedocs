@@ -88,6 +88,41 @@ class ContainerSerializer(serializers.ModelSerializer):
         return value
 
 
+# ---- Lightweight list serializer (list page only) --------------------------
+
+class PackingListListSerializer(serializers.ModelSerializer):
+    """
+    Returns only the fields the PL list table renders.
+    Avoids shipping nested containers/items to the browser.
+    commercial_invoice is fetched via select_related in the list queryset.
+    """
+    consignee_name = serializers.CharField(source="consignee.name", allow_null=True, read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    pi_number_display = serializers.SerializerMethodField()
+    ci_number = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PackingList
+        fields = [
+            "id", "pl_number", "pl_date", "status",
+            "ci_number", "pi_number_display",
+            "consignee_name", "created_by_name", "created_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.full_name or obj.created_by.email
+
+    def get_pi_number_display(self, obj):
+        return obj.proforma_invoice.pi_number if obj.proforma_invoice_id else None
+
+    def get_ci_number(self, obj):
+        # commercial_invoice is fetched via select_related — no extra query.
+        try:
+            return obj.commercial_invoice.ci_number
+        except Exception:
+            return None
+
+
 # ---- PackingList serializer -------------------------------------------------
 
 class PackingListSerializer(serializers.ModelSerializer):

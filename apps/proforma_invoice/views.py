@@ -31,6 +31,7 @@ from .serializers import (
     AuditLogSerializer,
     ProformaInvoiceChargeSerializer,
     ProformaInvoiceLineItemSerializer,
+    ProformaInvoiceListSerializer,
     ProformaInvoiceSerializer,
 )
 
@@ -73,13 +74,27 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
     # Constraint #29: explicit permission_classes
     permission_classes = [IsAnyRole]
     pagination_class = StandardPageNumberPagination
-    serializer_class = ProformaInvoiceSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = ProformaInvoiceFilterSet
     ordering_fields = ["created_at", "pi_date", "pi_number"]
     ordering = ["-created_at"]
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ProformaInvoiceListSerializer
+        return ProformaInvoiceSerializer
+
     def get_queryset(self):
+        # List action: fetch only what the table needs — no nested line_items/charges
+        # in the response, but we still prefetch them to compute grand_total.
+        # This eliminates the per-row get_linked_pl_number N+1 and halves payload size.
+        if self.action == "list":
+            return (
+                ProformaInvoice.objects
+                .select_related("exporter", "consignee", "currency", "created_by")
+                .prefetch_related("line_items", "charges")
+                .all()
+            )
         return (
             ProformaInvoice.objects
             .select_related(
@@ -88,7 +103,7 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
                 "pre_carriage_by", "place_of_receipt",
                 "port_of_loading", "port_of_discharge", "final_destination",
                 "payment_terms", "incoterms", "bank",
-                "tc_template", "created_by",
+                "tc_template", "created_by", "currency",
             )
             .prefetch_related("line_items", "charges")
             .all()

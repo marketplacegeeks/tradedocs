@@ -7,6 +7,7 @@ Constraint #11 / #12: workflow transitions go through WorkflowService only.
 
 import django_filters
 from django.db import transaction
+from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -26,6 +27,7 @@ from .models import Container, ContainerItem, PackingList
 from .serializers import (
     ContainerItemSerializer,
     ContainerSerializer,
+    PackingListListSerializer,
     PackingListSerializer,
     PackingListWriteSerializer,
 )
@@ -77,10 +79,29 @@ class PackingListViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_queryset(self):
+        # List action: only the fields the table needs — no containers, no CI line items.
+        # commercial_invoice is fetched via select_related for the ci_number column.
+        if self.action == "list":
+            return (
+                PackingList.objects
+                .select_related(
+                    "proforma_invoice",
+                    "consignee",
+                    "created_by",
+                    "commercial_invoice",
+                )
+                .all()
+            )
+        # Detail / write actions: full queryset with all related data.
+        # Fixes:
+        #   - containers__items__type_of_package added (was missing → N+1)
+        #   - CI prefetched with its bank via Prefetch (ci.bank was missing → N+1)
+        #   - proforma_invoice__currency added (get_currency_display traverses it)
+        from apps.commercial_invoice.models import CommercialInvoice
         return (
             PackingList.objects
             .select_related(
-                "proforma_invoice",
+                "proforma_invoice", "proforma_invoice__currency",
                 "exporter", "consignee", "buyer", "notify_party",
                 "pre_carriage_by",
                 "place_of_receipt", "place_of_receipt_by_pre_carrier",
@@ -91,7 +112,13 @@ class PackingListViewSet(viewsets.ModelViewSet):
             )
             .prefetch_related(
                 "containers__items__uom",
-                "commercial_invoice__line_items",
+                "containers__items__type_of_package",
+                Prefetch(
+                    "commercial_invoice",
+                    queryset=CommercialInvoice.objects
+                        .select_related("bank")
+                        .prefetch_related("line_items"),
+                ),
             )
             .all()
         )
@@ -99,6 +126,8 @@ class PackingListViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
             return PackingListWriteSerializer
+        if self.action == "list":
+            return PackingListListSerializer
         return PackingListSerializer
 
     def create(self, request, *args, **kwargs):

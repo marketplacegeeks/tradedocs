@@ -86,6 +86,33 @@ class PurchaseOrderLineItemSerializer(serializers.ModelSerializer):
         return value
 
 
+# ---- Lightweight list serializer (list page only) --------------------------
+
+class PurchaseOrderListSerializer(serializers.ModelSerializer):
+    """
+    Returns only the fields the PO list table renders.
+    Avoids shipping nested line_items to the browser; total is computed
+    from the prefetch cache in a single pass.
+    """
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    currency_code = serializers.CharField(source="currency.code", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            "id", "po_number", "po_date", "status",
+            "vendor_name", "currency_code",
+            "total", "created_by", "created_by_name", "created_at",
+        ]
+        read_only_fields = ["id", "po_number", "status", "created_by", "created_at"]
+
+    def get_total(self, obj):
+        # Uses the prefetch cache — no extra SQL query.
+        return sum(item.total for item in obj.line_items.all())
+
+
 # ---- Main PO serializer -----------------------------------------------------
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -192,7 +219,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         return sum(item.total for item in obj.line_items.all())
 
     def get_line_item_count(self, obj):
-        return obj.line_items.count()
+        # Use len() so Django uses the prefetch cache instead of firing a COUNT(*) query.
+        return len(obj.line_items.all())
 
     def get_total_taxable(self, obj):
         return sum(item.taxable_amount for item in obj.line_items.all())

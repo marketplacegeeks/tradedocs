@@ -83,6 +83,42 @@ class ProformaInvoiceChargeSerializer(serializers.ModelSerializer):
         return value
 
 
+# ---- Lightweight list serializer (list page only) --------------------------
+
+class ProformaInvoiceListSerializer(serializers.ModelSerializer):
+    """
+    Returns only the fields the PI list table renders.
+    Avoids shipping nested line_items/charges to the browser and eliminates
+    the per-row get_linked_pl_number N+1 query entirely.
+    """
+    exporter_name = serializers.CharField(source="exporter.name", read_only=True)
+    consignee_name = serializers.CharField(source="consignee.name", allow_null=True, read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    currency_display = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProformaInvoice
+        fields = [
+            "id", "pi_number", "pi_date", "status",
+            "exporter_name", "consignee_name",
+            "currency_display", "grand_total",
+            "created_by", "created_by_name", "created_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.full_name if obj.created_by else None
+
+    def get_currency_display(self, obj):
+        return {"id": obj.currency.id, "code": obj.currency.code, "name": obj.currency.name}
+
+    def get_grand_total(self, obj):
+        # Uses the prefetch cache — no extra SQL queries.
+        line_total = sum((item.amount for item in obj.line_items.all()), Decimal("0.00"))
+        charge_total = sum((charge.amount for charge in obj.charges.all()), Decimal("0.00"))
+        return str(line_total + charge_total)
+
+
 # ---- Main PI serializer ----------------------------------------------------
 
 class ProformaInvoiceSerializer(serializers.ModelSerializer):

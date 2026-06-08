@@ -23,7 +23,7 @@ from apps.workflow.services import WorkflowService
 from tradetocs.pagination import StandardPageNumberPagination
 
 from .models import PurchaseOrder, PurchaseOrderLineItem
-from .serializers import AuditLogSerializer, PurchaseOrderLineItemSerializer, PurchaseOrderSerializer
+from .serializers import AuditLogSerializer, PurchaseOrderLineItemSerializer, PurchaseOrderListSerializer, PurchaseOrderSerializer
 
 
 # ---- Filterset --------------------------------------------------------------
@@ -55,13 +55,28 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsAnyRole]  # Constraint #29
     pagination_class = StandardPageNumberPagination
-    serializer_class = PurchaseOrderSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = PurchaseOrderFilterSet
     ordering_fields = ["created_at", "po_date", "po_number"]
     ordering = ["-created_at"]
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PurchaseOrderListSerializer
+        return PurchaseOrderSerializer
+
     def get_queryset(self):
+        # List action: only what the table needs.
+        if self.action == "list":
+            return (
+                PurchaseOrder.objects
+                .select_related("vendor", "currency", "created_by")
+                .prefetch_related("line_items")
+                .all()
+            )
+        # Detail / write actions: full queryset.
+        # Adds incoterms, port fields, type_of_package which were missing from
+        # select_related before (each was firing an extra query per document).
         return (
             PurchaseOrder.objects
             .select_related(
@@ -75,6 +90,11 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
                 "country_of_origin",
                 "tc_template",
                 "created_by",
+                "incoterms",
+                "port_of_loading",
+                "port_of_discharge",
+                "port_of_final_destination",
+                "type_of_package",
             )
             .prefetch_related("line_items")
             .all()
