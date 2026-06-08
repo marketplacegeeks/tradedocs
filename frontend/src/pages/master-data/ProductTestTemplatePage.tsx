@@ -137,6 +137,7 @@ export default function ProductTestTemplatePage() {
     updateRow(index, {
       parameter: paramId,
       unit: current.unit ?? param?.default_unit ?? null,
+      test_method: current.test_method ?? param?.default_test_method ?? null,
     });
   }
 
