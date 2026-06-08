@@ -26,6 +26,14 @@ const VIDEOS = [
     chip: "Advanced",
     chipColor: { bg: "var(--pastel-yellow)", text: "var(--pastel-yellow-text)" },
   },
+  {
+    id: "WszWXelh39w",
+    title: "Certificate of Analysis",
+    description:
+      "Learn how to create and manage a Certificate of Analysis — from entering test results to submitting it through the approval workflow.",
+    chip: "Advanced",
+    chipColor: { bg: "var(--pastel-yellow)", text: "var(--pastel-yellow-text)" },
+  },
 ];
 
 export default function TrainingPage() {
