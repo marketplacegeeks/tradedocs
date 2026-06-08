@@ -6,6 +6,7 @@ export interface DashboardCounts {
   proforma_invoices: number;
   packing_lists: number;
   purchase_orders: number;
+  certificates_of_analysis: number;
   pending_approvals: number;
 }
 

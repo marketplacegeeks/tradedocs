@@ -3,7 +3,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Package, ShoppingBag, Clock } from "lucide-react";
+import { FileText, Package, ShoppingBag, Clock, FlaskConical } from "lucide-react";
 
 import { useAuth } from "../../store/AuthContext";
 import { getDashboardData } from "../../api/dashboard";
@@ -34,6 +34,7 @@ function docTypeLabel(type: string): string {
     packing_list: "Packing List",
     commercial_invoice: "Commercial Invoice",
     purchase_order: "Purchase Order",
+    certificate_of_analysis: "Certificate of Analysis",
   };
   return map[type] ?? type.replace(/_/g, " ");
 }
@@ -145,6 +146,13 @@ export default function DashboardPage() {
       iconColor: "var(--pastel-purple-text)",
     },
     {
+      label: "Certificates of Analysis",
+      value: counts?.certificates_of_analysis,
+      icon: FlaskConical,
+      iconBg: "var(--pastel-pink)",
+      iconColor: "var(--pastel-pink-text)",
+    },
+    {
       label: "Pending Approvals",
       value: counts?.pending_approvals,
       icon: Clock,
@@ -177,7 +185,7 @@ export default function DashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: "repeat(5, 1fr)",
           gap: 16,
           marginBottom: 28,
         }}

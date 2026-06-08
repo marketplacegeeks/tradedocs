@@ -12,6 +12,7 @@ from apps.accounts.permissions import IsAnyRole
 from apps.proforma_invoice.models import ProformaInvoice
 from apps.packing_list.models import PackingList
 from apps.purchase_order.models import PurchaseOrder
+from apps.certificate_of_analysis.models import CertificateOfAnalysis
 from apps.workflow.constants import PENDING_APPROVAL
 from apps.workflow.models import AuditLog
 
@@ -30,6 +31,7 @@ _DOC_URL_PREFIX = {
     "packing_list": "/packing-lists",
     "purchase_order": "/purchase-orders",
     "commercial_invoice": "/packing-lists",  # CI is viewed via the PL detail page
+    "certificate_of_analysis": "/coas",
 }
 
 
@@ -41,11 +43,13 @@ class DashboardView(APIView):
         pi_count = ProformaInvoice.objects.count()
         pl_count = PackingList.objects.count()
         po_count = PurchaseOrder.objects.count()
+        coa_count = CertificateOfAnalysis.objects.count()
 
         pending_count = (
             ProformaInvoice.objects.filter(status=PENDING_APPROVAL).count()
             + PackingList.objects.filter(status=PENDING_APPROVAL).count()
             + PurchaseOrder.objects.filter(status=PENDING_APPROVAL).count()
+            + CertificateOfAnalysis.objects.filter(status=PENDING_APPROVAL).count()
         )
 
         # ---- Recent activity (10 latest audit log entries) ------------------
@@ -75,6 +79,7 @@ class DashboardView(APIView):
                 "proforma_invoices": pi_count,
                 "packing_lists": pl_count,
                 "purchase_orders": po_count,
+                "certificates_of_analysis": coa_count,
                 "pending_approvals": pending_count,
             },
             "recent_activity": activity,
