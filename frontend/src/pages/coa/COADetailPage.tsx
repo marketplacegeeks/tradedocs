@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal, Input, message, Spin } from "antd";
 import { Download, History, Pencil } from "lucide-react";
+import dayjs from "dayjs";
 
 import {
   getCOA,
@@ -210,6 +211,12 @@ export default function COADetailPage() {
   const showApprove = status === DOCUMENT_STATUS.PENDING_APPROVAL && isCheckerOrAdmin;
   const showRejectRework = status === DOCUMENT_STATUS.PENDING_APPROVAL && isCheckerOrAdmin;
 
+  // Browser timezone abbreviation (e.g. "IST", "PST")
+  const tzAbbr =
+    Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
+
   const tdStyle: React.CSSProperties = {
     padding: "12px 14px",
     borderBottom: "1px solid var(--border-light)",
@@ -250,7 +257,7 @@ export default function COADetailPage() {
             </span>
           </div>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-            Created by {coa.created_by_name} · {new Date(coa.created_at).toLocaleDateString()}
+            Created by {coa.created_by_name} · {dayjs(coa.created_at).format("DD MMM YYYY")}
           </p>
         </div>
 
@@ -445,11 +452,11 @@ export default function COADetailPage() {
             value={`${coa.package_volume} ${coa.package_uom_abbreviation}`}
           />
           <InfoField label="Package Type" value={coa.package_type_name} />
-          <InfoField label="Date of Manufacture" value={coa.date_of_manufacture} />
-          <InfoField label="Date of Retest" value={coa.date_of_retest} />
-          <InfoField label="Date of Despatch" value={coa.date_of_despatch ?? "—"} />
-          <InfoField label="Date & Time of Sampling" value={coa.date_time_of_sampling} />
-          <InfoField label="Date & Time of Analysis" value={coa.date_time_of_analysis} />
+          <InfoField label="Date of Manufacture" value={dayjs(coa.date_of_manufacture).format("DD MMM YYYY")} />
+          <InfoField label="Date of Retest" value={dayjs(coa.date_of_retest).format("DD MMM YYYY")} />
+          <InfoField label="Date of Despatch" value={coa.date_of_despatch ? dayjs(coa.date_of_despatch).format("DD MMM YYYY") : "—"} />
+          <InfoField label="Date & Time of Sampling" value={coa.date_time_of_sampling ? `${dayjs(coa.date_time_of_sampling).format("DD MMM YYYY hh:mm A")} ${tzAbbr}` : "—"} />
+          <InfoField label="Date & Time of Analysis" value={coa.date_time_of_analysis ? `${dayjs(coa.date_time_of_analysis).format("DD MMM YYYY hh:mm A")} ${tzAbbr}` : "—"} />
           <InfoField label="Analyst Name" value={coa.analyst_name} />
           <InfoField label="QC Incharge Name" value={coa.qc_incharge_name} />
         </div>
