@@ -428,10 +428,10 @@ class ProductTestTemplateRowSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductTestTemplateRow
         fields = [
-            "id", "s_no", "parameter", "parameter_label",
+            "id", "s_no", "parameter",
             "unit", "spec_type",
             "spec_min", "spec_max", "spec_description",
-            "test_method", "test_method_label",
+            "test_method",
         ]
 
 

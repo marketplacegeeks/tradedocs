@@ -23,28 +23,24 @@ interface TemplateRow {
   id?: number;
   s_no: number;
   parameter: number | null;
-  parameter_label: string;
   unit: number | null;
   spec_type: "QUANTITATIVE" | "QUALITATIVE";
   spec_min: string;
   spec_max: string;
   spec_description: string;
   test_method: number | null;
-  test_method_label: string;
 }
 
 function blankRow(sNo: number): TemplateRow {
   return {
     s_no: sNo,
     parameter: null,
-    parameter_label: "",
     unit: null,
     spec_type: "QUANTITATIVE",
     spec_min: "",
     spec_max: "",
     spec_description: "",
     test_method: null,
-    test_method_label: "",
   };
 }
 
@@ -140,27 +136,20 @@ export default function ProductTestTemplatePage() {
     const current = rows[index];
     updateRow(index, {
       parameter: paramId,
-      parameter_label: current.parameter_label || (param?.name ?? ""),
       unit: current.unit ?? param?.default_unit ?? null,
     });
   }
 
-  // When a test method is selected, auto-fill the method label if not yet set
   function handleMethodSelect(index: number, methodId: number | null) {
-    const method = testMethods.find((m) => m.id === methodId) ?? null;
-    const current = rows[index];
-    updateRow(index, {
-      test_method: methodId,
-      test_method_label: current.test_method_label || (method?.code ?? ""),
-    });
+    updateRow(index, { test_method: methodId });
   }
 
   // ---- Save ----------------------------------------------------------------
 
   async function handleSave() {
-    const invalid = rows.some((r) => !r.parameter_label.trim());
+    const invalid = rows.some((r) => !r.parameter);
     if (invalid) {
-      message.error("Each row must have a parameter label.");
+      message.error("Each row must have a parameter selected.");
       return;
     }
     setSaving(true);
@@ -256,7 +245,7 @@ export default function ProductTestTemplatePage() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1200 }}>
             <thead>
               <tr style={{ background: "var(--bg-base)" }}>
-                {["#", "Parameter", "Label *", "Unit", "Type", "Min", "Max", "Description", "Test Method", "Method Label", ""].map((h) => (
+                {["#", "Parameter", "Unit", "Type", "Min", "Max", "Description", "Test Method", ""].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -300,16 +289,6 @@ export default function ProductTestTemplatePage() {
                       value={row.parameter ?? undefined}
                       onChange={(val) => handleParameterSelect(idx, val ?? null)}
                       size="small"
-                    />
-                  </td>
-
-                  {/* Label (required) */}
-                  <td style={{ padding: "6px 8px", minWidth: 160 }}>
-                    <input
-                      style={inputStyle}
-                      value={row.parameter_label}
-                      onChange={(e) => updateRow(idx, { parameter_label: e.target.value })}
-                      placeholder="Display label"
                     />
                   </td>
 
@@ -397,16 +376,6 @@ export default function ProductTestTemplatePage() {
                     />
                   </td>
 
-                  {/* Method label */}
-                  <td style={{ padding: "6px 8px", minWidth: 150 }}>
-                    <input
-                      style={inputStyle}
-                      value={row.test_method_label}
-                      onChange={(e) => updateRow(idx, { test_method_label: e.target.value })}
-                      placeholder="Method label"
-                    />
-                  </td>
-
                   {/* Delete row */}
                   <td style={{ padding: "6px 12px", width: 44, textAlign: "center" }}>
                     <button
@@ -428,7 +397,7 @@ export default function ProductTestTemplatePage() {
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={9}
                     style={{
                       padding: 40, textAlign: "center",
                       fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-muted)",

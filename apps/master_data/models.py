@@ -528,11 +528,9 @@ class ProductTestTemplateRow(models.Model):
         ProductTestTemplate, on_delete=models.CASCADE, related_name="rows"
     )
     s_no = models.PositiveIntegerField()
-    # parameter links to the library entry; parameter_label is the display override used on the COA.
     parameter = models.ForeignKey(
         TestParameter, on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
     )
-    parameter_label = models.CharField(max_length=255)
     unit = models.ForeignKey(
         "UOM", on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
     )
@@ -544,11 +542,10 @@ class ProductTestTemplateRow(models.Model):
     test_method = models.ForeignKey(
         TestMethod, on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
     )
-    test_method_label = models.CharField(max_length=100, blank=True)
 
     class Meta:
         db_table = "master_data_product_test_template_row"
         ordering = ["s_no"]
 
     def __str__(self):
-        return f"{self.template} | Row {self.s_no}: {self.parameter_label}"
+        return f"{self.template} | Row {self.s_no}: {self.parameter.name if self.parameter else ''}"
