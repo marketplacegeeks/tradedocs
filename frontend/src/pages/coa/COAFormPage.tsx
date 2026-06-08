@@ -4,8 +4,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Select, message, Modal } from "antd";
+import { Select, message, Modal, DatePicker } from "antd";
 import { Plus, Trash2 } from "lucide-react";
+import dayjs from "dayjs";
 
 import {
   getCOA,
@@ -206,12 +207,11 @@ export default function COAFormPage() {
 
   // ---- Auto-suggest retest date = manufacture + 1 year --------------------
 
-  function handleManufactureDateChange(val: string) {
+  function handleManufactureDateChange(d: dayjs.Dayjs | null) {
+    const val = d ? d.format("YYYY-MM-DD") : "";
     setDateOfManufacture(val);
-    if (val && !dateOfRetest) {
-      const d = new Date(val);
-      d.setFullYear(d.getFullYear() + 1);
-      setDateOfRetest(d.toISOString().split("T")[0]);
+    if (d && !dateOfRetest) {
+      setDateOfRetest(d.add(1, "year").format("YYYY-MM-DD"));
     }
   }
 
@@ -454,6 +454,12 @@ export default function COAFormPage() {
     .filter((m) => m.is_active)
     .map((m) => ({ value: m.id, label: `${m.code} — ${m.description}` }));
 
+  // Browser timezone abbreviation (e.g. "IST", "PST")
+  const tzAbbr =
+    Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
+
   // ---- Render ------------------------------------------------------------
 
   return (
@@ -649,56 +655,73 @@ export default function COAFormPage() {
           {/* Date of Despatch */}
           <div>
             <FieldLabel text="Date of Despatch (optional)" />
-            <input
-              type="date"
-              value={dateOfDespatch}
-              onChange={(e) => setDateOfDespatch(e.target.value)}
-              style={inputStyle}
+            <DatePicker
+              value={dateOfDespatch ? dayjs(dateOfDespatch) : null}
+              onChange={(d) => setDateOfDespatch(d ? d.format("YYYY-MM-DD") : "")}
+              format="DD MMM YYYY"
+              style={{ width: "100%" }}
+              placeholder="Select date"
             />
           </div>
 
           {/* Date of Manufacture */}
           <div>
             <FieldLabel text="Date of Manufacture" required />
-            <input
-              type="date"
-              value={dateOfManufacture}
-              onChange={(e) => handleManufactureDateChange(e.target.value)}
-              style={inputStyle}
+            <DatePicker
+              value={dateOfManufacture ? dayjs(dateOfManufacture) : null}
+              onChange={handleManufactureDateChange}
+              format="DD MMM YYYY"
+              style={{ width: "100%" }}
+              placeholder="Select date"
             />
           </div>
 
           {/* Date of Retest */}
           <div>
             <FieldLabel text="Date of Retest" required />
-            <input
-              type="date"
-              value={dateOfRetest}
-              onChange={(e) => setDateOfRetest(e.target.value)}
-              style={inputStyle}
+            <DatePicker
+              value={dateOfRetest ? dayjs(dateOfRetest) : null}
+              onChange={(d) => setDateOfRetest(d ? d.format("YYYY-MM-DD") : "")}
+              format="DD MMM YYYY"
+              style={{ width: "100%" }}
+              placeholder="Select date"
             />
           </div>
 
           {/* Date & Time of Sampling */}
           <div>
             <FieldLabel text="Date & Time of Sampling" required />
-            <input
-              type="datetime-local"
-              value={dateTimeOfSampling}
-              onChange={(e) => setDateTimeOfSampling(e.target.value)}
-              style={inputStyle}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <DatePicker
+                showTime={{ use12Hours: true, format: "hh:mm A" }}
+                value={dateTimeOfSampling ? dayjs(dateTimeOfSampling) : null}
+                onChange={(d) => setDateTimeOfSampling(d ? d.format("YYYY-MM-DDTHH:mm") : "")}
+                format="DD MMM YYYY hh:mm A"
+                style={{ flex: 1 }}
+                placeholder="Select date & time"
+              />
+              <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-body)", whiteSpace: "nowrap" }}>
+                {tzAbbr}
+              </span>
+            </div>
           </div>
 
           {/* Date & Time of Analysis */}
           <div>
             <FieldLabel text="Date & Time of Analysis" required />
-            <input
-              type="datetime-local"
-              value={dateTimeOfAnalysis}
-              onChange={(e) => setDateTimeOfAnalysis(e.target.value)}
-              style={inputStyle}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <DatePicker
+                showTime={{ use12Hours: true, format: "hh:mm A" }}
+                value={dateTimeOfAnalysis ? dayjs(dateTimeOfAnalysis) : null}
+                onChange={(d) => setDateTimeOfAnalysis(d ? d.format("YYYY-MM-DDTHH:mm") : "")}
+                format="DD MMM YYYY hh:mm A"
+                style={{ flex: 1 }}
+                placeholder="Select date & time"
+              />
+              <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-body)", whiteSpace: "nowrap" }}>
+                {tzAbbr}
+              </span>
+            </div>
           </div>
 
           {/* Analyst Name */}
