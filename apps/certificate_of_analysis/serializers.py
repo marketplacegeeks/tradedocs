@@ -57,11 +57,16 @@ class CertificateOfAnalysisSerializer(serializers.ModelSerializer):
     footer_organisation_name = serializers.CharField(source="footer_organisation.name", read_only=True)
     created_by_name = serializers.SerializerMethodField()
 
+    # Packing list link — read-only display
+    pl_number = serializers.CharField(source="packing_list.pl_number", read_only=True, default=None)
+    ci_number = serializers.SerializerMethodField()
+
     class Meta:
         model = CertificateOfAnalysis
         fields = [
             "id", "coa_number",
             "product_grade", "product_name", "grade",
+            "packing_list", "pl_number", "ci_number",
             "customer", "customer_name",
             "batch_number",
             "package_count", "package_volume", "package_uom", "package_uom_abbreviation",
@@ -81,6 +86,15 @@ class CertificateOfAnalysisSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj):
         # User model exposes `full_name` as a property, not Django's `get_full_name()`.
         return obj.created_by.full_name or obj.created_by.email
+
+    def get_ci_number(self, obj):
+        # Traverse PL → CI reverse relation to get the CI number.
+        if not obj.packing_list_id:
+            return None
+        try:
+            return obj.packing_list.commercial_invoice.ci_number
+        except Exception:
+            return None
 
     def validate(self, data):
         # Date validation rules

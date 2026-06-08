@@ -28,6 +28,9 @@ export interface COA {
   product_grade: number;
   product_name: string;
   grade: string;
+  packing_list?: number | null;
+  pl_number?: string | null;
+  ci_number?: string | null;
   customer: number;
   customer_name: string;
   batch_number: string;
@@ -66,6 +69,8 @@ export type COAPayload = Omit<
   | "updated_at"
   | "product_name"
   | "grade"
+  | "pl_number"
+  | "ci_number"
   | "customer_name"
   | "package_uom_abbreviation"
   | "package_type_name"

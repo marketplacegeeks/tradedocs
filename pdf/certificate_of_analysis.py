@@ -160,10 +160,22 @@ def generate_coa_pdf(coa) -> BytesIO:
 
     date_despatch = _fmt_date(coa.date_of_despatch) if coa.date_of_despatch else "XXXX"
 
+    # Build optional PL / CI reference rows
+    pl_ci_rows = []
+    if coa.packing_list_id:
+        pl_ci_rows.append(("Packing List No.", _safe(coa.packing_list.pl_number)))
+        try:
+            ci_num = coa.packing_list.commercial_invoice.ci_number
+            if ci_num:
+                pl_ci_rows.append(("Commercial Invoice No.", _safe(ci_num)))
+        except Exception:
+            pass
+
     info_rows = [
         ("Name of the Product", product_name),
         ("Grade", grade),
         ("Name of the Customer", customer_name),
+        *pl_ci_rows,
         ("Batch No", coa.batch_number),
         ("Supplied Quantity", supplied_qty),
         ("Date of Despatch", date_despatch),

@@ -19,6 +19,7 @@ import {
 } from "../../api/coa";
 import type { COAParameter, COAPayload } from "../../api/coa";
 import { listOrganisations } from "../../api/organisations";
+import { listPackingLists, getPackingList } from "../../api/packingLists";
 import { listUOMs, listTypeOfPackages } from "../../api/referenceData";
 import { extractApiError } from "../../utils/apiErrors";
 import { SPEC_TYPES } from "../../utils/constants";
@@ -80,6 +81,7 @@ export default function COAFormPage() {
   const navigate = useNavigate();
 
   // ---- Header form state --------------------------------------------------
+  const [packingListId, setPackingListId] = useState<number | null>(null);
   const [productId, setProductId] = useState<number | null>(null);
   const [productGradeId, setProductGradeId] = useState<number | null>(null);
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -144,6 +146,25 @@ export default function COAFormPage() {
     queryFn: listTypeOfPackages,
   });
 
+  // Fetch only approved packing lists for the PL dropdown
+  const { data: approvedPLs = [] } = useQuery({
+    queryKey: ["packing-lists", "APPROVED"],
+    queryFn: () => listPackingLists({ status: "APPROVED" }),
+  });
+
+  // When a PL is selected, auto-fill customer from buyer (or consignee as fallback)
+  async function handlePackingListChange(plId: number | null) {
+    setPackingListId(plId);
+    if (!plId) return;
+    try {
+      const pl = await getPackingList(plId);
+      const customerOrgId = pl.buyer ?? pl.consignee;
+      if (customerOrgId) setCustomerId(customerOrgId);
+    } catch {
+      // Non-blocking — user can still set customer manually
+    }
+  }
+
   // ---- Edit mode: load existing COA data -----------------------------------
 
   const { data: existingCOA } = useQuery({
@@ -161,6 +182,7 @@ export default function COAFormPage() {
     if (product) {
       setProductId(product.id);
     }
+    setPackingListId(existingCOA.packing_list ?? null);
     setProductGradeId(existingCOA.product_grade);
     setCustomerId(existingCOA.customer);
     setFooterOrgId(existingCOA.footer_organisation);
@@ -333,6 +355,7 @@ export default function COAFormPage() {
     }
 
     return {
+      packing_list: packingListId,
       product_grade: productGradeId,
       customer: customerId,
       footer_organisation: footerOrgId,
@@ -477,6 +500,28 @@ export default function COAFormPage() {
         </h2>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* Packing List — full-width row */}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <FieldLabel text="Packing List (optional)" />
+            <Select
+              value={packingListId ?? undefined}
+              onChange={handlePackingListChange}
+              allowClear
+              showSearch
+              filterOption={(input, opt) =>
+                (opt?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              placeholder="Select an approved packing list"
+              style={{ width: "100%" }}
+              options={approvedPLs.map((pl) => ({
+                value: pl.id,
+                label: pl.ci_number
+                  ? `${pl.pl_number} / CI: ${pl.ci_number}`
+                  : pl.pl_number,
+              }))}
+            />
+          </div>
+
           {/* Product */}
           <div>
             <FieldLabel text="Product" required />

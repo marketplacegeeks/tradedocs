@@ -19,6 +19,15 @@ class CertificateOfAnalysis(models.Model):
         related_name="coas",
     )
 
+    # Optional link to the Packing List this COA was raised against
+    packing_list = models.ForeignKey(
+        "packing_list.PackingList",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="coas",
+    )
+
     # Customer: Organisation tagged CONSIGNEE or BUYER
     customer = models.ForeignKey(
         "master_data.Organisation",
