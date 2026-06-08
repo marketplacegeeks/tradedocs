@@ -757,17 +757,17 @@ class TestPlExtendedCoverage:
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
         uom = UOMFactory()
-        line = CommercialInvoiceLineItemFactory(ci=ci, uom=uom, total_quantity=Decimal("100.000"), rate_usd=Decimal("0.00"))
+        line = CommercialInvoiceLineItemFactory(ci=ci, uom=uom, total_quantity=Decimal("100.000"), rate=Decimal("0.00"))
         resp = auth_client(maker).patch(
             ci_line_item_detail_url(line.pk),
-            {"rate_usd": "500.00"},
+            {"rate": "500.00"},
             format="json",
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert Decimal(data["rate_usd"]) == Decimal("500.00")
-        # amount_usd = qty × rate = 100.000 × 500.00
-        assert Decimal(data["amount_usd"]) == Decimal("50000.00")
+        assert Decimal(data["rate"]) == Decimal("500.00")
+        # amount = qty × rate = 100.000 × 500.00
+        assert Decimal(data["amount"]) == Decimal("50000.00")
 
     # ---- 6. Container requires container_ref --------------------------------
 

@@ -37,22 +37,22 @@ class TestProformaInvoiceModel:
 @pytest.mark.django_db
 class TestProformaInvoiceLineItemModel:
 
-    def test_amount_usd_is_computed_on_save(self):
+    def test_amount_is_computed_on_save(self):
         item = ProformaInvoiceLineItemFactory(
             quantity=Decimal("10.000"),
-            rate_usd=Decimal("50.00"),
+            rate=Decimal("50.00"),
         )
-        assert item.amount_usd == Decimal("500.00")
+        assert item.amount == Decimal("500.00")
 
     def test_amount_updates_when_saved_again(self):
         item = ProformaInvoiceLineItemFactory(
             quantity=Decimal("2.000"),
-            rate_usd=Decimal("100.00"),
+            rate=Decimal("100.00"),
         )
         item.quantity = Decimal("3.000")
         item.save()
         item.refresh_from_db()
-        assert item.amount_usd == Decimal("300.00")
+        assert item.amount == Decimal("300.00")
 
     def test_hsn_regex_valid(self):
         # 2, 4, 6, 8 digits are valid
@@ -109,9 +109,9 @@ class TestProformaInvoiceChargeModel:
         assert "Bank Charges" in result
 
     def test_amount_stored_with_correct_precision(self):
-        charge = ProformaInvoiceChargeFactory(amount_usd=Decimal("150.75"))
+        charge = ProformaInvoiceChargeFactory(amount=Decimal("150.75"))
         charge.refresh_from_db()
-        assert charge.amount_usd == Decimal("150.75")
+        assert charge.amount == Decimal("150.75")
 
     def test_charge_cascade_deleted_with_pi(self):
         """CASCADE on the pi FK means charges are deleted when the PI is deleted."""
@@ -138,18 +138,18 @@ class TestLineItemModelEdgeCases:
         pi.delete()
         assert not ProformaInvoiceLineItem.objects.filter(pk=item_id).exists()
 
-    def test_amount_usd_field_is_not_directly_editable(self):
-        """amount_usd is always computed on save — passing a wrong value is ignored."""
+    def test_amount_field_is_not_directly_editable(self):
+        """amount is always computed on save — passing a wrong value is ignored."""
         item = ProformaInvoiceLineItemFactory(
             quantity=Decimal("2.000"),
-            rate_usd=Decimal("100.00"),
+            rate=Decimal("100.00"),
         )
         # Force an incorrect stored value and re-save
         item.quantity = Decimal("3.000")
         item.save()
         item.refresh_from_db()
         # Must reflect 3 × 100 = 300, not the old stale value
-        assert item.amount_usd == Decimal("300.00")
+        assert item.amount == Decimal("300.00")
 
     def test_hsn_code_blank_is_valid_at_model_level(self):
         """HSN code is optional — blank string is accepted at the model level."""
