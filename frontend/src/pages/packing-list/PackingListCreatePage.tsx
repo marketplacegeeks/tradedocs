@@ -840,6 +840,7 @@ function Step3({
   // Invalidate helper used by onBlur saves
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
+    queryClient.invalidateQueries({ queryKey: ["commercial-invoice", pl.ci_id] });
   }
 
   async function savePendingContainer(idx: number) {

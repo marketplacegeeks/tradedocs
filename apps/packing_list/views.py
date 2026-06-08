@@ -504,6 +504,9 @@ class ContainerViewSet(viewsets.ModelViewSet):
                     qty_per_package=item.qty_per_package,
                     weight_per_unit_packaging=item.weight_per_unit_packaging,
                 )
+            # Rebuild CI line items so the copied container's quantities are included.
+            from apps.commercial_invoice.services import rebuild_ci_line_items
+            rebuild_ci_line_items(source.packing_list)
 
         serializer = self.get_serializer(new_container)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
