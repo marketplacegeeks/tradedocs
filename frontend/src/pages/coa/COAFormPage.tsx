@@ -57,6 +57,26 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
 };
 
+// ---- Decimal string normalisation -----------------------------------------
+// Django serialises DecimalField(decimal_places=6) as "0.002000".
+// Strip trailing zeros so inputs show "0.002" instead.
+
+function normalizeDecimalStr(val: string | null | undefined): string | null {
+  if (val === null || val === undefined || val === "") return val ?? null;
+  const num = parseFloat(val);
+  if (isNaN(num)) return val;
+  return String(num);
+}
+
+function normalizeRow(r: COAParameter): COAParameter {
+  return {
+    ...r,
+    spec_min: normalizeDecimalStr(r.spec_min),
+    spec_max: normalizeDecimalStr(r.spec_max),
+    result_value: normalizeDecimalStr(r.result_value),
+  };
+}
+
 // ---- A blank parameter row -------------------------------------------------
 
 function blankRow(sNo: number): COAParameter {
@@ -189,7 +209,7 @@ export default function COAFormPage() {
     setFooterOrgId(existingCOA.footer_organisation);
     setBatchNumber(existingCOA.batch_number);
     setPackageCount(String(existingCOA.package_count));
-    setPackageVolume(existingCOA.package_volume);
+    setPackageVolume(normalizeDecimalStr(existingCOA.package_volume) ?? "");
     setPackageUomId(existingCOA.package_uom);
     setPackageTypeId(existingCOA.package_type);
     setDateOfManufacture(existingCOA.date_of_manufacture);
@@ -201,7 +221,7 @@ export default function COAFormPage() {
     setAnalystName(existingCOA.analyst_name);
     setQcInchargeName(existingCOA.qc_incharge_name);
     if (existingCOA.parameters.length > 0) {
-      setRows(existingCOA.parameters);
+      setRows(existingCOA.parameters.map(normalizeRow));
     }
   }, [existingCOA, products]);
 
@@ -227,7 +247,7 @@ export default function COAFormPage() {
       const res = await getProductGradeTemplate(gradeId);
       const templateRows: COAParameter[] = res.data?.rows ?? [];
       if (templateRows.length > 0) {
-        setRows(templateRows.map((r, i) => ({ ...r, s_no: i + 1 })));
+        setRows(templateRows.map((r, i) => normalizeRow({ ...r, s_no: i + 1 })));
         const grade = gradeOptions.find((g) => g.id === gradeId);
         const productName = selectedProduct?.name ?? "";
         setTemplateBanner(
@@ -371,7 +391,13 @@ export default function COAFormPage() {
       date_time_of_analysis: dateTimeOfAnalysis,
       analyst_name: analystName,
       qc_incharge_name: qcInchargeName,
-      parameters: rows,
+      // Convert empty strings to null for DecimalFields — Django rejects "" for numeric fields.
+      parameters: rows.map((r) => ({
+        ...r,
+        spec_min: r.spec_min === "" ? null : r.spec_min,
+        spec_max: r.spec_max === "" ? null : r.spec_max,
+        result_value: r.result_value === "" ? null : r.result_value,
+      })),
     };
   }
 

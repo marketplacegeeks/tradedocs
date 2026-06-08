@@ -38,11 +38,27 @@ export function extractApiError(
   // Field-level errors: collect all fields into readable lines.
   const lines: string[] = [];
   for (const [field, messages] of Object.entries(obj)) {
-    const text = Array.isArray(messages)
-      ? messages.join(", ")
-      : typeof messages === "string"
-      ? messages
-      : JSON.stringify(messages);
+    let text: string;
+    if (Array.isArray(messages)) {
+      // DRF nested serializer errors: array where each element is either a string
+      // or an object of per-row field errors (e.g. parameters[2].spec).
+      const parts: string[] = [];
+      messages.forEach((item, idx) => {
+        if (typeof item === "string") {
+          parts.push(item);
+        } else if (item && typeof item === "object" && Object.keys(item).length > 0) {
+          for (const [subField, subMsgs] of Object.entries(item as Record<string, unknown>)) {
+            const subText = Array.isArray(subMsgs) ? subMsgs.join(", ") : String(subMsgs);
+            parts.push(`Row ${idx + 1} — ${subField}: ${subText}`);
+          }
+        }
+      });
+      text = parts.length > 0 ? parts.join("; ") : JSON.stringify(messages);
+    } else if (typeof messages === "string") {
+      text = messages;
+    } else {
+      text = JSON.stringify(messages);
+    }
     // non_field_errors shown without a field prefix so they read naturally.
     lines.push(field === "non_field_errors" ? text : `${field}: ${text}`);
   }
