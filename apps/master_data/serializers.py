@@ -411,10 +411,19 @@ class TestParameterSerializer(serializers.ModelSerializer):
     default_unit_abbreviation = serializers.CharField(
         source="default_unit.abbreviation", read_only=True, default=None
     )
+    # Expose the test method code read-only for display in the master table and COA form auto-fill.
+    default_test_method_code = serializers.CharField(
+        source="default_test_method.code", read_only=True, default=None
+    )
 
     class Meta:
         model = TestParameter
-        fields = ["id", "name", "default_unit", "default_unit_abbreviation", "is_active"]
+        fields = [
+            "id", "name",
+            "default_unit", "default_unit_abbreviation",
+            "default_test_method", "default_test_method_code",
+            "is_active",
+        ]
 
 
 class TestMethodSerializer(serializers.ModelSerializer):

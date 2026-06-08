@@ -94,6 +94,8 @@ export interface TestParameter {
   name: string;
   default_unit: number | null;
   default_unit_abbreviation: string | null;
+  default_test_method: number | null;
+  default_test_method_code: string | null;
   is_active: boolean;
 }
 
@@ -172,10 +174,10 @@ export const updateProductGrade = (productId: number, gradeId: number, data: { g
 export const listTestParameters = (params?: Record<string, string>) =>
   axiosInstance.get<TestParameter[]>("/master-data/test-parameters/", { params });
 
-export const createTestParameter = (data: { name: string; default_unit?: number | null }) =>
+export const createTestParameter = (data: { name: string; default_unit?: number | null; default_test_method?: number | null }) =>
   axiosInstance.post<TestParameter>("/master-data/test-parameters/", data);
 
-export const updateTestParameter = (id: number, data: { name?: string; default_unit?: number | null; is_active?: boolean }) =>
+export const updateTestParameter = (id: number, data: { name?: string; default_unit?: number | null; default_test_method?: number | null; is_active?: boolean }) =>
   axiosInstance.patch<TestParameter>(`/master-data/test-parameters/${id}/`, data);
 
 export const deleteTestParameter = (id: number) =>

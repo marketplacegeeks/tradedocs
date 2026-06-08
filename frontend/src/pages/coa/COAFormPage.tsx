@@ -289,7 +289,7 @@ export default function COAFormPage() {
     setRows((prev) => prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, s_no: i + 1 })));
   }
 
-  // When a test parameter FK is selected, auto-fill label and default unit
+  // When a test parameter FK is selected, auto-fill label, default unit, and default test method
   function handleParameterSelect(index: number, paramId: number | null) {
     if (!paramId) {
       updateRow(index, { parameter: null, parameter_name: null });
@@ -303,6 +303,10 @@ export default function COAFormPage() {
     };
     if (param.default_unit) {
       patch.unit = param.default_unit;
+    }
+    if (param.default_test_method) {
+      patch.test_method = param.default_test_method;
+      patch.test_method_code = param.default_test_method_code ?? null;
     }
     updateRow(index, patch);
   }

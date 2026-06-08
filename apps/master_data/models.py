@@ -473,6 +473,10 @@ class TestParameter(models.Model):
     default_unit = models.ForeignKey(
         "UOM", on_delete=models.PROTECT, null=True, blank=True, related_name="test_parameters"
     )
+    # Default test method is pre-filled when the parameter is added in the COA form.
+    default_test_method = models.ForeignKey(
+        "TestMethod", on_delete=models.PROTECT, null=True, blank=True, related_name="test_parameters"
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

@@ -262,11 +262,11 @@ export default function COAMasterPage() {
       const payload: Record<string, unknown> = { ...form };
       if (modal === "add") {
         if (activeTab === "products")        return createProduct({ name: payload.name as string, cas_number: payload.cas_number as string });
-        if (activeTab === "test-parameters") return createTestParameter({ name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null });
+        if (activeTab === "test-parameters") return createTestParameter({ name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null, default_test_method: payload.default_test_method ? Number(payload.default_test_method) : null });
         if (activeTab === "test-methods")    return createTestMethod({ code: payload.code as string, description: payload.description as string });
       } else if (typeof modal === "number") {
         if (activeTab === "products")        return updateProduct(modal, { name: payload.name as string, cas_number: payload.cas_number as string });
-        if (activeTab === "test-parameters") return updateTestParameter(modal, { name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null });
+        if (activeTab === "test-parameters") return updateTestParameter(modal, { name: payload.name as string, default_unit: payload.default_unit ? Number(payload.default_unit) : null, default_test_method: payload.default_test_method ? Number(payload.default_test_method) : null });
         if (activeTab === "test-methods")    return updateTestMethod(modal, { code: payload.code as string, description: payload.description as string });
       }
     },
@@ -381,6 +381,7 @@ export default function COAMasterPage() {
                 <tr style={{ background: "var(--bg-base)" }}>
                   <SortableTh label="Parameter Name" active={true} dir={sortDir} onClick={toggleSort} />
                   <StaticTh label="Default Unit" />
+                  <StaticTh label="Default Test Method" />
                   <StaticTh label="Status" />
                   <th style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-light)" }} />
                 </tr>
@@ -390,6 +391,11 @@ export default function COAMasterPage() {
                   <tr key={r.id} onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
                     <td style={tdStyle}>{r.name}</td>
                     <td style={tdMutedStyle}>{r.default_unit_abbreviation || "—"}</td>
+                    <td style={tdMutedStyle}>
+                      {r.default_test_method_code
+                        ? <span className="chip chip-blue" style={{ fontSize: 11 }}>{r.default_test_method_code}</span>
+                        : "—"}
+                    </td>
                     <td style={tdStyle}>
                       <span className={r.is_active ? "chip-green" : "chip-pink"} style={{ fontSize: 11 }}>
                         {r.is_active ? "Active" : "Inactive"}
@@ -439,8 +445,15 @@ export default function COAMasterPage() {
     queryFn: listUOMs,
   });
 
+  // Test method options for the test-parameters add/edit modal
+  const { data: allTestMethods = [] } = useQuery({
+    queryKey: ["test-methods"],
+    queryFn: () => listTestMethods().then((r) => r.data),
+  });
+
   function renderModalFields() {
     const uomOptions = (allUOMs as UOM[]).filter((u) => u.is_active).map((u) => ({ value: String(u.id), label: `${u.name} (${u.abbreviation})` }));
+    const testMethodOptions = (allTestMethods as TestMethod[]).filter((m) => m.is_active).map((m) => ({ value: String(m.id), label: m.code + (m.description ? ` — ${m.description}` : "") }));
     switch (activeTab) {
       case "products":
         return (
@@ -464,6 +477,19 @@ export default function COAMasterPage() {
                 placeholder="Select unit"
                 style={{ width: "100%" }}
                 options={uomOptions}
+              />
+            </div>
+            <div>
+              {fieldLabel("Default Test Method (optional)")}
+              <Select
+                value={form.default_test_method || undefined}
+                onChange={(v) => setForm((f) => ({ ...f, default_test_method: v ?? "" }))}
+                allowClear
+                showSearch
+                filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+                placeholder="Select test method"
+                style={{ width: "100%" }}
+                options={testMethodOptions}
               />
             </div>
           </div>
