@@ -306,7 +306,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         "", "", "", "", "", "", "",
     ]]
     col_headers = [[
-        Paragraph("<b>S.No</b>", style_tbl_hdr),
+        Paragraph("<b>Sr</b>", style_tbl_hdr),
         Paragraph("<b>Characteristic</b>", style_tbl_hdr),
         Paragraph("<b>Unit</b>", style_tbl_hdr),
         Paragraph("<b>Spec Min</b>", style_tbl_hdr),
