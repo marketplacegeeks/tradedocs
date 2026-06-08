@@ -352,14 +352,18 @@ export default function ProductTestTemplatePage() {
                     )}
                   </td>
 
-                  {/* Description */}
+                  {/* Description — only for qualitative */}
                   <td style={{ padding: "6px 8px", minWidth: 170 }}>
-                    <input
-                      style={inputStyle}
-                      value={row.spec_description}
-                      onChange={(e) => updateRow(idx, { spec_description: e.target.value })}
-                      placeholder={row.spec_type === "QUALITATIVE" ? "e.g. Clear, colourless" : "Optional note"}
-                    />
+                    {row.spec_type === "QUALITATIVE" ? (
+                      <input
+                        style={inputStyle}
+                        value={row.spec_description}
+                        onChange={(e) => updateRow(idx, { spec_description: e.target.value })}
+                        placeholder="e.g. Clear, colourless"
+                      />
+                    ) : (
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--border-medium)", paddingLeft: 4 }}>—</span>
+                    )}
                   </td>
 
                   {/* Test method dropdown */}
