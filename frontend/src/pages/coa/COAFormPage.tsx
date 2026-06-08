@@ -703,36 +703,12 @@ export default function COAFormPage() {
             />
           </div>
 
-          {/* Date of Despatch */}
-          <div>
-            <FieldLabel text="Date of Despatch (optional)" />
-            <DatePicker
-              value={dateOfDespatch ? dayjs(dateOfDespatch) : null}
-              onChange={(d) => setDateOfDespatch(d ? d.format("YYYY-MM-DD") : "")}
-              format="DD MMM YYYY"
-              style={{ width: "100%" }}
-              placeholder="Select date"
-            />
-          </div>
-
           {/* Date of Manufacture */}
           <div>
             <FieldLabel text="Date of Manufacture" required />
             <DatePicker
               value={dateOfManufacture ? dayjs(dateOfManufacture) : null}
               onChange={handleManufactureDateChange}
-              format="DD MMM YYYY"
-              style={{ width: "100%" }}
-              placeholder="Select date"
-            />
-          </div>
-
-          {/* Date of Retest */}
-          <div>
-            <FieldLabel text="Date of Retest" required />
-            <DatePicker
-              value={dateOfRetest ? dayjs(dateOfRetest) : null}
-              onChange={(d) => setDateOfRetest(d ? d.format("YYYY-MM-DD") : "")}
               format="DD MMM YYYY"
               style={{ width: "100%" }}
               placeholder="Select date"
@@ -773,6 +749,30 @@ export default function COAFormPage() {
                 {tzAbbr}
               </span>
             </div>
+          </div>
+
+          {/* Date of Retest */}
+          <div>
+            <FieldLabel text="Date of Retest" required />
+            <DatePicker
+              value={dateOfRetest ? dayjs(dateOfRetest) : null}
+              onChange={(d) => setDateOfRetest(d ? d.format("YYYY-MM-DD") : "")}
+              format="DD MMM YYYY"
+              style={{ width: "100%" }}
+              placeholder="Select date"
+            />
+          </div>
+
+          {/* Date of Despatch */}
+          <div>
+            <FieldLabel text="Date of Despatch (optional)" />
+            <DatePicker
+              value={dateOfDespatch ? dayjs(dateOfDespatch) : null}
+              onChange={(d) => setDateOfDespatch(d ? d.format("YYYY-MM-DD") : "")}
+              format="DD MMM YYYY"
+              style={{ width: "100%" }}
+              placeholder="Select date"
+            />
           </div>
 
           {/* Analyst Name */}
