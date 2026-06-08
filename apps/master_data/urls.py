@@ -5,6 +5,8 @@ from .views import (
     BankViewSet, CountryViewSet, CurrencyViewSet, IncotermViewSet, LocationViewSet,
     OrganisationAddressViewSet, OrganisationViewSet,
     PortViewSet, PaymentTermViewSet, PreCarriageByViewSet, TCTemplateViewSet, TypeOfPackageViewSet, UOMViewSet,
+    ProductViewSet, ProductGradeViewSet, TestParameterViewSet, TestMethodViewSet,
+    ProductTestTemplateView,
 )
 
 router = DefaultRouter()
@@ -20,6 +22,9 @@ router.register("banks", BankViewSet, basename="bank")
 router.register("organisations", OrganisationViewSet, basename="organisation")
 router.register("tc-templates", TCTemplateViewSet, basename="tctemplate")
 router.register("type-of-packages", TypeOfPackageViewSet, basename="typeofpackage")
+router.register("products", ProductViewSet, basename="product")
+router.register("test-parameters", TestParameterViewSet, basename="testparameter")
+router.register("test-methods", TestMethodViewSet, basename="testmethod")
 
 # Nested address routes under /organisations/{organisation_pk}/addresses/
 # Written manually so we don't need an extra package (drf-nested-routers).
@@ -41,4 +46,32 @@ address_patterns = [
     ),
 ]
 
-urlpatterns = router.urls + address_patterns
+# Nested grade routes under /products/{product_pk}/grades/
+product_grade_patterns = [
+    path(
+        "products/<int:product_pk>/grades/",
+        ProductGradeViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-grade-list",
+    ),
+    path(
+        "products/<int:product_pk>/grades/<int:pk>/",
+        ProductGradeViewSet.as_view({
+            "get": "retrieve",
+            "put": "update",
+            "patch": "partial_update",
+            "delete": "destroy",
+        }),
+        name="product-grade-detail",
+    ),
+]
+
+# Test template route: /product-grades/{product_grade_pk}/test-template/
+test_template_patterns = [
+    path(
+        "product-grades/<int:product_grade_pk>/test-template/",
+        ProductTestTemplateView.as_view(),
+        name="product-grade-test-template",
+    ),
+]
+
+urlpatterns = router.urls + address_patterns + product_grade_patterns + test_template_patterns

@@ -430,3 +430,125 @@ class OrganisationAddress(models.Model):
 
     def __str__(self):
         return f"{self.organisation.name} — {self.get_address_type_display()} — {self.city}"
+
+
+# ---------------------------------------------------------------------------
+# COA Master Data (Certificate of Analysis)
+# ---------------------------------------------------------------------------
+
+class Product(models.Model):
+    """A chemical product that can be analysed in a COA."""
+    name = models.CharField(max_length=255, unique=True)
+    # CAS Registry Number uniquely identifies a chemical substance (e.g. "67-66-3" for Chloroform).
+    cas_number = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "master_data_product"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ProductGrade(models.Model):
+    """One row per (product, grade) pair — e.g. Chloroform / Technical."""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="grades")
+    grade = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "master_data_product_grade"
+        ordering = ["product__name", "grade"]
+        unique_together = [("product", "grade")]
+
+    def __str__(self):
+        return f"{self.product.name} — {self.grade}"
+
+
+class TestParameter(models.Model):
+    """Library of test characteristics used as rows in a COA (e.g. Purity, Moisture)."""
+    name = models.CharField(max_length=255, unique=True)
+    # Default unit is a suggestion; the template row can override it.
+    default_unit = models.ForeignKey(
+        "UOM", on_delete=models.PROTECT, null=True, blank=True, related_name="test_parameters"
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "master_data_test_parameter"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class TestMethod(models.Model):
+    """Library of test method codes (e.g. ASTM D3741-00, IS 5296-K)."""
+    code = models.CharField(max_length=50, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "master_data_test_method"
+        ordering = ["code"]
+
+    def __str__(self):
+        return self.code
+
+
+class ProductTestTemplate(models.Model):
+    """
+    One test template per product grade (1:1).
+    Holds the ordered list of parameters and their specifications for that grade.
+    """
+    product_grade = models.OneToOneField(
+        ProductGrade, on_delete=models.CASCADE, related_name="test_template"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "master_data_product_test_template"
+
+    def __str__(self):
+        return f"Template for {self.product_grade}"
+
+
+class ProductTestTemplateRow(models.Model):
+    """
+    One row in a test template — describes a single parameter with its spec limits.
+    decimal_places=6 is intentional: chemical trace-level measurements need sub-ppm precision.
+    """
+    SPEC_TYPE_CHOICES = [
+        ("QUANTITATIVE", "Quantitative"),
+        ("QUALITATIVE", "Qualitative"),
+    ]
+
+    template = models.ForeignKey(
+        ProductTestTemplate, on_delete=models.CASCADE, related_name="rows"
+    )
+    s_no = models.PositiveIntegerField()
+    # parameter links to the library entry; parameter_label is the display override used on the COA.
+    parameter = models.ForeignKey(
+        TestParameter, on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
+    )
+    parameter_label = models.CharField(max_length=255)
+    unit = models.ForeignKey(
+        "UOM", on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
+    )
+    spec_type = models.CharField(max_length=20, choices=SPEC_TYPE_CHOICES)
+    # Use decimal_places=6 for trace-level chemical measurements
+    spec_min = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    spec_max = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    spec_description = models.TextField(blank=True)
+    test_method = models.ForeignKey(
+        TestMethod, on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
+    )
+    test_method_label = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        db_table = "master_data_product_test_template_row"
+        ordering = ["s_no"]
+
+    def __str__(self):
+        return f"{self.template} | Row {self.s_no}: {self.parameter_label}"
