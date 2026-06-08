@@ -28,6 +28,17 @@ import { extractApiError } from "../../utils/apiErrors";
 import AuditLogDrawer from "../../components/AuditLogDrawer";
 import type { AuditLogEntry } from "../../components/AuditLogDrawer";
 
+// ---- Decimal string normalisation -----------------------------------------
+// Django serialises DecimalField(decimal_places=6) as "0.002000".
+// Strip trailing zeros so displayed values show "0.002" instead.
+
+function normalizeDecimalStr(val: string | number | null | undefined): string | null {
+  if (val === null || val === undefined || val === "") return null;
+  const num = parseFloat(String(val));
+  if (isNaN(num)) return String(val);
+  return String(num);
+}
+
 // ---- Read-only field display helper ----------------------------------------
 
 function InfoField({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -449,7 +460,7 @@ export default function COADetailPage() {
           <InfoField label="Package Count" value={coa.package_count} />
           <InfoField
             label="Package Volume"
-            value={`${coa.package_volume} ${coa.package_uom_abbreviation}`}
+            value={`${normalizeDecimalStr(coa.package_volume)} ${coa.package_uom_abbreviation}`}
           />
           <InfoField label="Package Type" value={coa.package_type_name} />
           <InfoField label="Date of Manufacture" value={dayjs(coa.date_of_manufacture).format("DD MMM YYYY")} />
@@ -561,14 +572,14 @@ export default function COADetailPage() {
                     </td>
                     <td style={tdStyle}>
                       {param.spec_type === SPEC_TYPES.QUANTITATIVE
-                        ? [param.spec_min, param.spec_max]
+                        ? [normalizeDecimalStr(param.spec_min), normalizeDecimalStr(param.spec_max)]
                             .filter(Boolean)
                             .join(" – ") || "—"
                         : param.spec_description || "—"}
                     </td>
                     <td style={tdStyle}>
                       {param.spec_type === SPEC_TYPES.QUANTITATIVE
-                        ? param.result_value || "—"
+                        ? normalizeDecimalStr(param.result_value) || "—"
                         : param.result_text || "—"}
                     </td>
                     <td style={tdStyle}>
