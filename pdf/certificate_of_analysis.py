@@ -131,6 +131,8 @@ def generate_coa_pdf(coa) -> BytesIO:
     org_name = _safe(org.name) if org else ""
 
     org_addresses = []
+    org_iec_code = ""
+    org_tax_info = ""
     if org:
         for addr in org.addresses.select_related("country").all():
             parts = [addr.line1]
@@ -141,16 +143,15 @@ def generate_coa_pdf(coa) -> BytesIO:
                 parts.append(addr.state)
             if addr.pin:
                 parts.append(addr.pin)
-            extra_lines = []
-            if addr.iec_code:
-                extra_lines.append(f"IEC Code: {addr.iec_code}")
-            if addr.tax_type and addr.tax_code:
-                extra_lines.append(f"{addr.tax_type}: {addr.tax_code}")
             org_addresses.append({
                 "type": addr.get_address_type_display(),
                 "text": ", ".join(parts),
-                "extra": extra_lines,
             })
+            # Collect IEC and tax info once (from first address that has them)
+            if not org_iec_code and addr.iec_code:
+                org_iec_code = addr.iec_code
+            if not org_tax_info and addr.tax_type and addr.tax_code:
+                org_tax_info = f"{addr.tax_type}: {addr.tax_code}"
 
     # CIN — from first address where tax_type contains "CIN"
     cin = ""
@@ -204,8 +205,14 @@ def generate_coa_pdf(coa) -> BytesIO:
             f"<b>{addr_info['type']} Address:</b> {addr_info['text']}",
             style_small,
         ))
-        for extra_line in addr_info['extra']:
-            story.append(Paragraph(extra_line, style_small))
+    # IEC Code and GSTIN shown once, side by side, after all addresses
+    iec_gstin_parts = []
+    if org_iec_code:
+        iec_gstin_parts.append(f"IEC Code: {org_iec_code}")
+    if org_tax_info:
+        iec_gstin_parts.append(org_tax_info)
+    if iec_gstin_parts:
+        story.append(Paragraph("    ".join(iec_gstin_parts), style_small))
 
     # Hairline separator (matches PL style)
     sep = Table([[""]], colWidths=[PAGE_W])
