@@ -189,7 +189,7 @@ class Container(models.Model):
         on_delete=models.CASCADE,
         related_name="containers",
     )
-    container_ref = models.CharField(max_length=100)
+    container_ref = models.CharField(max_length=100, blank=True)
     marks_numbers = models.TextField()
     seal_number = models.CharField(max_length=100)
 

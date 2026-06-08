@@ -844,8 +844,8 @@ function Step3({
 
   async function savePendingContainer(idx: number) {
     const { _item, ...c } = pendingContainers[idx];
-    if (!c.container_ref || !c.marks_numbers || !c.seal_number) {
-      message.error("Container Ref, Marks & Numbers, and Seal Number are required.");
+    if (!c.marks_numbers || !c.seal_number) {
+      message.error("Marks & Numbers and Seal Number are required.");
       return;
     }
     const item = _item as Record<string, any> | undefined;
@@ -1028,7 +1028,7 @@ function Step3({
 
           {/* Field label headers row 1 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-            <div style={containerHeaderStyle}>Container Reference *</div>
+            <div style={containerHeaderStyle}>Container Reference</div>
             <div style={{ ...containerHeaderStyle, borderRight: "none" }}>Marks and Numbers *</div>
           </div>
           {/* Field inputs row 1 */}
@@ -1320,7 +1320,7 @@ function Step3({
 
             {/* Row 1 labels */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-              <div style={containerHeaderStyle}>Container Reference *</div>
+              <div style={containerHeaderStyle}>Container Reference</div>
               <div style={{ ...containerHeaderStyle, borderRight: "none" }}>Marks and Numbers *</div>
             </div>
             {/* Row 1 inputs */}

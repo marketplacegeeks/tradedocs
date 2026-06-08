@@ -569,7 +569,7 @@ export default function PackingListEditPage() {
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-              {[["container_ref", "Container Ref *"], ["marks_numbers", "Marks & Numbers *"], ["seal_number", "Seal Number *"]].map(([field, label]) => (
+              {[["container_ref", "Container Ref"], ["marks_numbers", "Marks & Numbers *"], ["seal_number", "Seal Number *"]].map(([field, label]) => (
                 <div key={field}>
                   <label style={LABEL}>{label}</label>
                   <input style={INPUT} defaultValue={(c as any)[field]} onBlur={(e) => {
