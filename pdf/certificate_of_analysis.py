@@ -5,22 +5,26 @@ Returns bytes in-memory — never writes to disk (Rule #9).
 from io import BytesIO
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.colors import HexColor, white
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
 
-# Import shared design constants
-from pdf.base import (
-    FONT_HEADING, FONT_LABEL, FONT_BODY,
-    SIZE_COMPANY, SIZE_DOC_TITLE, SIZE_BODY, SIZE_TABLE, SIZE_TABLE_HDR,
-    MARGIN_H, MARGIN_TOP, MARGIN_BOTTOM, CONTENT_W,
-)
+NAVY = colors.HexColor('#1A2B4B')
+LIGHT_GREY = colors.HexColor('#F0F0F0')
+ROW_TINT = colors.HexColor('#EEF1FF')
 
-NAVY = HexColor('#1a2a5e')
-LIGHT_GREY = HexColor('#F0F0F0')
+# Matches the _GRID_STYLE used by packing_list_generator for visual consistency
+_GRID_STYLE = [
+    ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+    ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
+    ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+    ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+    ("TOPPADDING",    (0, 0), (-1, -1), 5),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+]
 
 
 def _safe(v, default=""):
@@ -53,34 +57,65 @@ def generate_coa_pdf(coa) -> BytesIO:
     Generate a COA PDF for the given CertificateOfAnalysis instance.
     Returns a BytesIO buffer ready to stream — never written to disk.
     """
+    from apps.workflow.constants import APPROVED
+    from datetime import date as date_class
+
     buf = BytesIO()
 
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=MARGIN_H,
-        rightMargin=MARGIN_H,
-        topMargin=MARGIN_TOP + 5 * mm,
-        bottomMargin=MARGIN_BOTTOM,
+    styles = getSampleStyleSheet()
+
+    style_company = ParagraphStyle(
+        "COACompany", parent=styles["Normal"],
+        fontSize=18, leading=22, spaceAfter=2,
+        alignment=TA_CENTER, fontName="Helvetica-Bold",
+    )
+    style_title = ParagraphStyle(
+        "COATitle", parent=styles["Normal"],
+        fontSize=13, leading=16, spaceAfter=14,
+        alignment=TA_CENTER, fontName="Helvetica-Bold",
+    )
+    style_small = ParagraphStyle(
+        "COASmall", parent=styles["Normal"],
+        fontSize=8, leading=11, alignment=TA_CENTER,
+    )
+    style_label = ParagraphStyle(
+        "COALabel", parent=styles["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+    )
+    style_text = ParagraphStyle(
+        "COAText", parent=styles["Normal"],
+        fontSize=9, leading=12,
+    )
+    style_label_white_center = ParagraphStyle(
+        "COALabelWhiteCenter", parent=styles["Normal"],
+        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    style_text_white_center = ParagraphStyle(
+        "COATextWhiteCenter", parent=styles["Normal"],
+        fontSize=9, leading=12,
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    style_tbl_hdr = ParagraphStyle(
+        "COATblHdr", parent=styles["Normal"],
+        fontSize=9, leading=11, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    style_tbl_cell = ParagraphStyle(
+        "COATblCell", parent=styles["Normal"],
+        fontSize=9, leading=11,
+    )
+    style_sig = ParagraphStyle(
+        "COASig", parent=styles["Normal"],
+        fontSize=9, leading=14, alignment=TA_CENTER,
     )
 
-    body_style = ParagraphStyle("coa_body", fontName=FONT_BODY, fontSize=SIZE_BODY, leading=13)
-    header_label_style = ParagraphStyle("coa_header_lbl", fontName=FONT_LABEL, fontSize=SIZE_BODY, leading=13)
-    table_hdr_style = ParagraphStyle("coa_tbl_hdr", fontName=FONT_LABEL, fontSize=SIZE_TABLE_HDR, textColor=white, leading=11)
-    table_cell_style = ParagraphStyle("coa_tbl_cell", fontName=FONT_BODY, fontSize=SIZE_TABLE, leading=11)
-    small_style = ParagraphStyle("coa_small", fontName=FONT_BODY, fontSize=7, leading=10)
-    sig_style = ParagraphStyle("sig", fontName=FONT_BODY, fontSize=SIZE_BODY, alignment=TA_CENTER, leading=14)
-    footer_style = ParagraphStyle("footer", fontName=FONT_BODY, fontSize=7, alignment=TA_CENTER, leading=10)
-
-    story = []
-
     # -------------------------------------------------------------------------
-    # 1. Company header block — uses footer_organisation for company details
+    # Gather org / address data (used in both header and footer callback)
     # -------------------------------------------------------------------------
     org = coa.footer_organisation
     org_name = _safe(org.name) if org else ""
 
-    # Build address lines from all addresses on the footer org
     org_addresses = []
     if org:
         for addr in org.addresses.select_related("country").all():
@@ -102,54 +137,97 @@ def generate_coa_pdf(coa) -> BytesIO:
                 cin = addr.tax_code
                 break
 
-    header_data = [[
-        Paragraph(
-            f"<b>{org_name}</b>",
-            ParagraphStyle("org_name", fontName=FONT_HEADING, fontSize=SIZE_COMPANY, leading=22),
-        )
-    ]]
-    if cin:
-        header_data.append([Paragraph(f"CIN: {cin}", body_style)])
-    for addr_text in org_addresses:
-        header_data.append([Paragraph(addr_text, small_style)])
+    is_draft = coa.status != APPROVED
 
-    header_table = Table(header_data, colWidths=[CONTENT_W])
-    header_table.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
+    # -------------------------------------------------------------------------
+    # Canvas callbacks — footer with hairline rule + disclaimer + page number
+    # and DRAFT watermark for non-approved documents
+    # -------------------------------------------------------------------------
+    def _on_page(canvas, doc):
+        if is_draft:
+            canvas.saveState()
+            canvas.setFont("Helvetica-Bold", 80)
+            canvas.setFillColor(colors.HexColor('#CC0000'), alpha=0.15)
+            canvas.translate(A4[0] / 2, A4[1] / 2)
+            canvas.rotate(45)
+            canvas.drawCentredString(0, 0, "DRAFT")
+            canvas.restoreState()
+
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor("#CCCCCC"))
+        canvas.setLineWidth(0.5)
+        canvas.line(15 * mm, 17 * mm, A4[0] - 15 * mm, 17 * mm)
+        canvas.setFont("Helvetica", 8)
+        canvas.drawCentredString(
+            A4[0] / 2, 12 * mm,
+            "This is a computer generated document and does not require signature",
+        )
+        canvas.setFont("Helvetica", 7)
+        canvas.drawCentredString(A4[0] / 2, 8 * mm, f"Page {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=20 * mm,
+    )
+
+    PAGE_W = 180 * mm
+    col_third = PAGE_W / 3
+
+    story = []
+
+    # -------------------------------------------------------------------------
+    # 1. Company header block
+    # -------------------------------------------------------------------------
+    story.append(Paragraph(org_name, style_company))
+    if cin:
+        story.append(Paragraph(f"CIN: {cin}", style_small))
+    for addr_text in org_addresses:
+        story.append(Paragraph(addr_text, style_small))
+
+    # Hairline separator (matches PL style)
+    sep = Table([[""]], colWidths=[PAGE_W])
+    sep.setStyle(TableStyle([
+        ("LINEABOVE",      (0, 0), (-1, 0), 1.5, colors.black),
+        ("TOPPADDING",     (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",  (0, 0), (-1, -1), 0),
     ]))
-    story.append(header_table)
-    story.append(Spacer(1, 4 * mm))
+    story.append(sep)
+    story.append(Spacer(1, 6))
 
     # -------------------------------------------------------------------------
     # 2. Document title + COA number
     # -------------------------------------------------------------------------
-    story.append(Paragraph(
-        "<u><b>Certificate of Analysis</b></u>",
-        ParagraphStyle(
-            "coa_title", fontName=FONT_HEADING, fontSize=SIZE_DOC_TITLE + 1,
-            alignment=TA_CENTER, leading=18, spaceAfter=4,
-        ),
-    ))
-    story.append(Paragraph(
-        f"<b>{_safe(coa.coa_number)}</b>",
-        ParagraphStyle(
-            "coa_num", fontName=FONT_LABEL, fontSize=SIZE_BODY,
-            alignment=TA_CENTER, leading=13, spaceAfter=4,
-        ),
-    ))
-    story.append(Spacer(1, 4 * mm))
+    story.append(Paragraph("Certificate of Analysis", style_title))
 
     # -------------------------------------------------------------------------
-    # 3. Header info block — product, customer, batch, dates, etc.
+    # 3. Header info block — COA No. / Product / Customer in a navy header row
     # -------------------------------------------------------------------------
     pg = coa.product_grade
     product_name = pg.product.name if pg else ""
-    grade = pg.grade if pg else ""
+    grade_str = pg.grade if pg else ""
     customer_name = coa.customer.name if coa.customer else ""
 
-    # Supplied quantity: "N x V uom package_type"
+    coa_header_data = [[
+        Paragraph(f"<b>COA No.</b><br/>{_safe(coa.coa_number)}", style_text_white_center),
+        Paragraph(f"<b>Product / Grade</b><br/>{product_name} / {grade_str}", style_text_white_center),
+        Paragraph(f"<b>Customer</b><br/>{customer_name}", style_text_white_center),
+    ]]
+    coa_header_tbl = Table(coa_header_data, colWidths=[col_third, col_third, col_third])
+    coa_header_tbl.setStyle(TableStyle(_GRID_STYLE + [
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TEXTCOLOR",  (0, 0), (-1, -1), colors.white),
+    ]))
+    coa_header_tbl.hAlign = "LEFT"
+    story.append(coa_header_tbl)
+
+    # -------------------------------------------------------------------------
+    # 4. Info rows — batch, dates, quantities
+    # -------------------------------------------------------------------------
     try:
         vol_str = f"{coa.package_volume.normalize():f}".rstrip("0").rstrip(".")
     except Exception:
@@ -160,7 +238,7 @@ def generate_coa_pdf(coa) -> BytesIO:
 
     date_despatch = _fmt_date(coa.date_of_despatch) if coa.date_of_despatch else "XXXX"
 
-    # Build optional PL / CI reference rows
+    # Optional PL / CI reference rows
     pl_ci_rows = []
     if coa.packing_list_id:
         pl_ci_rows.append(("Packing List No.", _safe(coa.packing_list.pl_number)))
@@ -172,58 +250,58 @@ def generate_coa_pdf(coa) -> BytesIO:
             pass
 
     info_rows = [
-        ("Name of the Product", product_name),
-        ("Grade", grade),
-        ("Name of the Customer", customer_name),
-        *pl_ci_rows,
-        ("Batch No", coa.batch_number),
+        ("Batch No.", _safe(coa.batch_number)),
         ("Supplied Quantity", supplied_qty),
         ("Date of Despatch", date_despatch),
         ("Date of Manufacture", _fmt_date(coa.date_of_manufacture)),
         ("Date of Retest", _fmt_date(coa.date_of_retest)),
-        ("Date and time of sampling", _fmt_datetime(coa.date_time_of_sampling)),
-        ("Date and time of analysis", _fmt_datetime(coa.date_time_of_analysis)),
+        ("Date and Time of Sampling", _fmt_datetime(coa.date_time_of_sampling)),
+        ("Date and Time of Analysis", _fmt_datetime(coa.date_time_of_analysis)),
+        *pl_ci_rows,
     ]
 
     info_data = [
-        [Paragraph(f"<b>{label} :</b>", header_label_style), Paragraph(value, body_style)]
+        [Paragraph(f"<b>{label}</b>", style_label), Paragraph(value, style_text)]
         for label, value in info_rows
     ]
-    info_table = Table(info_data, colWidths=[CONTENT_W * 0.42, CONTENT_W * 0.58])
-    info_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-    ]))
+    info_table = Table(info_data, colWidths=[PAGE_W * 0.42, PAGE_W * 0.58])
+    info_table.setStyle(TableStyle(_GRID_STYLE))
+    info_table.hAlign = "LEFT"
     story.append(info_table)
     story.append(Spacer(1, 5 * mm))
 
     # -------------------------------------------------------------------------
-    # 4. Test parameters table
+    # 5. Test parameters table
     # Columns: S.No | Characteristic | Unit | Spec Min | Spec Max | Specification | Results | Test Method
     # -------------------------------------------------------------------------
     col_widths = [
-        CONTENT_W * 0.05,   # S.No
-        CONTENT_W * 0.22,   # Characteristic
-        CONTENT_W * 0.08,   # Unit
-        CONTENT_W * 0.10,   # Spec Min
-        CONTENT_W * 0.10,   # Spec Max
-        CONTENT_W * 0.15,   # Spec Description
-        CONTENT_W * 0.15,   # Results
-        CONTENT_W * 0.15,   # Test Method
+        PAGE_W * 0.05,   # S.No
+        PAGE_W * 0.22,   # Characteristic
+        PAGE_W * 0.08,   # Unit
+        PAGE_W * 0.10,   # Spec Min
+        PAGE_W * 0.10,   # Spec Max
+        PAGE_W * 0.15,   # Spec Description
+        PAGE_W * 0.15,   # Results
+        PAGE_W * 0.15,   # Test Method
     ]
 
-    table_data = [[
-        Paragraph("<b>S.No</b>", table_hdr_style),
-        Paragraph("<b>Characteristic</b>", table_hdr_style),
-        Paragraph("<b>Unit</b>", table_hdr_style),
-        Paragraph("<b>Spec Min</b>", table_hdr_style),
-        Paragraph("<b>Spec Max</b>", table_hdr_style),
-        Paragraph("<b>Specification</b>", table_hdr_style),
-        Paragraph("<b>Results</b>", table_hdr_style),
-        Paragraph("<b>Test Method</b>", table_hdr_style),
+    # Section header row spanning all columns
+    section_hdr = [[
+        Paragraph("<b>TEST RESULTS</b>", style_label_white_center),
+        "", "", "", "", "", "", "",
     ]]
+    col_headers = [[
+        Paragraph("<b>S.No</b>", style_tbl_hdr),
+        Paragraph("<b>Characteristic</b>", style_tbl_hdr),
+        Paragraph("<b>Unit</b>", style_tbl_hdr),
+        Paragraph("<b>Spec Min</b>", style_tbl_hdr),
+        Paragraph("<b>Spec Max</b>", style_tbl_hdr),
+        Paragraph("<b>Specification</b>", style_tbl_hdr),
+        Paragraph("<b>Results</b>", style_tbl_hdr),
+        Paragraph("<b>Test Method</b>", style_tbl_hdr),
+    ]]
+
+    table_data = section_hdr + col_headers
 
     params = list(coa.parameters.select_related("unit", "parameter", "test_method").all())
     for p in params:
@@ -236,52 +314,55 @@ def generate_coa_pdf(coa) -> BytesIO:
         else:
             spec_min_str = ""
             spec_max_str = ""
-            spec_desc_str = p.spec_description
-            result_str = p.result_text
+            spec_desc_str = _safe(p.spec_description)
+            result_str = _safe(p.result_text)
 
         method_str = p.test_method.code if p.test_method else ""
 
         table_data.append([
-            Paragraph(str(p.s_no), table_cell_style),
-            Paragraph(_safe(p.parameter.name if p.parameter else ""), table_cell_style),
-            Paragraph(unit_str, table_cell_style),
-            Paragraph(spec_min_str, table_cell_style),
-            Paragraph(spec_max_str, table_cell_style),
-            Paragraph(spec_desc_str, table_cell_style),
-            Paragraph(result_str, table_cell_style),
-            Paragraph(method_str, table_cell_style),
+            Paragraph(str(p.s_no), style_tbl_cell),
+            Paragraph(_safe(p.parameter.name if p.parameter else ""), style_tbl_cell),
+            Paragraph(unit_str, style_tbl_cell),
+            Paragraph(spec_min_str, style_tbl_cell),
+            Paragraph(spec_max_str, style_tbl_cell),
+            Paragraph(spec_desc_str, style_tbl_cell),
+            Paragraph(result_str, style_tbl_cell),
+            Paragraph(method_str, style_tbl_cell),
         ])
 
-    param_table = Table(table_data, colWidths=col_widths)
+    param_table = Table(table_data, colWidths=col_widths, repeatRows=2)
 
-    table_style = [
-        # Header row: dark navy background, white text
+    tbl_style = [
+        ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        # Row 0: full-width section title
+        ("SPAN",       (0, 0), (-1, 0)),
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), FONT_LABEL),
-        ("FONTSIZE", (0, 0), (-1, 0), SIZE_TABLE_HDR),
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 3),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
+        ("ALIGN",      (0, 0), (-1, 0), "CENTER"),
+        # Row 1: column header row
+        ("BACKGROUND", (0, 1), (-1, 1), NAVY),
+        ("TEXTCOLOR",  (0, 1), (-1, 1), colors.white),
+        ("ALIGN",      (0, 1), (-1, 1), "CENTER"),
     ]
-    # Alternating row shading for readability
-    for i in range(1, len(table_data)):
+    # Alternating row shading starting from first data row (index 2)
+    for i in range(2, len(table_data)):
         if i % 2 == 0:
-            table_style.append(("BACKGROUND", (0, i), (-1, i), LIGHT_GREY))
+            tbl_style.append(("BACKGROUND", (0, i), (-1, i), LIGHT_GREY))
 
-    param_table.setStyle(TableStyle(table_style))
+    param_table.setStyle(TableStyle(tbl_style))
+    param_table.hAlign = "LEFT"
     story.append(param_table)
     story.append(Spacer(1, 8 * mm))
 
     # -------------------------------------------------------------------------
-    # 5. Signature section — analyst and QC incharge
+    # 6. Signature section — analyst and QC incharge
     # -------------------------------------------------------------------------
-    from apps.workflow.constants import APPROVED
-    from datetime import date as date_class
     if coa.status == APPROVED:
         sig_date = _fmt_date(coa.updated_at.date())
     else:
@@ -301,37 +382,24 @@ def generate_coa_pdf(coa) -> BytesIO:
     )
 
     sig_data = [[
-        Paragraph(analyst_col, sig_style),
-        Paragraph("", sig_style),   # Center column: company seal placeholder
-        Paragraph(qc_col, sig_style),
+        Paragraph(analyst_col, style_sig),
+        Paragraph("", style_sig),   # Center column: company seal placeholder
+        Paragraph(qc_col, style_sig),
     ]]
-    sig_table = Table(sig_data, colWidths=[CONTENT_W / 3, CONTENT_W / 3, CONTENT_W / 3])
+    sig_table = Table(sig_data, colWidths=[col_third, col_third, col_third])
     sig_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
     ]))
-    story.append(sig_table)
-    story.append(Spacer(1, 6 * mm))
+    sig_table.hAlign = "LEFT"
+    story.append(KeepTogether([sig_table]))
 
-    # -------------------------------------------------------------------------
-    # 6. Footer — repeat footer_organisation details below a hairline rule
-    # -------------------------------------------------------------------------
-    footer_lines = [f"<b>{org_name}</b>"]
-    if cin:
-        footer_lines.append(f"CIN: {cin}")
-    for addr_text in org_addresses:
-        footer_lines.append(addr_text)
-
-    footer_para = Paragraph("<br/>".join(footer_lines), footer_style)
-    footer_table = Table([[footer_para]], colWidths=[CONTENT_W])
-    footer_table.setStyle(TableStyle([
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("LINEABOVE", (0, 0), (-1, 0), 0.5, colors.grey),
-    ]))
-    story.append(footer_table)
-
-    doc.build(story)
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     buf.seek(0)
     return buf
