@@ -200,7 +200,9 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<string[]>(["/master-data"]);
+  const [openGroups, setOpenGroups] = useState<string[]>(
+    location.pathname.startsWith("/master-data") ? ["/master-data"] : []
+  );
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => user && item.roles.includes(user.role as typeof ROLES[keyof typeof ROLES])
