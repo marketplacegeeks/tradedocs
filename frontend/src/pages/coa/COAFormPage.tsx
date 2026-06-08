@@ -374,6 +374,31 @@ export default function COAFormPage() {
       return null;
     }
 
+    // Validate chronological order: manufacture < sampling < analysis < retest < despatch
+    const mfgDay = dayjs(dateOfManufacture);
+    const samplingDay = dayjs(dateTimeOfSampling);
+    const analysisDay = dayjs(dateTimeOfAnalysis);
+    const retestDay = dayjs(dateOfRetest);
+    if (!mfgDay.isBefore(samplingDay)) {
+      message.error("Date of Manufacture must be before Date & Time of Sampling.");
+      return null;
+    }
+    if (!samplingDay.isBefore(analysisDay)) {
+      message.error("Date & Time of Sampling must be before Date & Time of Analysis.");
+      return null;
+    }
+    if (!analysisDay.isBefore(retestDay)) {
+      message.error("Date & Time of Analysis must be before Date of Retest.");
+      return null;
+    }
+    if (dateOfDespatch) {
+      const despatchDay = dayjs(dateOfDespatch);
+      if (!retestDay.isBefore(despatchDay)) {
+        message.error("Date of Retest must be before Date of Despatch.");
+        return null;
+      }
+    }
+
     return {
       packing_list: packingListId,
       product_grade: productGradeId,
@@ -976,6 +1001,21 @@ export default function COAFormPage() {
   );
 }
 
+// ---- OOS detection ---------------------------------------------------------
+// A quantitative row is out-of-spec when the numeric result falls outside the
+// defined min/max limits. Non-numeric or empty results are ignored.
+
+function isOutOfSpec(row: COAParameter): boolean {
+  if (row.spec_type !== SPEC_TYPES.QUANTITATIVE) return false;
+  const result = parseFloat(row.result_value ?? "");
+  if (isNaN(result)) return false;
+  const min = row.spec_min !== null && row.spec_min !== "" ? parseFloat(String(row.spec_min)) : null;
+  const max = row.spec_max !== null && row.spec_max !== "" ? parseFloat(String(row.spec_max)) : null;
+  if (min !== null && !isNaN(min) && result < min) return true;
+  if (max !== null && !isNaN(max) && result > max) return true;
+  return false;
+}
+
 // ---- Parameter table row ---------------------------------------------------
 
 interface RowProps {
@@ -1001,6 +1041,7 @@ function ParameterRow({
   onDelete,
 }: RowProps) {
   const isQuantitative = row.spec_type === SPEC_TYPES.QUANTITATIVE;
+  const oos = isOutOfSpec(row);
 
   const cellStyle: React.CSSProperties = {
     padding: "8px 10px",
@@ -1022,7 +1063,7 @@ function ParameterRow({
   };
 
   return (
-    <tr>
+    <tr style={oos ? { background: "var(--pastel-pink)" } : undefined}>
       {/* S.No */}
       <td style={{ ...cellStyle, width: 40, color: "var(--text-muted)", fontSize: 13, fontFamily: "var(--font-body)" }}>
         {row.s_no}
