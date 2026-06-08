@@ -141,7 +141,16 @@ def generate_coa_pdf(coa) -> BytesIO:
                 parts.append(addr.state)
             if addr.pin:
                 parts.append(addr.pin)
-            org_addresses.append(", ".join(parts))
+            extra_lines = []
+            if addr.iec_code:
+                extra_lines.append(f"IEC Code: {addr.iec_code}")
+            if addr.tax_type and addr.tax_code:
+                extra_lines.append(f"{addr.tax_type}: {addr.tax_code}")
+            org_addresses.append({
+                "type": addr.get_address_type_display(),
+                "text": ", ".join(parts),
+                "extra": extra_lines,
+            })
 
     # CIN — from first address where tax_type contains "CIN"
     cin = ""
@@ -190,8 +199,13 @@ def generate_coa_pdf(coa) -> BytesIO:
     story.append(Paragraph(org_name, style_company))
     if cin:
         story.append(Paragraph(f"CIN: {cin}", style_small))
-    for addr_text in org_addresses:
-        story.append(Paragraph(addr_text, style_small))
+    for addr_info in org_addresses:
+        story.append(Paragraph(
+            f"<b>{addr_info['type']} Address:</b> {addr_info['text']}",
+            style_small,
+        ))
+        for extra_line in addr_info['extra']:
+            story.append(Paragraph(extra_line, style_small))
 
     # Hairline separator (matches PL style)
     sep = Table([[""]], colWidths=[PAGE_W])
@@ -209,25 +223,12 @@ def generate_coa_pdf(coa) -> BytesIO:
     story.append(Paragraph("Certificate of Analysis", style_title))
 
     # -------------------------------------------------------------------------
-    # 3. Header info block — COA No. / Product / Customer in a navy header row
+    # 3. Variables for COA info — included as top rows of the info table below
     # -------------------------------------------------------------------------
     pg = coa.product_grade
     product_name = pg.product.name if pg else ""
     grade_str = pg.grade if pg else ""
     customer_name = coa.customer.name if coa.customer else ""
-
-    coa_header_data = [[
-        Paragraph(f"<b>COA No.</b><br/>{_safe(coa.coa_number)}", style_text_white_center),
-        Paragraph(f"<b>Product / Grade</b><br/>{product_name} / {grade_str}", style_text_white_center),
-        Paragraph(f"<b>Customer</b><br/>{customer_name}", style_text_white_center),
-    ]]
-    coa_header_tbl = Table(coa_header_data, colWidths=[col_third, col_third, col_third])
-    coa_header_tbl.setStyle(TableStyle(_GRID_STYLE + [
-        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
-        ("TEXTCOLOR",  (0, 0), (-1, -1), colors.white),
-    ]))
-    coa_header_tbl.hAlign = "LEFT"
-    story.append(coa_header_tbl)
 
     # -------------------------------------------------------------------------
     # 4. Info rows — batch, dates, quantities
@@ -254,6 +255,9 @@ def generate_coa_pdf(coa) -> BytesIO:
             pass
 
     info_rows = [
+        ("COA No.", _safe(coa.coa_number)),
+        ("Product / Grade", f"{product_name} / {grade_str}"),
+        ("Customer", customer_name),
         ("Batch No.", _safe(coa.batch_number)),
         ("Supplied Quantity", supplied_qty),
         ("Date of Despatch", date_despatch),
@@ -373,16 +377,18 @@ def generate_coa_pdf(coa) -> BytesIO:
         sig_date = _fmt_date(date_class.today())
 
     analyst_col = (
-        "_________________________<br/>"
-        "Analyst<br/>"
+        "<b>Analyst</b><br/>"
         f"{_safe(coa.analyst_name)}<br/>"
-        f"Date : {sig_date}"
+        f"Date : {sig_date}<br/>"
+        "<br/><br/><br/>"
+        "_________________________"
     )
     qc_col = (
-        "_________________________<br/>"
-        "QC Incharge<br/>"
+        "<b>QC Incharge</b><br/>"
         f"{_safe(coa.qc_incharge_name)}<br/>"
-        f"Date : {sig_date}"
+        f"Date : {sig_date}<br/>"
+        "<br/><br/><br/>"
+        "_________________________"
     )
 
     sig_data = [[
@@ -394,7 +400,7 @@ def generate_coa_pdf(coa) -> BytesIO:
     sig_table.setStyle(TableStyle([
         ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
         ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ("TOPPADDING",    (0, 0), (-1, -1), 10),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
