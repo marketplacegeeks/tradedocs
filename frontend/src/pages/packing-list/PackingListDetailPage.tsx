@@ -727,7 +727,7 @@ export default function PackingListDetailPage() {
   const isAdmin = user?.role === ROLES.COMPANY_ADMIN || user?.role === ROLES.SUPER_ADMIN;
   // Any Maker can edit or delete any editable PL — not just the creator.
   const canEdit = isEditable && (user?.role === ROLES.MAKER || isCreator || isAdmin);
-  const canDelete = isDraft && (user?.role === ROLES.MAKER || isCreator || isAdmin);
+  const canDelete = isDraft && (user?.role === ROLES.MAKER || isCreator || user?.role === ROLES.COMPANY_ADMIN) && user?.role !== ROLES.SUPER_ADMIN;
   const isApproved = pl.status === DOCUMENT_STATUS.APPROVED;
   // FR-08.3: PDF available to all roles in all states (DRAFT watermark shown on non-Approved).
   const canDownloadPDF = true;
@@ -757,7 +757,7 @@ export default function PackingListDetailPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
           <button
             onClick={() => setAuditOpen(true)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-secondary)" }}
@@ -784,15 +784,6 @@ export default function PackingListDetailPage() {
             </button>
           )}
 
-          {canDelete && (
-            <button
-              onClick={() => setDeleteModalOpen(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-pink)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-pink-text)" }}
-            >
-              <Trash2 size={14} /> Delete
-            </button>
-          )}
-
           {canDownloadPDF && (
             <button
               onClick={() => {
@@ -804,9 +795,18 @@ export default function PackingListDetailPage() {
                   );
                 }
               }}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "#fff" }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-green)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-green-text)" }}
             >
               <FileDown size={14} /> Download PDF
+            </button>
+          )}
+
+          {canDelete && (
+            <button
+              onClick={() => setDeleteModalOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-pink)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-pink-text)" }}
+            >
+              <Trash2 size={14} /> Delete
             </button>
           )}
 
