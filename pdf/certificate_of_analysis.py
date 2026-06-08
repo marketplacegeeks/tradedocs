@@ -268,7 +268,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         ("Batch No.", _safe(coa.batch_number)),
         ("Supplied Quantity", supplied_qty),
         ("Date of Despatch", date_despatch),
-        ("Date of Manufacture", _fmt_date(coa.date_of_manufacture)),
+        ("Date of Manufacturing", _fmt_date(coa.date_of_manufacture)),
         ("Date of Retest", _fmt_date(coa.date_of_retest)),
         ("Date and Time of Sampling", _fmt_datetime(coa.date_time_of_sampling)),
         ("Date and Time of Analysis", _fmt_datetime(coa.date_time_of_analysis)),
