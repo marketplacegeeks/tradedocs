@@ -9,6 +9,7 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
 
 NAVY = colors.HexColor('#1A2B4B')
@@ -33,23 +34,36 @@ def _safe(v, default=""):
 
 
 def _fmt_date(d):
-    """Format a date object as DD.MM.YYYY, returning 'XXXX' if None."""
+    """Format a date object as DD/MMM/YYYY, returning 'XXXX' if None."""
     if d is None:
         return "XXXX"
     try:
-        return d.strftime("%d.%m.%Y")
+        return d.strftime("%d/%b/%Y")
     except Exception:
         return str(d)
 
 
 def _fmt_datetime(dt):
-    """Format a datetime object as DD.MM.YYYY – HH:MM."""
+    """Format a datetime object as DD/MMM/YYYY – HH:MM."""
     if dt is None:
         return ""
     try:
-        return dt.strftime("%d.%m.%Y \u2013 %H:%M")
+        return dt.strftime("%d/%b/%Y \u2013 %H:%M")
     except Exception:
         return str(dt)
+
+
+class _DraftWatermarkCanvas(Canvas):
+    """Custom canvas that stamps 'DRAFT' on top of all page content."""
+    def showPage(self):
+        self.saveState()
+        self.setFont("Helvetica-Bold", 80)
+        self.setFillColorRGB(0.8, 0, 0, alpha=0.15)
+        self.translate(A4[0] / 2, A4[1] / 2)
+        self.rotate(45)
+        self.drawCentredString(0, 0, "DRAFT")
+        self.restoreState()
+        super().showPage()
 
 
 def generate_coa_pdf(coa) -> BytesIO:
@@ -141,18 +155,8 @@ def generate_coa_pdf(coa) -> BytesIO:
 
     # -------------------------------------------------------------------------
     # Canvas callbacks — footer with hairline rule + disclaimer + page number
-    # and DRAFT watermark for non-approved documents
     # -------------------------------------------------------------------------
     def _on_page(canvas, doc):
-        if is_draft:
-            canvas.saveState()
-            canvas.setFont("Helvetica-Bold", 80)
-            canvas.setFillColor(colors.HexColor('#CC0000'), alpha=0.15)
-            canvas.translate(A4[0] / 2, A4[1] / 2)
-            canvas.rotate(45)
-            canvas.drawCentredString(0, 0, "DRAFT")
-            canvas.restoreState()
-
         canvas.saveState()
         canvas.setStrokeColor(colors.HexColor("#CCCCCC"))
         canvas.setLineWidth(0.5)
@@ -400,6 +404,7 @@ def generate_coa_pdf(coa) -> BytesIO:
     sig_table.hAlign = "LEFT"
     story.append(KeepTogether([sig_table]))
 
-    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    canvasmaker = _DraftWatermarkCanvas if is_draft else Canvas
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page, canvasmaker=canvasmaker)
     buf.seek(0)
     return buf
