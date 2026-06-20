@@ -83,7 +83,7 @@ class CommercialInvoiceViewSet(viewsets.ModelViewSet):
             )
         pl = instance.packing_list
         if (pl.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
+                and self.request.user.role not in (UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
             raise PermissionDenied("Only the document creator can edit this Commercial Invoice.")
         serializer.save()
 
@@ -168,6 +168,6 @@ class CommercialInvoiceLineItemViewSet(viewsets.ModelViewSet):
             )
         pl = ci.packing_list
         if (pl.created_by != self.request.user
-                and self.request.user.role != UserRole.COMPANY_ADMIN):
+                and self.request.user.role not in (UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
             raise PermissionDenied("Only the document creator can edit rates.")
         serializer.save()

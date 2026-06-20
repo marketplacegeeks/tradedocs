@@ -11,7 +11,7 @@ from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory
+from apps.accounts.tests.factories import CheckerFactory, CompanyAdminFactory, MakerFactory, SuperAdminFactory
 from apps.master_data.tests.factories import BankFactory, UOMFactory
 from apps.workflow.constants import APPROVED, DRAFT, PENDING_APPROVAL, REWORK
 
@@ -311,4 +311,13 @@ class TestCheckerPermissions:
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         ci = CommercialInvoiceFactory(packing_list=pl, status=DRAFT, created_by=maker)
         resp = auth_client(maker).patch(ci_detail_url(ci.pk), {"lc_details": "LC-TEST-001"}, format="json")
+        assert resp.status_code == 200
+
+    def test_super_admin_can_patch_ci(self):
+        # CR-01 fix: SUPER_ADMIN must pass the object-level creator check, not just the routing layer
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=DRAFT, created_by=maker)
+        super_admin = SuperAdminFactory()
+        resp = auth_client(super_admin).patch(ci_detail_url(ci.pk), {"lc_details": "SUPER-EDIT"}, format="json")
         assert resp.status_code == 200
