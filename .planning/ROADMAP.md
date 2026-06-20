@@ -85,7 +85,14 @@ Plans:
 
 **Contents:** `.planning/phases/phase-4-test-coverage/`
 
-**Status:** Planned
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Checker permission-denial tests (PI + PL edit/delete) + PL-without-CI serializer safety tests
+- [ ] 04-02-PLAN.md — Create apps/workflow/tests/test_services.py: PI→PL→CI cascade + transition_joint() atomicity
+- [ ] 04-03-PLAN.md — PL+CI PDF edge-case tests (long names, null fields) + concurrent PI number uniqueness test
+
+**Status:** Ready to execute
 
 ---
 
