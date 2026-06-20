@@ -118,6 +118,61 @@ Plans:
 
 ---
 
+## Phase 6 — Tenant Foundation 🔴 PENDING
+
+**Goal:** Establish the multi-tenant data model — new Tenant entity, subdomain middleware, User→Tenant FK, and JWT tenant context. Migrate all existing single-tenant data to Tenant #1.
+
+**Scope:**
+- New `apps/tenants/` app with `Tenant` model (`name`, `slug`, `is_active`, `created_at`) — slug is the subdomain key (e.g. `acme` → `acme.tradetocs.com`)
+- Django middleware: extract subdomain from `HTTP_HOST`, resolve `Tenant` record, attach to `request.tenant`; return 404 for unknown subdomains
+- `ALLOWED_HOSTS` updated to accept `*.tradetocs.com` wildcard
+- `User` model: add `tenant = ForeignKey(Tenant, null=True, on_delete=PROTECT)` — nullable so SUPER_ADMIN stays platform-level (no tenant)
+- JWT: add `tenant_id` claim to token payload via `SIMPLE_JWT` custom serializer
+- SUPER_ADMIN tenant management: Django admin interface for creating and disabling tenants
+- Data migration script: create Tenant #1 record for existing company, assign all current User rows to it
+
+**Contents:** `.planning/phases/phase-6-tenant-foundation/`
+
+**Status:** Context gathered — ready to plan
+
+---
+
+## Phase 7 — Data Isolation 🔴 PENDING
+
+**Goal:** Scope every tenant-owned model behind a `tenant` FK and enforce isolation at the queryset layer so cross-tenant data leaks are structurally impossible — not just by convention.
+
+**Scope:**
+- Add `tenant = ForeignKey(Tenant, on_delete=PROTECT)` to: `ProformaInvoice`, `PackingList`, `CommercialInvoice`, `CertificateOfAnalysis`, `PurchaseOrder`, `Organisation`, `Bank`, `TCTemplate`, `AuditLog`
+- `TenantScopedMixin` for all viewsets — overrides `get_queryset()` to always `.filter(tenant=request.tenant)`
+- `generate_document_number()` in PI/PL/CI services: scope `select_for_update()` count query to current tenant (each company restarts at 0001 per year)
+- `IsDocumentOwner` permission class: add `document.tenant == request.tenant` guard
+- Data migration script: assign `tenant_id` to all existing document and master data rows
+- Cross-tenant isolation tests: Tenant A user cannot GET/PATCH/DELETE Tenant B documents, organisations, or banks
+
+**Contents:** `.planning/phases/phase-7-data-isolation/`
+
+**Status:** Context gathered — ready to plan
+
+---
+
+## Phase 8 — Frontend Integration & Security Hardening 🔴 PENDING
+
+**Goal:** Make the frontend subdomain-aware, wire the login flow to subdomain-resolved tenants, lock down CORS and host settings, and confirm cross-tenant isolation with an end-to-end audit.
+
+**Scope:**
+- Frontend API base URL: derive from `window.location.hostname` at runtime instead of hardcoded env var — `src/api/client.ts`
+- Login page: tenant resolved from subdomain; show "Company not found" error page for unknown subdomains
+- CORS: add `CORS_ALLOWED_ORIGIN_REGEXES` for `*.tradetocs.com`; remove any wildcard `CORS_ALLOW_ALL_ORIGINS = True`
+- Django settings hardening: `ALLOWED_HOSTS = ["*.tradetocs.com", "localhost", "127.0.0.1"]`
+- Security audit: two-tenant E2E test suite verifying isolation of documents, orgs, banks, audit logs — must all pass before phase is complete
+- Deployment notes: wildcard TLS cert (`*.tradetocs.com`) required; Nginx wildcard subdomain routing config
+
+**Contents:** `.planning/phases/phase-8-frontend-multitenant/`
+
+**Status:** Context gathered — ready to plan
+
+---
+
 ## Backlog (Not Yet Phased)
 
 | Item | Source | Priority |
