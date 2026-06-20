@@ -198,6 +198,9 @@ class WorkflowService:
             )
 
             # Transition the CI to the same state.
+            # Capture the CI's actual current status before overwriting it so the
+            # AuditLog reflects the CI's own prior state, not the PL's status.
+            ci_from_status = ci.status
             ci.status = next_status
             ci.save(update_fields=["status", "updated_at"])
             AuditLog.objects.create(
@@ -205,7 +208,7 @@ class WorkflowService:
                 document_id=ci.pk,
                 document_number=ci.ci_number,
                 action=action,
-                from_status=current_status,
+                from_status=ci_from_status,
                 to_status=next_status,
                 comment=comment.strip(),
                 performed_by=performed_by,
