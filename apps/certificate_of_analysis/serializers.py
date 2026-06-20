@@ -26,6 +26,12 @@ class COAParameterSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         spec_type = data.get("spec_type")
+        # Reject explicitly so a null/empty spec_type never silently passes
+        # through to create a row that cannot be rendered in the PDF.
+        if spec_type not in ("QUANTITATIVE", "QUALITATIVE"):
+            raise serializers.ValidationError(
+                {"spec_type": "spec_type must be 'QUANTITATIVE' or 'QUALITATIVE'."}
+            )
         if spec_type == "QUANTITATIVE":
             spec_min = data.get("spec_min") or ""
             spec_max = data.get("spec_max") or ""
