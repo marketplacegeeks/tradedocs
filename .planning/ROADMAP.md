@@ -100,7 +100,14 @@ Plans:
 
 **Contents:** `.planning/phases/phase-5-critical-features/`
 
-**Status:** Planned
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — AuditLogViewSet (read-only, role-filtered, filterable) + frontend/src/api/auditLog.ts
+- [ ] 05-02-PLAN.md — bulk-workflow @action on PI/PL/CI viewsets + frontend/src/api/bulkWorkflow.ts
+- [ ] 05-03-PLAN.md — Django post_save signal on AuditLog → send_mail notifications + signal tests
+
+**Status:** Ready to execute
 
 ---
 
