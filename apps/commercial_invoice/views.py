@@ -13,8 +13,10 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
+from rest_framework.permissions import IsAuthenticated
+
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole
+from apps.accounts.permissions import IsAnyRole, IsMakerOrAdmin
 from apps.workflow.constants import EDITABLE_STATES
 
 from .models import CommercialInvoice, CommercialInvoiceLineItem
@@ -40,6 +42,15 @@ class CommercialInvoiceViewSet(viewsets.ModelViewSet):
     filterset_fields = ["status", "created_by"]
     ordering_fields = ["created_at", "ci_date", "ci_number"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        # IsAuthenticated is explicit because get_permissions() overrides
+        # the global DEFAULT_PERMISSION_CLASSES.
+        # CI create and destroy are blocked by ValidationError regardless of role,
+        # but partial_update (financial field edits) is a write action for Makers only.
+        if self.action in ("update", "partial_update"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_queryset(self):
         return (
@@ -128,6 +139,12 @@ class CommercialInvoiceLineItemViewSet(viewsets.ModelViewSet):
     serializer_class = CommercialInvoiceLineItemSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["ci"]
+
+    def get_permissions(self):
+        # Line item rate edits are write actions; create/destroy are blocked by ValidationError.
+        if self.action in ("update", "partial_update"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_queryset(self):
         return CommercialInvoiceLineItem.objects.select_related("uom", "ci__packing_list").all()
