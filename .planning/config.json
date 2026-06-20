@@ -1,0 +1,11 @@
+{
+  "project": "TradeDocs",
+  "initialized": "2026-06-20",
+  "commit_per_task": true,
+  "run_tests_before_commit": true,
+  "test_command": "pytest",
+  "dev_server": {
+    "backend": "source .venv/bin/activate && python manage.py runserver 8000",
+    "frontend": "cd frontend && npm run dev"
+  }
+}
