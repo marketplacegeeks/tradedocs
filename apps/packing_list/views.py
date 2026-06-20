@@ -476,6 +476,11 @@ class ContainerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self._check_pl_editable(instance.packing_list)
         serializer.save()
+        # Container header fields (container_ref, marks_numbers, seal_number,
+        # tare_weight) do not change CI line item quantities, so a CI rebuild is
+        # intentionally skipped here. Only item-level changes (via ContainerItemViewSet)
+        # require a rebuild. If this assumption ever changes, add:
+        # rebuild_ci_line_items(instance.packing_list)
 
     def perform_destroy(self, instance):
         self._check_pl_editable(instance.packing_list)
