@@ -39,6 +39,7 @@ Documents flow through: `DRAFT → PENDING_APPROVAL → APPROVED` (or `REWORK / 
 - **Layer 2 — PDFs:** All document types, in-memory generation, DRAFT watermark, currency-aware
 - **Layer 3 — Multi-currency:** Dynamic currency on PI/PL/CI (migrated from hardcoded USD)
 - **Layer 3 — COA spec fields:** Changed from DecimalField to CharField to support values like "< 5.0"
+- **Phase 2 — Code Reliability (2026-06-20):** Eliminated all broad `except Exception` blocks; fixed null CI crash in perform_update (raises ValidationError); ProtectedError now propagates on destroy ops; transition_joint() atomic block confirmed
 
 ---
 
