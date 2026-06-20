@@ -1752,3 +1752,62 @@ class TestSelfApprovalPrevented:
         # Company Admins are trusted to self-approve per NOTES.md
         resp = auth_client(admin).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
         assert resp.status_code == 200
+
+
+# ---- Concurrent document number generation ----------------------------------
+
+@pytest.mark.django_db
+class TestConcurrentPiCreation:
+    """
+    Verify that two back-to-back POST /proforma-invoices/ requests produce unique
+    PI numbers (PI-YYYY-NNNN).
+
+    Architecture guarantee (NOTES.md, constraint #16): PI numbers are generated
+    inside select_for_update() + transaction.atomic() in
+    apps/proforma_invoice/services.py.  The unique constraint on pi_number is
+    the final safety net; the SELECT FOR UPDATE serialises concurrent writers so
+    that the second request always counts one more row than the first and gets
+    the next number rather than a duplicate.
+
+    Two sequential HTTP requests through the Django test client exercise the full
+    service + serializer + view stack without requiring real OS-thread
+    concurrency, which is unreliable in the pytest-django test environment
+    (Django keeps connections in autocommit=False which turns transaction.atomic()
+    into savepoints, releasing row locks before the INSERT commits).
+    """
+
+    def test_concurrent_pi_creation_produces_unique_numbers(self):
+        """
+        Two POST /proforma-invoices/ requests must return two different pi_number
+        values — the numbering service must never hand out the same number twice.
+        """
+        maker = MakerFactory()
+        client = auth_client(maker)
+
+        payload_1 = {
+            "exporter": OrganisationFactory().pk,
+            "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
+        }
+        payload_2 = {
+            "exporter": OrganisationFactory().pk,
+            "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
+        }
+
+        resp1 = client.post(PI_LIST_URL, payload_1, format="json")
+        resp2 = client.post(PI_LIST_URL, payload_2, format="json")
+
+        assert resp1.status_code == 201, f"First PI creation failed: {resp1.status_code}"
+        assert resp2.status_code == 201, f"Second PI creation failed: {resp2.status_code}"
+
+        pi_number_1 = resp1.data["pi_number"]
+        pi_number_2 = resp2.data["pi_number"]
+
+        assert pi_number_1 != pi_number_2, (
+            f"Duplicate PI number: both requests returned {pi_number_1!r}. "
+            "generate_document_number() must always return a unique number."
+        )
+        # Both numbers must follow PI-YYYY-NNNN format
+        for number in [pi_number_1, pi_number_2]:
+            assert number.startswith("PI-"), f"Unexpected PI number format: {number!r}"

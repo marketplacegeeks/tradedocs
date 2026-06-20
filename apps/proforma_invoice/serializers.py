@@ -300,16 +300,25 @@ class ProformaInvoiceSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from django.db import transaction as db_transaction
+
         validated_data.setdefault("pi_date", date.today())
         # Auto-assign the logged-in user as creator
         validated_data["created_by"] = self.context["request"].user
-        # Generate a unique PI number (constraint #16)
-        validated_data["pi_number"] = generate_document_number()
         # Snapshot the T&C template body if a template was selected (FR-09.4)
         tc_template = validated_data.get("tc_template")
         if tc_template and not validated_data.get("tc_content"):
             validated_data["tc_content"] = tc_template.body
-        return super().create(validated_data)
+
+        # Wrap number generation + INSERT in one atomic block so that the
+        # select_for_update() row-lock from generate_document_number() is held
+        # until the INSERT commits (constraint #16 — prevents duplicate PI numbers
+        # under concurrent requests). Without this outer atomic(), the lock from
+        # generate_document_number() releases before the INSERT happens, creating
+        # a race window where two threads can generate the same number.
+        with db_transaction.atomic():
+            validated_data["pi_number"] = generate_document_number()
+            return super().create(validated_data)
 
     # ---- Computed fields ------------------------------------------------
 
