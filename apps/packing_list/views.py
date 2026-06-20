@@ -395,7 +395,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
             pl.signed_copy.delete(save=False)
 
         pl.signed_copy = uploaded_file
-        pl.save(update_fields=["signed_copy"])
+        pl.save(update_fields=["signed_copy", "updated_at"])
 
         serializer = self.get_serializer(pl)
         return Response({"signed_copy_url": serializer.data["signed_copy_url"]})
