@@ -194,12 +194,7 @@ class PackingListViewSet(viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer):
-        instance = self.get_object()
-        if instance.status not in EDITABLE_STATES:
-            raise ValidationError(
-                {"detail": f"Cannot edit a Packing List with status '{instance.status}'."}
-            )
-        # Any MAKER (or COMPANY_ADMIN / SUPER_ADMIN) can edit regardless of creator.
+        # Role check is independent of document state — reject Checkers up front.
         if self.request.user.role == UserRole.CHECKER:
             raise PermissionDenied("Checkers cannot edit Packing Lists.")
 
@@ -217,6 +212,13 @@ class PackingListViewSet(viewsets.ModelViewSet):
         ci_has_updates = any(v is not None for v in ci_data.values())
 
         with transaction.atomic():
+            # Lock the PL row so a concurrent workflow transition cannot change
+            # status between our check and the save (SELECT FOR UPDATE).
+            instance = PackingList.objects.select_for_update().get(pk=serializer.instance.pk)
+            if instance.status not in EDITABLE_STATES:
+                raise ValidationError(
+                    {"detail": f"Cannot edit a Packing List with status '{instance.status}'."}
+                )
             pl = serializer.save()
             if ci_has_updates:
                 # Only load CI when we need to write to it; raise if it is missing.
