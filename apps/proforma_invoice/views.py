@@ -18,8 +18,10 @@ from rest_framework.views import APIView
 
 from django.conf import settings
 
+from rest_framework.permissions import IsAuthenticated
+
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole, IsSuperAdmin
+from apps.accounts.permissions import IsAnyRole, IsMakerOrAdmin, IsSuperAdmin
 from apps.workflow.constants import APPROVED, EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
@@ -73,11 +75,23 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
     """
     # Constraint #29: explicit permission_classes
     permission_classes = [IsAnyRole]
+    # Opt in to the ScopedRateThrottle scope configured in settings.py (100/day).
+    throttle_scope = "document_creation"
     pagination_class = StandardPageNumberPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = ProformaInvoiceFilterSet
     ordering_fields = ["created_at", "pi_date", "pi_number"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        # IsAuthenticated is explicit here because get_permissions() overrides
+        # the global DEFAULT_PERMISSION_CLASSES. Makers and Admins can create
+        # and edit; Checkers are read-only. hard_delete is Super Admin only.
+        if self.action == "hard_delete":
+            return [IsAuthenticated(), IsSuperAdmin()]
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_serializer_class(self):
         if self.action == "list":
