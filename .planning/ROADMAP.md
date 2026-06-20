@@ -61,7 +61,14 @@ Plans:
 
 **Contents:** `.planning/phases/phase-3-security-permissions/`
 
-**Status:** Planned
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Add IsMakerOrAdmin permission class + ScopedRateThrottle config in settings.py
+- [ ] 03-02-PLAN.md — Wire get_permissions() on all document viewsets (PI, PL, CI, COA)
+- [ ] 03-03-PLAN.md — Add TestCheckerPermissions and TestSelfApprovalPrevented tests across all 4 apps
+
+**Status:** Ready to execute
 
 ---
 
