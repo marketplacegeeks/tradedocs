@@ -97,6 +97,13 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Generous for legitimate export trade use; blocks programmatic spam.
+        "document_creation": "100/day",
+    },
 }
 
 # --- JWT ---
