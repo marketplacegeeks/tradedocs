@@ -44,7 +44,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — Replace 7 broad `except Exception` blocks with specific types; fix null CI crash in perform_update; confirm transition_joint() atomic coverage
+- [x] 02-01-PLAN.md — Replace 7 broad `except Exception` blocks with specific types; fix null CI crash in perform_update; confirm transition_joint() atomic coverage
 
 **Status:** Ready to execute
 
