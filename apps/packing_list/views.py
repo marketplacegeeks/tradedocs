@@ -6,8 +6,9 @@ Constraint #11 / #12: workflow transitions go through WorkflowService only.
 """
 
 import django_filters
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, ProtectedError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -212,34 +213,41 @@ class PackingListViewSet(viewsets.ModelViewSet):
             "lc_details": serializer.validated_data.pop("lc_details", None),
         }
 
+        # Determine which CI fields the caller actually wants to update.
+        ci_has_updates = any(v is not None for v in ci_data.values())
+
         with transaction.atomic():
             pl = serializer.save()
-            try:
-                ci = pl.commercial_invoice
-            except Exception:
-                ci = None
-            update_fields = []
-            if ci_data["ci_date"] is not None:
-                ci.ci_date = ci_data["ci_date"]
-                update_fields.append("ci_date")
-            if ci_data["bank_id"] is not None:
-                ci.bank_id = ci_data["bank_id"]
-                update_fields.append("bank_id")
-            if ci_data["fob_rate"] is not None:
-                ci.fob_rate = ci_data["fob_rate"]
-                update_fields.append("fob_rate")
-            if ci_data["freight"] is not None:
-                ci.freight = ci_data["freight"]
-                update_fields.append("freight")
-            if ci_data["insurance"] is not None:
-                ci.insurance = ci_data["insurance"]
-                update_fields.append("insurance")
-            if ci_data["lc_details"] is not None:
-                ci.lc_details = ci_data["lc_details"]
-                update_fields.append("lc_details")
-            if update_fields and ci is not None:
-                update_fields.append("updated_at")
-                ci.save(update_fields=update_fields)
+            if ci_has_updates:
+                # Only load CI when we need to write to it; raise if it is missing.
+                try:
+                    ci = pl.commercial_invoice
+                except ObjectDoesNotExist:
+                    raise ValidationError(
+                        {"detail": "No Commercial Invoice found linked to this Packing List."}
+                    )
+                update_fields = []
+                if ci_data["ci_date"] is not None:
+                    ci.ci_date = ci_data["ci_date"]
+                    update_fields.append("ci_date")
+                if ci_data["bank_id"] is not None:
+                    ci.bank_id = ci_data["bank_id"]
+                    update_fields.append("bank_id")
+                if ci_data["fob_rate"] is not None:
+                    ci.fob_rate = ci_data["fob_rate"]
+                    update_fields.append("fob_rate")
+                if ci_data["freight"] is not None:
+                    ci.freight = ci_data["freight"]
+                    update_fields.append("freight")
+                if ci_data["insurance"] is not None:
+                    ci.insurance = ci_data["insurance"]
+                    update_fields.append("insurance")
+                if ci_data["lc_details"] is not None:
+                    ci.lc_details = ci_data["lc_details"]
+                    update_fields.append("lc_details")
+                if update_fields:
+                    update_fields.append("updated_at")
+                    ci.save(update_fields=update_fields)
 
     def perform_destroy(self, instance):
         """FR-14M.12: Delete only allowed in Draft state; also deletes the linked CI."""
@@ -255,7 +263,8 @@ class PackingListViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             try:
                 instance.commercial_invoice.delete()
-            except Exception:
+            except ObjectDoesNotExist:
+                # CI was already deleted or never existed — safe to proceed.
                 pass
             instance.delete()
 
@@ -404,7 +413,8 @@ class PackingListViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             try:
                 pl.commercial_invoice.delete()
-            except Exception:
+            except ObjectDoesNotExist:
+                # CI was already deleted or never existed — safe to proceed.
                 pass
             pl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

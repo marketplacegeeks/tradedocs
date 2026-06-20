@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from apps.workflow.models import AuditLog
@@ -96,7 +97,7 @@ class CertificateOfAnalysisSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.packing_list.commercial_invoice.ci_number
-        except Exception:
+        except ObjectDoesNotExist:
             return None
 
     def validate(self, data):
