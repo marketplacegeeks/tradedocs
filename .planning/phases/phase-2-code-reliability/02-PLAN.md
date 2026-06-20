@@ -1,0 +1,553 @@
+---
+phase: 2
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+files_modified:
+  - apps/packing_list/serializers.py
+  - apps/packing_list/views.py
+  - apps/certificate_of_analysis/serializers.py
+  - apps/workflow/services.py
+autonomous: true
+requirements: []
+must_haves:
+  truths:
+    - "No broad `except Exception` blocks remain in any of the four target files"
+    - "Null CI reference in perform_update raises ValidationError rather than silently setting ci=None and then crashing on ci.ci_date"
+    - "Destroy operations only swallow ObjectDoesNotExist (CI genuinely absent); ProtectedError propagates and rolls back the transaction"
+    - "All 605+ existing tests still pass (0 failures)"
+    - "transition_joint() has an inline comment confirming all PL+CI status updates are within transaction.atomic()"
+  artifacts:
+    - path: "apps/packing_list/serializers.py"
+      provides: "ObjectDoesNotExist-specific exception handling in get_ci_number and _get_ci; logger.warning on None CI"
+    - path: "apps/packing_list/views.py"
+      provides: "Null-safe perform_update; ProtectedError-aware perform_destroy and hard_delete"
+    - path: "apps/certificate_of_analysis/serializers.py"
+      provides: "ObjectDoesNotExist-specific exception handling in get_ci_number"
+    - path: "apps/workflow/services.py"
+      provides: "ObjectDoesNotExist-specific exception in transition_joint; atomic-block confirmation comment"
+  key_links:
+    - from: "apps/packing_list/views.py perform_update"
+      to: "CommercialInvoice instance"
+      via: "pl.commercial_invoice reverse OneToOne accessor"
+      pattern: "ObjectDoesNotExist"
+    - from: "apps/packing_list/views.py perform_destroy"
+      to: "CommercialInvoice.delete()"
+      via: "instance.commercial_invoice.delete()"
+      pattern: "except ObjectDoesNotExist: pass  # re-raise ProtectedError"
+---
+
+# Phase 2 Plan: Code Reliability
+
+## Objective
+
+Replace every broad `except Exception` block in the target files with the specific
+exception type that can actually occur (`ObjectDoesNotExist` for reverse OneToOne
+access, `ProtectedError` for PROTECT-constraint FK deletes). Fix the null CI reference
+crash in `perform_update` and confirm the `transition_joint()` atomic block covers all
+status paths.
+
+Purpose: Silent broad catches hide production bugs — a crashing exception masked by
+`except Exception: pass` or `except Exception: return None` is worse than a raised
+error because the caller has no idea what happened. These are surgical one-line or
+two-line replacements; no surrounding code is touched.
+
+Output: Four modified Python files; all 605+ existing tests still passing.
+
+## Import Note (CRITICAL for executor)
+
+`RelatedObjectDoesNotExist` is NOT importable from `django.core.exceptions` as a
+standalone name. The correct importable class for all OneToOne reverse-access failures
+is:
+
+```python
+from django.core.exceptions import ObjectDoesNotExist
+```
+
+`PackingList.commercial_invoice.RelatedObjectDoesNotExist` is a subclass of
+`ObjectDoesNotExist`, so catching `ObjectDoesNotExist` is correct and specific.
+
+For delete-with-PROTECT failures:
+
+```python
+from django.db.models import ProtectedError
+```
+
+<execution_context>
+@$HOME/.claude/get-shit-done/workflows/execute-plan.md
+@$HOME/.claude/get-shit-done/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+@.planning/STATE.md
+@.planning/phases/phase-2-code-reliability/02-CONTEXT.md
+</context>
+
+<tasks>
+
+<task id="2.1" type="auto" title="Fix exception handling in packing_list/serializers.py">
+
+<read_first>
+- apps/packing_list/serializers.py (full file — confirm current state before touching anything)
+- .planning/phases/phase-2-code-reliability/02-CONTEXT.md (decisions section)
+</read_first>
+
+<action>
+Two changes in this file. Touch ONLY the lines identified below — do not reformat or
+clean up surrounding code.
+
+**Change 1 — Line 8 (imports): Add ObjectDoesNotExist import**
+
+Current top of file:
+```python
+import re
+from datetime import date
+from decimal import Decimal
+
+from rest_framework import serializers
+```
+
+Add `ObjectDoesNotExist` and `logging` imports (insert after `from decimal import Decimal`):
+```python
+import logging
+import re
+from datetime import date
+from decimal import Decimal
+
+from django.core.exceptions import ObjectDoesNotExist
+from rest_framework import serializers
+```
+
+Also add logger declaration after imports (before `HSN_REGEX`):
+```python
+logger = logging.getLogger(__name__)
+```
+
+**Change 2 — Lines 125-128: PackingListListSerializer.get_ci_number()**
+
+BEFORE (lines 125-128):
+```python
+        try:
+            return obj.commercial_invoice.ci_number
+        except Exception:
+            return None
+```
+
+AFTER:
+```python
+        try:
+            return obj.commercial_invoice.ci_number
+        except ObjectDoesNotExist:
+            return None
+```
+
+**Change 3 — Lines 233-236: PackingListSerializer._get_ci()**
+
+BEFORE (lines 231-236):
+```python
+    def _get_ci(self, obj):
+        """Helper: return linked CI or None without raising."""
+        try:
+            return obj.commercial_invoice
+        except Exception:
+            return None
+```
+
+AFTER:
+```python
+    def _get_ci(self, obj):
+        """Helper: return linked CI or None without raising."""
+        try:
+            return obj.commercial_invoice
+        except ObjectDoesNotExist:
+            logger.warning("CI missing for PL %s — expected in production", obj.pk)
+            return None
+```
+
+No other lines in this file are touched.
+</action>
+
+<acceptance_criteria>
+- `grep -n "except Exception" apps/packing_list/serializers.py` returns no output
+- `grep -n "except ObjectDoesNotExist" apps/packing_list/serializers.py` returns two matches (lines in get_ci_number and _get_ci)
+- `grep -n "ObjectDoesNotExist" apps/packing_list/serializers.py` shows the import at the top
+- `grep -n "logger.warning" apps/packing_list/serializers.py` shows one match in _get_ci
+- `pytest apps/packing_list/ -x -q` exits 0
+</acceptance_criteria>
+
+<verify>
+  <automated>pytest apps/packing_list/ -x -q</automated>
+</verify>
+
+<done>Both `except Exception` blocks in packing_list/serializers.py replaced with `except ObjectDoesNotExist`; logger.warning added in _get_ci; all packing_list tests pass.</done>
+
+</task>
+
+<task id="2.2" type="auto" title="Fix null CI reference and destroy safety in packing_list/views.py">
+
+<read_first>
+- apps/packing_list/views.py (full file — confirm current state, especially lines 195-260 and 395-410)
+- .planning/phases/phase-2-code-reliability/02-CONTEXT.md (decisions section: "Exception Handling — Views", "Null CI Reference Fix", "Destroy Operation Safety")
+</read_first>
+
+<action>
+Three changes in this file. Touch ONLY the lines identified below.
+
+**Change 1 — Lines 9-10 (imports): Add ObjectDoesNotExist and ProtectedError**
+
+Current imports block includes:
+```python
+from django.db import transaction
+from django.db.models import Prefetch
+```
+
+Add `ObjectDoesNotExist` and `ProtectedError` after the `django.db` imports:
+```python
+from django.db import transaction
+from django.db.models import Prefetch, ProtectedError
+from django.core.exceptions import ObjectDoesNotExist
+```
+
+**Change 2 — Lines 215-242: perform_update() — fix null CI reference**
+
+The current code catches any exception when loading the CI and sets `ci = None`, then
+unconditionally does `ci.ci_date = ...` below, which crashes with `AttributeError` if
+`ci` really is `None`.
+
+BEFORE (lines 215-242):
+```python
+        with transaction.atomic():
+            pl = serializer.save()
+            try:
+                ci = pl.commercial_invoice
+            except Exception:
+                ci = None
+            update_fields = []
+            if ci_data["ci_date"] is not None:
+                ci.ci_date = ci_data["ci_date"]
+                update_fields.append("ci_date")
+            if ci_data["bank_id"] is not None:
+                ci.bank_id = ci_data["bank_id"]
+                update_fields.append("bank_id")
+            if ci_data["fob_rate"] is not None:
+                ci.fob_rate = ci_data["fob_rate"]
+                update_fields.append("fob_rate")
+            if ci_data["freight"] is not None:
+                ci.freight = ci_data["freight"]
+                update_fields.append("freight")
+            if ci_data["insurance"] is not None:
+                ci.insurance = ci_data["insurance"]
+                update_fields.append("insurance")
+            if ci_data["lc_details"] is not None:
+                ci.lc_details = ci_data["lc_details"]
+                update_fields.append("lc_details")
+            if update_fields and ci is not None:
+                update_fields.append("updated_at")
+                ci.save(update_fields=update_fields)
+```
+
+AFTER:
+```python
+        with transaction.atomic():
+            pl = serializer.save()
+            try:
+                ci = pl.commercial_invoice
+            except ObjectDoesNotExist:
+                raise ValidationError(
+                    {"detail": "No Commercial Invoice found linked to this Packing List."}
+                )
+            update_fields = []
+            if ci_data["ci_date"] is not None:
+                ci.ci_date = ci_data["ci_date"]
+                update_fields.append("ci_date")
+            if ci_data["bank_id"] is not None:
+                ci.bank_id = ci_data["bank_id"]
+                update_fields.append("bank_id")
+            if ci_data["fob_rate"] is not None:
+                ci.fob_rate = ci_data["fob_rate"]
+                update_fields.append("fob_rate")
+            if ci_data["freight"] is not None:
+                ci.freight = ci_data["freight"]
+                update_fields.append("freight")
+            if ci_data["insurance"] is not None:
+                ci.insurance = ci_data["insurance"]
+                update_fields.append("insurance")
+            if ci_data["lc_details"] is not None:
+                ci.lc_details = ci_data["lc_details"]
+                update_fields.append("lc_details")
+            if update_fields:
+                update_fields.append("updated_at")
+                ci.save(update_fields=update_fields)
+```
+
+Note: The redundant `and ci is not None` guard on the last `if` is removed because we
+now raise before reaching that point — but this change is a direct consequence of the
+fix above (not a separate refactor). Keep this limited to removing only that guard from
+the `if update_fields` check.
+
+**Change 3 — Lines 255-259: perform_destroy() — ProtectedError-aware**
+
+BEFORE (lines 255-260):
+```python
+        with transaction.atomic():
+            try:
+                instance.commercial_invoice.delete()
+            except Exception:
+                pass
+            instance.delete()
+```
+
+AFTER:
+```python
+        with transaction.atomic():
+            try:
+                instance.commercial_invoice.delete()
+            except ObjectDoesNotExist:
+                # CI was already deleted or never existed — safe to proceed.
+                pass
+            instance.delete()
+```
+
+Note: `ProtectedError` will now propagate naturally (not caught), which rolls back the
+transaction. This is the correct behaviour — if something else holds a reference to the
+CI, the PL must not be deleted either.
+
+**Change 4 — Lines 404-408: hard_delete() — same pattern**
+
+BEFORE (lines 404-409):
+```python
+        with transaction.atomic():
+            try:
+                pl.commercial_invoice.delete()
+            except Exception:
+                pass
+            pl.delete()
+```
+
+AFTER:
+```python
+        with transaction.atomic():
+            try:
+                pl.commercial_invoice.delete()
+            except ObjectDoesNotExist:
+                # CI was already deleted or never existed — safe to proceed.
+                pass
+            pl.delete()
+```
+
+No other lines in this file are touched.
+</action>
+
+<acceptance_criteria>
+- `grep -n "except Exception" apps/packing_list/views.py` returns no output
+- `grep -n "except ObjectDoesNotExist" apps/packing_list/views.py` returns three matches (perform_update, perform_destroy, hard_delete)
+- `grep -n "ProtectedError" apps/packing_list/views.py` shows the import (ProtectedError is intentionally NOT caught — it propagates)
+- `grep -n "ObjectDoesNotExist" apps/packing_list/views.py` shows the import from django.core.exceptions
+- `grep -n "and ci is not None" apps/packing_list/views.py` returns no output (removed)
+- `pytest apps/packing_list/ -x -q` exits 0
+</acceptance_criteria>
+
+<verify>
+  <automated>pytest apps/packing_list/ -x -q</automated>
+</verify>
+
+<done>All three `except Exception` blocks in packing_list/views.py replaced; null CI reference in perform_update raises ValidationError; destroy operations only suppress ObjectDoesNotExist; ProtectedError propagates; all packing_list tests pass.</done>
+
+</task>
+
+<task id="2.3" type="auto" title="Fix exception handling in COA serializers and workflow services; audit transaction_joint()">
+
+<read_first>
+- apps/certificate_of_analysis/serializers.py (full file, especially lines 93-100)
+- apps/workflow/services.py (full file, especially lines 114-210)
+- .planning/phases/phase-2-code-reliability/02-CONTEXT.md (decisions section: "Atomic Transaction Audit")
+</read_first>
+
+<action>
+Two files. Touch ONLY the lines identified below.
+
+---
+
+### File 1: apps/certificate_of_analysis/serializers.py
+
+**Change 1 — Imports: Add ObjectDoesNotExist**
+
+Current imports:
+```python
+from rest_framework import serializers
+
+from apps.workflow.models import AuditLog
+
+from .models import CertificateOfAnalysis, COAParameter
+```
+
+Add after `from rest_framework import serializers`:
+```python
+from django.core.exceptions import ObjectDoesNotExist
+```
+
+**Change 2 — Lines 97-100: get_ci_number()**
+
+BEFORE (lines 93-100):
+```python
+    def get_ci_number(self, obj):
+        # Traverse PL → CI reverse relation to get the CI number.
+        if not obj.packing_list_id:
+            return None
+        try:
+            return obj.packing_list.commercial_invoice.ci_number
+        except Exception:
+            return None
+```
+
+AFTER:
+```python
+    def get_ci_number(self, obj):
+        # Traverse PL → CI reverse relation to get the CI number.
+        if not obj.packing_list_id:
+            return None
+        try:
+            return obj.packing_list.commercial_invoice.ci_number
+        except ObjectDoesNotExist:
+            return None
+```
+
+No other lines in this file are touched.
+
+---
+
+### File 2: apps/workflow/services.py
+
+**Change 3 — Imports: Add ObjectDoesNotExist**
+
+Current imports at top of file:
+```python
+from django.db import transaction
+from rest_framework.exceptions import PermissionDenied, ValidationError
+```
+
+Add `ObjectDoesNotExist` import after `from django.db import transaction`:
+```python
+from django.core.exceptions import ObjectDoesNotExist
+```
+
+**Change 4 — Lines 174-180: transition_joint() CI load**
+
+BEFORE (lines 174-180):
+```python
+        # Load the linked CI (required — PL and CI always exist together).
+        try:
+            ci = packing_list.commercial_invoice
+        except Exception:
+            raise ValidationError(
+                {"detail": "No Commercial Invoice found linked to this Packing List."}
+            )
+```
+
+AFTER:
+```python
+        # Load the linked CI (required — PL and CI always exist together).
+        try:
+            ci = packing_list.commercial_invoice
+        except ObjectDoesNotExist:
+            raise ValidationError(
+                {"detail": "No Commercial Invoice found linked to this Packing List."}
+            )
+```
+
+**Change 5 — Line 182: Add inline comment confirming atomic block coverage**
+
+BEFORE (line 182):
+```python
+        with transaction.atomic():
+```
+
+AFTER:
+```python
+        # All PL and CI status updates and AuditLog entries are committed together here.
+        # No status update or AuditLog.objects.create() happens outside this block.
+        with transaction.atomic():
+```
+
+No other lines in this file are touched.
+</action>
+
+<acceptance_criteria>
+- `grep -n "except Exception" apps/certificate_of_analysis/serializers.py` returns no output
+- `grep -n "except ObjectDoesNotExist" apps/certificate_of_analysis/serializers.py` returns one match
+- `grep -n "ObjectDoesNotExist" apps/certificate_of_analysis/serializers.py` shows the import
+- `grep -n "except Exception" apps/workflow/services.py` returns no output
+- `grep -n "except ObjectDoesNotExist" apps/workflow/services.py` returns one match (transition_joint)
+- `grep -n "ObjectDoesNotExist" apps/workflow/services.py` shows the import
+- `grep -n "All PL and CI status updates" apps/workflow/services.py` returns one match (inline comment)
+- `pytest apps/certificate_of_analysis/ apps/workflow/ -x -q` exits 0
+- `pytest --tb=short -q` exits 0 (all 605+ tests pass)
+</acceptance_criteria>
+
+<verify>
+  <automated>pytest --tb=short -q</automated>
+</verify>
+
+<done>`except Exception` replaced with `except ObjectDoesNotExist` in COA serializers and workflow services; transition_joint() atomic block confirmed with inline comment; all 605+ tests pass.</done>
+
+</task>
+
+</tasks>
+
+<threat_model>
+## Trust Boundaries
+
+| Boundary | Description |
+|----------|-------------|
+| API layer → service layer | Serializer/view exception handling must not silently swallow crashes that indicate data integrity issues |
+| Transaction boundary | PL.delete() must not succeed if CI.delete() raises ProtectedError |
+
+## STRIDE Threat Register
+
+| Threat ID | Category | Component | Disposition | Mitigation Plan |
+|-----------|----------|-----------|-------------|-----------------|
+| T-02-01 | Tampering | perform_destroy — silent swallow of ProtectedError | mitigate | Catch only ObjectDoesNotExist; ProtectedError propagates and rolls back atomic block — implemented in Task 2.2 |
+| T-02-02 | Denial of Service | perform_update — AttributeError on None CI crashes 500 | mitigate | Raise ValidationError immediately on missing CI — implemented in Task 2.2 |
+| T-02-03 | Information Disclosure | broad except Exception masks unexpected exceptions (auth errors, DB errors) | mitigate | Specific exception types let unexpected exceptions propagate to default error handler — implemented in all three tasks |
+| T-02-04 | Repudiation | transition_joint() atomic block coverage unclear | accept | Audit confirms all status updates and AuditLog entries are inside transaction.atomic(); inline comment added for future readers |
+</threat_model>
+
+<verification>
+Run the full test suite after all tasks complete:
+
+```bash
+pytest --tb=short -q
+```
+
+Expected output: all 605+ tests pass, 0 failures.
+
+Secondary spot checks:
+```bash
+grep -rn "except Exception" apps/packing_list/ apps/certificate_of_analysis/ apps/workflow/
+```
+Expected: no output.
+
+```bash
+grep -n "ObjectDoesNotExist" apps/packing_list/serializers.py apps/packing_list/views.py apps/certificate_of_analysis/serializers.py apps/workflow/services.py
+```
+Expected: one import and one or more usage lines per file.
+</verification>
+
+<success_criteria>
+- Zero occurrences of `except Exception` in the four modified files
+- `pytest --tb=short -q` exits 0 (605+ tests, 0 failures)
+- `apps/packing_list/views.py perform_update` raises ValidationError (not AttributeError) when CI is missing
+- Destroy operations pass on missing CI (ObjectDoesNotExist) and fail loudly on ProtectedError
+- Inline comment in `transition_joint()` confirms atomic block coverage
+</success_criteria>
+
+<output>
+After completion, create `.planning/phases/phase-2-code-reliability/02-01-SUMMARY.md` with:
+- Files modified and exact lines changed
+- Exception types used and why
+- Test suite result (605+ passing)
+- Any edge cases discovered during implementation
+</output>
