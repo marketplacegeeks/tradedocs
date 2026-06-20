@@ -7,6 +7,7 @@ Constraint #13: Permanently Rejected cascade is implemented only here.
 Constraint #14: REWORK and PERMANENTLY_REJECT require a non-empty comment.
 """
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -174,11 +175,13 @@ class WorkflowService:
         # Load the linked CI (required — PL and CI always exist together).
         try:
             ci = packing_list.commercial_invoice
-        except Exception:
+        except ObjectDoesNotExist:
             raise ValidationError(
                 {"detail": "No Commercial Invoice found linked to this Packing List."}
             )
 
+        # All PL and CI status updates and AuditLog entries are committed together here.
+        # No status update or AuditLog.objects.create() happens outside this block.
         with transaction.atomic():
             # Transition the PL.
             packing_list.status = next_status
