@@ -5,16 +5,20 @@ Constraint #18: Serializers are state-aware — fields become read_only when the
 document is not in DRAFT or REWORK.
 """
 
+import logging
 import re
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from apps.workflow.constants import EDITABLE_STATES
 from .models import Container, ContainerItem, PackingList
 from .services import generate_document_number as generate_pl_number
 
+
+logger = logging.getLogger(__name__)
 
 HSN_REGEX = re.compile(r"^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?)?$")
 
@@ -124,7 +128,7 @@ class PackingListListSerializer(serializers.ModelSerializer):
         # commercial_invoice is fetched via select_related — no extra query.
         try:
             return obj.commercial_invoice.ci_number
-        except Exception:
+        except ObjectDoesNotExist:
             return None
 
 
@@ -232,7 +236,8 @@ class PackingListSerializer(serializers.ModelSerializer):
         """Helper: return linked CI or None without raising."""
         try:
             return obj.commercial_invoice
-        except Exception:
+        except ObjectDoesNotExist:
+            logger.warning("CI missing for PL %s — expected in production", obj.pk)
             return None
 
     def get_ci_number(self, obj):
