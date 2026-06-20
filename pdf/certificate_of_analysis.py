@@ -2,6 +2,7 @@
 Certificate of Analysis PDF Generator
 Returns bytes in-memory — never writes to disk (Rule #9).
 """
+import html
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -31,6 +32,12 @@ _GRID_STYLE = [
 def _safe(v, default=""):
     """Coerce None or any value to a safe string."""
     return default if v is None else str(v)
+
+
+def _esc(v, default=""):
+    """HTML-escape user-entered text so ReportLab's Paragraph parser won't
+    misinterpret characters like <, >, & as markup."""
+    return html.escape(default if v is None else str(v))
 
 
 def _fmt_date(d):
@@ -215,7 +222,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         story.append(Paragraph("    ".join(iec_gstin_parts), style_small))
 
     # Hairline separator (matches PL style)
-    sep = Table([[""]], colWidths=[PAGE_W])
+    sep = Table([[""]], colWidths=[PAGE_W], splitByRow=False)
     sep.setStyle(TableStyle([
         ("LINEABOVE",      (0, 0), (-1, 0), 1.5, colors.black),
         ("TOPPADDING",     (0, 0), (-1, -1), 0),
@@ -279,7 +286,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         [Paragraph(f"<b>{label}</b>", style_label), Paragraph(value, style_text)]
         for label, value in info_rows
     ]
-    info_table = Table(info_data, colWidths=[PAGE_W * 0.42, PAGE_W * 0.58])
+    info_table = Table(info_data, colWidths=[PAGE_W * 0.42, PAGE_W * 0.58], splitByRow=False)
     info_table.setStyle(TableStyle(_GRID_STYLE))
     info_table.hAlign = "LEFT"
     story.append(info_table)
@@ -322,15 +329,18 @@ def generate_coa_pdf(coa) -> BytesIO:
     for p in params:
         unit_str = p.unit.abbreviation if p.unit else "\u2013"
         if p.spec_type == "QUANTITATIVE":
-            spec_min_str = str(p.spec_min).rstrip("0").rstrip(".") if p.spec_min is not None else "\u2013"
-            spec_max_str = str(p.spec_max).rstrip("0").rstrip(".") if p.spec_max is not None else "\u2013"
+            # Fields are now CharField \u2014 use the stored string directly (no decimal cleanup needed).
+            # _esc() HTML-escapes so characters like < > & in spec/result values don't break
+            # ReportLab's Paragraph XML parser.
+            spec_min_str = _esc(p.spec_min) if p.spec_min else "\u2013"
+            spec_max_str = _esc(p.spec_max) if p.spec_max else "\u2013"
             spec_desc_str = ""
-            result_str = str(p.result_value).rstrip("0").rstrip(".") if p.result_value is not None else ""
+            result_str = _esc(p.result_value) if p.result_value else ""
         else:
             spec_min_str = ""
             spec_max_str = ""
-            spec_desc_str = _safe(p.spec_description)
-            result_str = _safe(p.result_text)
+            spec_desc_str = _esc(p.spec_description)
+            result_str = _esc(p.result_text)
 
         method_str = p.test_method.code if p.test_method else ""
 
@@ -403,7 +413,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         Paragraph("", style_sig),   # Center column: company seal placeholder
         Paragraph(qc_col, style_sig),
     ]]
-    sig_table = Table(sig_data, colWidths=[col_third, col_third, col_third])
+    sig_table = Table(sig_data, colWidths=[col_third, col_third, col_third], splitByRow=False)
     sig_table.setStyle(TableStyle([
         ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
         ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),

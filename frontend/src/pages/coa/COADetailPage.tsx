@@ -29,14 +29,44 @@ import AuditLogDrawer from "../../components/AuditLogDrawer";
 import type { AuditLogEntry } from "../../components/AuditLogDrawer";
 
 // ---- Decimal string normalisation -----------------------------------------
-// Django serialises DecimalField(decimal_places=6) as "0.002000".
-// Strip trailing zeros so displayed values show "0.002" instead.
+// Still used for package_volume (DecimalField). Strips Django's trailing zeros
+// so "1000.000" displays as "1000".
 
 function normalizeDecimalStr(val: string | number | null | undefined): string | null {
   if (val === null || val === undefined || val === "") return null;
   const num = parseFloat(String(val));
   if (isNaN(num)) return String(val);
   return String(num);
+}
+
+// ---- OOS detection (mirrors COAFormPage logic) -----------------------------
+
+function extractSpecNumber(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed === "*") return null;
+  const numeric = trimmed.replace(/^[<>≤≥=*]?\s*(NMT|NLT|APPROX)?\s*/i, "").trim();
+  const n = parseFloat(numeric);
+  return isNaN(n) ? null : n;
+}
+
+function isParamOutOfSpec(param: { spec_type: string; spec_min?: string | null; spec_max?: string | null; result_value?: string | null }): boolean {
+  if (param.spec_type !== "QUANTITATIVE") return false;
+  const rawResult = (param.result_value ?? "").trim();
+  if (!rawResult) return false;
+  const resultNum = parseFloat(rawResult.replace(/^[<>≤≥]\s*/, ""));
+  if (isNaN(resultNum)) return false;
+  const specMinRaw = String(param.spec_min ?? "").trim();
+  const specMaxRaw = String(param.spec_max ?? "").trim();
+  if (specMinRaw && specMinRaw !== "*") {
+    const minNum = extractSpecNumber(specMinRaw);
+    if (minNum !== null && resultNum < minNum) return true;
+  }
+  if (specMaxRaw && specMaxRaw !== "*") {
+    const maxNum = extractSpecNumber(specMaxRaw);
+    if (maxNum !== null && resultNum > maxNum) return true;
+  }
+  return false;
 }
 
 // ---- Read-only field display helper ----------------------------------------
@@ -547,46 +577,57 @@ export default function COADetailPage() {
                   </td>
                 </tr>
               ) : (
-                coa.parameters.map((param) => (
-                  <tr
-                    key={param.id ?? param.s_no}
-                    onMouseEnter={(e) =>
-                      ((e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)")
-                    }
-                    onMouseLeave={(e) =>
-                      ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")
-                    }
-                  >
-                    <td style={tdStyle}>{param.s_no}</td>
-                    <td style={tdStyle}>{param.parameter_name ?? "—"}</td>
-                    <td style={tdStyle}>{param.unit_abbreviation ?? "—"}</td>
-                    <td style={tdStyle}>
-                      <span
-                        className={
-                          param.spec_type === SPEC_TYPES.QUANTITATIVE ? "chip-blue" : "chip-purple"
-                        }
-                        style={{ fontSize: 11 }}
+                coa.parameters.map((param) => {
+                  const oos = isParamOutOfSpec(param);
+                  return (
+                    <tr
+                      key={param.id ?? param.s_no}
+                      onMouseEnter={(e) =>
+                        ((e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-hover)")
+                      }
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")
+                      }
+                    >
+                      <td style={tdStyle}>{param.s_no}</td>
+                      <td style={tdStyle}>{param.parameter_name ?? "—"}</td>
+                      <td style={tdStyle}>{param.unit_abbreviation ?? "—"}</td>
+                      <td style={tdStyle}>
+                        <span
+                          className={
+                            param.spec_type === SPEC_TYPES.QUANTITATIVE ? "chip-blue" : "chip-purple"
+                          }
+                          style={{ fontSize: 11 }}
+                        >
+                          {param.spec_type === SPEC_TYPES.QUANTITATIVE ? "Quantitative" : "Qualitative"}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        {param.spec_type === SPEC_TYPES.QUANTITATIVE
+                          ? [param.spec_min, param.spec_max].filter(Boolean).join(" – ") || "—"
+                          : param.spec_description || "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          ...(oos && {
+                            background: "var(--pastel-pink)",
+                            color: "var(--pastel-pink-text)",
+                            fontWeight: 600,
+                          }),
+                        }}
+                        title={oos ? "Out of specification" : undefined}
                       >
-                        {param.spec_type === SPEC_TYPES.QUANTITATIVE ? "Quantitative" : "Qualitative"}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      {param.spec_type === SPEC_TYPES.QUANTITATIVE
-                        ? [normalizeDecimalStr(param.spec_min), normalizeDecimalStr(param.spec_max)]
-                            .filter(Boolean)
-                            .join(" – ") || "—"
-                        : param.spec_description || "—"}
-                    </td>
-                    <td style={tdStyle}>
-                      {param.spec_type === SPEC_TYPES.QUANTITATIVE
-                        ? normalizeDecimalStr(param.result_value) || "—"
-                        : param.result_text || "—"}
-                    </td>
-                    <td style={tdStyle}>
-                      {param.test_method_code || "—"}
-                    </td>
-                  </tr>
-                ))
+                        {param.spec_type === SPEC_TYPES.QUANTITATIVE
+                          ? param.result_value || "—"
+                          : param.result_text || "—"}
+                      </td>
+                      <td style={tdStyle}>
+                        {param.test_method_code || "—"}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

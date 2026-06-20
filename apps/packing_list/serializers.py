@@ -71,6 +71,11 @@ class ContainerItemSerializer(serializers.ModelSerializer):
 
 class ContainerSerializer(serializers.ModelSerializer):
     items = ContainerItemSerializer(many=True, read_only=True)
+    # container_ref is optional — blank=True in the model but DRF still generates
+    # required=True without an explicit default, so we declare it here explicitly.
+    container_ref = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
 
     class Meta:
         model = Container

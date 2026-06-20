@@ -1002,17 +1002,47 @@ export default function COAFormPage() {
 }
 
 // ---- OOS detection ---------------------------------------------------------
+// Extracts a numeric value from a spec string that may include a leading
+// operator prefix such as "<", ">", "≤", "≥", "*", "NMT", "NLT".
+// Returns null when the string is empty or starts with "*" (meaning any value passes).
+
+function extractSpecNumber(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed === "*") return null; // wildcard — any value passes
+  // Strip common operator prefixes before parsing the number
+  const numeric = trimmed.replace(/^[<>≤≥=*]?\s*(NMT|NLT|APPROX)?\s*/i, "").trim();
+  const n = parseFloat(numeric);
+  return isNaN(n) ? null : n;
+}
+
 // A quantitative row is out-of-spec when the numeric result falls outside the
-// defined min/max limits. Non-numeric or empty results are ignored.
+// spec bounds. Specs like "< 5.0" or "> 95" are parsed by stripping the prefix
+// and comparing the extracted number. A "*" in either bound means no limit.
+// Results prefixed with "<" (below detection limit) are treated as the
+// detection limit value for comparison purposes.
 
 function isOutOfSpec(row: COAParameter): boolean {
   if (row.spec_type !== SPEC_TYPES.QUANTITATIVE) return false;
-  const result = parseFloat(row.result_value ?? "");
-  if (isNaN(result)) return false;
-  const min = row.spec_min !== null && row.spec_min !== "" ? parseFloat(String(row.spec_min)) : null;
-  const max = row.spec_max !== null && row.spec_max !== "" ? parseFloat(String(row.spec_max)) : null;
-  if (min !== null && !isNaN(min) && result < min) return true;
-  if (max !== null && !isNaN(max) && result > max) return true;
+  const rawResult = (row.result_value ?? "").trim();
+  if (!rawResult) return false;
+
+  // Extract numeric result — strip leading "< " or "> " if the instrument
+  // reported a detection-limit value (e.g. "< 0.001")
+  const resultNum = parseFloat(rawResult.replace(/^[<>≤≥]\s*/, ""));
+  if (isNaN(resultNum)) return false;
+
+  const specMinRaw = String(row.spec_min ?? "").trim();
+  const specMaxRaw = String(row.spec_max ?? "").trim();
+
+  if (specMinRaw && specMinRaw !== "*") {
+    const minNum = extractSpecNumber(specMinRaw);
+    if (minNum !== null && resultNum < minNum) return true;
+  }
+  if (specMaxRaw && specMaxRaw !== "*") {
+    const maxNum = extractSpecNumber(specMaxRaw);
+    if (maxNum !== null && resultNum > maxNum) return true;
+  }
   return false;
 }
 
@@ -1063,7 +1093,7 @@ function ParameterRow({
   };
 
   return (
-    <tr style={oos ? { background: "var(--pastel-pink)" } : undefined}>
+    <tr>
       {/* S.No */}
       <td style={{ ...cellStyle, width: 40, color: "var(--text-muted)", fontSize: 13, fontFamily: "var(--font-body)" }}>
         {row.s_no}
@@ -1164,15 +1194,33 @@ function ParameterRow({
         )}
       </td>
 
-      {/* Result */}
-      <td style={{ ...cellStyle, minWidth: 120 }}>
+      {/* Result — cell turns red when the value is out of spec */}
+      <td
+        style={{
+          ...cellStyle,
+          minWidth: 120,
+          ...(oos && {
+            background: "var(--pastel-pink)",
+            borderRadius: 6,
+          }),
+        }}
+        title={oos ? "Out of specification" : undefined}
+      >
         {isQuantitative ? (
           <input
             type="text"
             value={row.result_value ?? ""}
             onChange={(e) => onUpdate({ result_value: e.target.value })}
             placeholder="Result"
-            style={smallInput}
+            style={{
+              ...smallInput,
+              ...(oos && {
+                color: "var(--pastel-pink-text)",
+                fontWeight: 600,
+                border: "1.5px solid var(--pastel-pink-text)",
+                background: "transparent",
+              }),
+            }}
           />
         ) : (
           <input

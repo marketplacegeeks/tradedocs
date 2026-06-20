@@ -121,12 +121,12 @@ class COAParameter(models.Model):
 
     spec_type = models.CharField(max_length=20, choices=SPEC_TYPE_CHOICES)
 
-    # Decimal precision 6 for trace-level chemical measurements
-    spec_min = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
-    spec_max = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    # CharField to allow values like "< 5.0", "> 99", "* NMT 5 ppm", or plain "5.000"
+    spec_min = models.CharField(max_length=50, blank=True, null=True)
+    spec_max = models.CharField(max_length=50, blank=True, null=True)
     spec_description = models.TextField(blank=True)
 
-    result_value = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    result_value = models.CharField(max_length=50, blank=True, null=True)
     result_text = models.CharField(max_length=100, blank=True)
 
     test_method = models.ForeignKey(

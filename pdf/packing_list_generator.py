@@ -243,39 +243,39 @@ def _make_pl_styles():
     )
     style_label = ParagraphStyle(
         "PLLabel", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
     )
     style_label_center = ParagraphStyle(
         "PLLabelCenter", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
         alignment=TA_CENTER,
     )
     style_text = ParagraphStyle(
         "PLText", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
     )
     style_small = ParagraphStyle(
         "PLSmall", parent=base["Normal"],
-        fontSize=8, leading=11,
+        fontSize=7, leading=9,
     )
     style_label_white = ParagraphStyle(
         "PLLabelWhite", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
         textColor=colors.white,
     )
     style_text_white = ParagraphStyle(
         "PLTextWhite", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
         textColor=colors.white,
     )
     style_label_white_center = ParagraphStyle(
         "PLLabelWhiteCenter", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
         textColor=colors.white, alignment=TA_CENTER,
     )
     style_text_white_center = ParagraphStyle(
         "PLTextWhiteCenter", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
         textColor=colors.white, alignment=TA_CENTER,
     )
     return (style_company_header, style_title, style_label, style_label_center,
@@ -289,8 +289,8 @@ _GRID_STYLE = [
     ("VALIGN",        (0, 0), (-1, -1), "TOP"),
     ("LEFTPADDING",   (0, 0), (-1, -1), 6),
     ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
-    ("TOPPADDING",    (0, 0), (-1, -1), 5),
-    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ("TOPPADDING",    (0, 0), (-1, -1), 3),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
 ]
 
 
@@ -321,14 +321,14 @@ def build_pl_story(packing_list, styles):
     story.append(Paragraph(exporter_name, style_company_header))
     story.append(Paragraph("Packing List / Weight Note", style_title))
 
-    line_table = Table([[""]], colWidths=[180 * mm])
+    line_table = Table([[""]], colWidths=[180 * mm], splitByRow=False)
     line_table.setStyle(TableStyle([
         ("LINEABOVE", (0, 0), (-1, 0), 1.5, colors.black),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
     story.append(line_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
 
     pi_obj = getattr(packing_list, "proforma_invoice", None)
     pi_number = safe(getattr(pi_obj, "pi_number", "")) if pi_obj else ""
@@ -454,7 +454,7 @@ def build_pl_story(packing_list, styles):
         Paragraph(f"<b>Packing List No.</b><br/>{pl_number_with_date}", style_text_white_center),
         Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text_white_center),
     ]]
-    header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4])
+    header_tbl = Table(header_data, colWidths=[col_4, col_4, col_4, col_4], splitByRow=False)
     header_tbl.setStyle(TableStyle(_GRID_STYLE + [
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
@@ -469,13 +469,13 @@ def build_pl_story(packing_list, styles):
             Paragraph(reg_cell_html, style_text),
             Paragraph(factory_cell_html, style_text),
         ]]
-        exp_tbl = Table(exp_data, colWidths=[col_3, col_3, col_3])
+        exp_tbl = Table(exp_data, colWidths=[col_3, col_3, col_3], splitByRow=False)
     else:
         exp_data = [[
             Paragraph(office_cell_html, style_text),
             Paragraph(reg_cell_html, style_text),
         ]]
-        exp_tbl = Table(exp_data, colWidths=[col_2, col_2])
+        exp_tbl = Table(exp_data, colWidths=[col_2, col_2], splitByRow=False)
 
     exp_tbl.setStyle(TableStyle(_GRID_STYLE))
     exp_tbl.hAlign = "LEFT"
@@ -496,13 +496,13 @@ def build_pl_story(packing_list, styles):
             Paragraph(cons_cell_html, style_text),
             Paragraph(notify_cell_html, style_text),
         ]]
-        party_tbl = Table(party_data, colWidths=[col_3, col_3, col_3])
+        party_tbl = Table(party_data, colWidths=[col_3, col_3, col_3], splitByRow=False)
     else:
         party_data = [[
             Paragraph(buyer_cell_html, style_text),
             Paragraph(cons_cell_html, style_text),
         ]]
-        party_tbl = Table(party_data, colWidths=[col_2, col_2])
+        party_tbl = Table(party_data, colWidths=[col_2, col_2], splitByRow=False)
 
     party_tbl.hAlign = "LEFT"
     party_tbl.setStyle(TableStyle(_GRID_STYLE))
@@ -546,7 +546,7 @@ def build_pl_story(packing_list, styles):
             Paragraph(f"<b>Vessel / Flight No.</b><br/>{vessel_val}", style_text),
         ],
     ]
-    shipping_tbl = Table(shipping_data, colWidths=[col_4, col_4, col_4, col_4])
+    shipping_tbl = Table(shipping_data, colWidths=[col_4, col_4, col_4, col_4], splitByRow=False)
     shipping_tbl.hAlign = "LEFT"
     shipping_tbl.setStyle(TableStyle(_GRID_STYLE))
     story.append(shipping_tbl)
@@ -562,7 +562,7 @@ def build_pl_story(packing_list, styles):
         Paragraph(f"<b>Incoterms</b><br/>{incoterm_val}", style_text),
         Paragraph(refs_cell_html, style_text),
     ]]
-    terms_tbl = Table(terms_data, colWidths=[col_3, col_3, col_3])
+    terms_tbl = Table(terms_data, colWidths=[col_3, col_3, col_3], splitByRow=False)
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID_STYLE))
     story.append(terms_tbl)
@@ -582,6 +582,7 @@ def build_pl_story(packing_list, styles):
                 Paragraph(f"<b>Marks &amp; Numbers:</b> {marks}", style_text_white_center),
             ]],
             colWidths=[col_2, col_2],
+            splitByRow=False,
         )
         cont_header.hAlign = "LEFT"
         cont_header.setStyle(TableStyle([
@@ -627,6 +628,7 @@ def build_pl_story(packing_list, styles):
                 "",  # merged into gross weight value cell
             ]],
             colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
+            splitByRow=False,
         )
         weights_table.hAlign = "LEFT"
         weights_table.setStyle(TableStyle([
@@ -688,6 +690,7 @@ def build_pl_story(packing_list, styles):
         items_table = Table(
             item_rows,
             colWidths=[4*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm, 22*mm],
+            splitByRow=False,
         )
         items_table.hAlign = "LEFT"
 
@@ -726,6 +729,7 @@ def build_pl_story(packing_list, styles):
             "",  # merged into gross weight value cell
         ]],
         colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
+        splitByRow=False,
     )
     totals_tbl.hAlign = "LEFT"
     totals_tbl.setStyle(TableStyle([
@@ -759,8 +763,8 @@ def generate_packing_list_pdf_bytes(packing_list) -> bytes:
         pagesize=A4,
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        topMargin=15 * mm,
-        bottomMargin=20 * mm,
+        topMargin=8 * mm,
+        bottomMargin=10 * mm,
     )
 
     def add_footer(canvas, _doc):

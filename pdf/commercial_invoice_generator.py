@@ -285,7 +285,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     story.append(Paragraph(safe(getattr(exp, "name", "")), style_company_header))
     story.append(Paragraph("COMMERCIAL INVOICE", style_title))
 
-    line_table = Table([[""]], colWidths=[180 * mm])
+    line_table = Table([[""]], colWidths=[180 * mm], splitByRow=False)
     line_table.setStyle(TableStyle([
         ("LINEABOVE", (0, 0), (-1, 0), 1.5, colors.black),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -422,6 +422,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             Paragraph(f"<b>Commercial Invoice No.</b><br/>{ci_number_with_date}", style_text_white_center),
         ]],
         colWidths=[col_4, col_4, col_4, col_4],
+        splitByRow=False,
     )
     header_tbl.hAlign = "LEFT"
     header_tbl.setStyle(TableStyle(_GRID + [
@@ -439,11 +440,13 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text),
               Paragraph(factory_cell, style_text)]],
             colWidths=[col_3, col_3, col_3],
+            splitByRow=False,
         )
     else:
         exp_tbl = Table(
             [[Paragraph(office_cell, style_text), Paragraph(reg_cell, style_text)]],
             colWidths=[col_2, col_2],
+            splitByRow=False,
         )
     exp_tbl.hAlign = "LEFT"
     exp_tbl.setStyle(TableStyle(_GRID))
@@ -458,11 +461,13 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             [[Paragraph(buyer_cell, style_text), Paragraph(cons_cell, style_text),
               Paragraph(notify_cell, style_text)]],
             colWidths=[col_3, col_3, col_3],
+            splitByRow=False,
         )
     else:
         party_tbl = Table(
             [[Paragraph(buyer_cell, style_text), Paragraph(cons_cell, style_text)]],
             colWidths=[col_2, col_2],
+            splitByRow=False,
         )
     party_tbl.hAlign = "LEFT"
     party_tbl.setStyle(TableStyle(_GRID))
@@ -500,6 +505,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             ],
         ],
         colWidths=[col_4, col_4, col_4, col_4],
+        splitByRow=False,
     )
     shipping_tbl.hAlign = "LEFT"
     shipping_tbl.setStyle(TableStyle(_GRID))
@@ -516,6 +522,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             Paragraph(refs_cell_html, style_text),
         ]],
         colWidths=[col_3, col_3, col_3],
+        splitByRow=False,
     )
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID))
@@ -588,6 +595,8 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     li_table = Table(
         li_rows,
         colWidths=[10 * mm, 22 * mm, 24 * mm, 20 * mm, 46 * mm, 18 * mm, 20 * mm, 20 * mm],
+        splitByRow=False,
+        repeatRows=1,
     )
     li_table.hAlign = "LEFT"
     li_table.setStyle(TableStyle([
@@ -664,7 +673,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         left_inner_rows.append(
             [Paragraph(f"<b>L/C Details:</b> {lc_details_val}", style_text)]
         )
-    left_inner = Table(left_inner_rows, colWidths=[78 * mm])
+    left_inner = Table(left_inner_rows, colWidths=[78 * mm], splitByRow=False)
     left_inner.setStyle(TableStyle([
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING",    (0, 0), (-1, -1), 2),
@@ -700,7 +709,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ])
 
     # Inner widths must fit inside the 90mm outer cell (12mm used by outer padding)
-    breakdown_inner = Table(breakdown_rows, colWidths=[46 * mm, 32 * mm])
+    breakdown_inner = Table(breakdown_rows, colWidths=[46 * mm, 32 * mm], splitByRow=False)
     breakdown_inner.setStyle(TableStyle([
         ("SPAN",          (0, 0), (1, 0)),   # header spans both sub-columns
         ("LINEBELOW",     (0, 0), (1, 0), 0.5, colors.black),  # line under header
@@ -714,6 +723,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     totals_charges_tbl = Table(
         [[left_cell_content, breakdown_inner]],
         colWidths=[90 * mm, 90 * mm],
+        splitByRow=False,
     )
     totals_charges_tbl.hAlign = "LEFT"
     totals_charges_tbl.setStyle(TableStyle([
@@ -732,6 +742,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             Paragraph(f"<b>{currency_code} {_fmt_money(invoice_total)}</b>", style_label_white),
         ]],
         colWidths=[140 * mm, 40 * mm],
+        splitByRow=False,
     )
     invoice_total_tbl.hAlign = "LEFT"
     invoice_total_tbl.setStyle(TableStyle([
@@ -756,6 +767,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         words_table = Table(
             [[Paragraph(f"<b>Amount in Words:</b> {amount_in_words_str}", style_text_center)]],
             colWidths=[180 * mm],
+            splitByRow=False,
         )
         words_table.setStyle(TableStyle([
             ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
@@ -778,6 +790,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             style_text,
         )]],
         colWidths=[180 * mm],
+        splitByRow=False,
     )
     decl_table.setStyle(TableStyle([
         ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
@@ -820,7 +833,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             "message to trace &amp; claim the payment from our bank."
         )
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
-        bank_box = Table(bank_rows, colWidths=[180 * mm])
+        bank_box = Table(bank_rows, colWidths=[180 * mm], splitByRow=False)
         bank_box.setStyle(TableStyle([
             # Explicit 4-sided line commands so each page-split fragment keeps all borders.
             ("LINEABOVE",    (0, 0),  (-1, 0),  1.2, colors.black),

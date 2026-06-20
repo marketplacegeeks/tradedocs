@@ -769,21 +769,22 @@ class TestPlExtendedCoverage:
         # amount = qty × rate = 100.000 × 500.00
         assert Decimal(data["amount"]) == Decimal("50000.00")
 
-    # ---- 6. Container requires container_ref --------------------------------
+    # ---- 6. Container can be created without container_ref ------------------
 
-    def test_container_create_requires_container_ref(self):
-        """POST /containers/ without container_ref → 400."""
+    def test_container_create_without_container_ref_succeeds(self):
+        """POST /containers/ without container_ref → 201 (field is optional)."""
         maker = MakerFactory()
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         payload = {
             "packing_list": pl.pk,
-            # container_ref intentionally omitted
+            # container_ref intentionally omitted — must be accepted
             "marks_numbers": "MARK-001",
             "seal_number": "SEAL-001",
             "tare_weight": "2200.000",
         }
         resp = auth_client(maker).post(container_list_url(), payload, format="json")
-        assert resp.status_code == 400
+        assert resp.status_code == 201
+        assert resp.data["container_ref"] == ""
 
     # ---- 7. Container requires seal_number ----------------------------------
 

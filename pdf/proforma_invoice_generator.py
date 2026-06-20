@@ -368,8 +368,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         pagesize=A4,
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        topMargin=10 * mm,
-        bottomMargin=15 * mm,
+        topMargin=8 * mm,
+        bottomMargin=10 * mm,
     )
 
     styles = getSampleStyleSheet()
@@ -532,7 +532,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     # ---- Document header -------------------------------------------------------
     story.append(Paragraph(exp_name, style_company_header))
     story.append(Paragraph("PROFORMA INVOICE CUM SALES CONTRACT", style_title))
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 4))
 
     # ---- Main information table (4 rows, 4 columns) ---------------------------
     #
@@ -668,10 +668,8 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
     ]))
 
-    story.append(main_info_table_top)
-    story.append(info_rows_b)
-    story.append(info_row_a)
-    story.append(Spacer(1, 10))
+    story.append(KeepTogether([main_info_table_top, info_rows_b, info_row_a]))
+    story.append(Spacer(1, 4))
 
     # ---- Line items table -----------------------------------------------------
     li_header = [
@@ -710,6 +708,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
     li_table = Table(
         li_rows,
         colWidths=[10 * mm, 24 * mm, 24 * mm, 40 * mm, 27 * mm, 31 * mm, 24 * mm],
+        splitByRow=False,
     )
     li_table.setStyle(TableStyle([
         ("GRID",         (0, 0), (-1, -1), 0.5, colors.black),
@@ -723,7 +722,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
     ]))
     story.append(li_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
 
     # ---- Totals section -------------------------------------------------------
     # Mirrors the on-screen totals card exactly:
@@ -843,14 +842,14 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         f"<b>Amount in Words:</b> {amount_to_words(final_total, currency=currency_code)}",
         style_text,
     ))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
 
     # ---- Validity and terms table ---------------------------------------------
     # partial_shipment / transshipment are CharFields: "ALLOWED" / "NOT_ALLOWED"
     validity_data = [
         [
-            Paragraph(f"<b>Validity for Acceptance:</b> {safe(invoice.validity_for_acceptance)}", style_text),
-            Paragraph(f"<b>Validity for Shipment:</b> {safe(invoice.validity_for_shipment)}", style_text),
+            Paragraph(f"<b>Validity for Acceptance:</b> {fmt_date(invoice.validity_for_acceptance)}", style_text),
+            Paragraph(f"<b>Validity for Shipment:</b> {fmt_date(invoice.validity_for_shipment)}", style_text),
         ],
         [
             Paragraph(f"<b>Partial Shipment:</b> {bool_yn(invoice.partial_shipment)}", style_text),
@@ -866,7 +865,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
         ("TOPPADDING",   (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
     ]))
-    story.append(KeepTogether([validity_table, Spacer(1, 10)]))
+    story.append(KeepTogether([validity_table, Spacer(1, 4)]))
 
     # ---- Declaration -----------------------------------------------------------
     decl_text = (
@@ -879,7 +878,7 @@ def generate_proforma_invoice_pdf_bytes(invoice) -> bytes:
             "OUTSIDE OF INDIA ON ACCOUNT OF BUYER"
         )
     story.append(Paragraph(decl_text, style_text))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
 
     # ---- Bank details ---------------------------------------------------------
     # Flat single-box layout: each field on its own line, bold label + value.

@@ -25,11 +25,14 @@ class COAParameterSerializer(serializers.ModelSerializer):
     def validate(self, data):
         spec_type = data.get("spec_type")
         if spec_type == "QUANTITATIVE":
-            if data.get("spec_min") is None and data.get("spec_max") is None:
+            spec_min = data.get("spec_min") or ""
+            spec_max = data.get("spec_max") or ""
+            if not spec_min.strip() and not spec_max.strip():
                 raise serializers.ValidationError(
                     {"spec": "Quantitative rows require at least one of spec_min or spec_max."}
                 )
-            if data.get("result_value") is None:
+            result_value = data.get("result_value") or ""
+            if not result_value.strip():
                 raise serializers.ValidationError(
                     {"result_value": "Result value is required for quantitative rows."}
                 )
