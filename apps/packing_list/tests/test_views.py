@@ -251,6 +251,134 @@ class TestPackingListDelete:
         assert resp.status_code == 403
 
 
+# ---- Checker permission-denial tests (Phase 4: Test Coverage) ---------------
+
+@pytest.mark.django_db
+class TestCheckerPermissionsOnPL:
+    """
+    Verify that a Checker cannot edit or delete Packing Lists.
+    Source: permissions matrix (NOTES.md) — CHECKER row for PL: Edit=❌, Delete=❌.
+    Enforced in: apps/packing_list/views.py perform_update() and perform_destroy().
+    """
+
+    def test_checker_cannot_patch_draft_pl(self):
+        """Checker PATCH on a DRAFT PL must return 403."""
+        pl = PackingListFactory(status=DRAFT)
+        resp = auth_client(CheckerFactory()).patch(
+            pl_detail_url(pl.pk),
+            {"vessel_flight_no": "MV CHECKER"},
+            format="json",
+        )
+        assert resp.status_code == 403
+
+    def test_checker_cannot_patch_rework_pl(self):
+        """Checker PATCH on a REWORK PL must return 403 — only Makers/Admin can edit."""
+        from apps.workflow.constants import REWORK
+        pl = PackingListFactory(status=REWORK)
+        resp = auth_client(CheckerFactory()).patch(
+            pl_detail_url(pl.pk),
+            {"vessel_flight_no": "MV CHECKER"},
+            format="json",
+        )
+        assert resp.status_code == 403
+
+    def test_checker_cannot_delete_draft_pl(self):
+        """Checker DELETE on a DRAFT PL must return 403."""
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        resp = auth_client(CheckerFactory()).delete(pl_detail_url(pl.pk))
+        assert resp.status_code == 403
+
+
+# ---- PL without CI serializer safety tests (Phase 4: Test Coverage) ---------
+
+@pytest.mark.django_db
+class TestPlWithoutCi:
+    """
+    Verify the PL serializer and update view handle the case where no
+    CommercialInvoice is linked — all CI-derived fields must return None,
+    never raise a 500.
+
+    Risk: apps/packing_list/serializers.py _get_ci() catches exceptions and
+    returns None; apps/packing_list/views.py perform_update() has null-CI
+    attribute access risk at lines 222-238 (guard at line 240 prevents save
+    but bare attribute access on None would still crash).
+
+    Setup: PackingListFactory() creates a PL without a CI. We also test the
+    deletion path by creating a CI then deleting it directly.
+    """
+
+    def _pl_no_ci(self):
+        """Return a DRAFT PL that has no linked CommercialInvoice."""
+        return PackingListFactory(status=DRAFT)
+
+    def test_retrieve_pl_with_no_ci_returns_null_ci_fields(self):
+        """GET /packing-lists/{id}/ with no CI must return null CI fields, not 500."""
+        pl = self._pl_no_ci()
+        resp = auth_client(pl.created_by).get(pl_detail_url(pl.pk))
+        assert resp.status_code == 200
+        data = resp.json()
+        # All CI-derived fields must be null, not missing and not a 500.
+        assert data["ci_number"] is None
+        assert data["ci_id"] is None
+        assert data["ci_status"] is None
+        assert data["ci_date"] is None
+        assert data["bank_id"] is None
+
+    def test_retrieve_pl_after_ci_deleted_returns_null_ci_fields(self):
+        """
+        GET /packing-lists/{id}/ after the linked CI has been hard-deleted
+        must return null CI fields, not 500.
+        """
+        from apps.commercial_invoice.models import CommercialInvoice
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
+        # Hard-delete the CI to simulate the orphaned state.
+        CommercialInvoice.objects.filter(pk=ci.pk).delete()
+
+        resp = auth_client(maker).get(pl_detail_url(pl.pk))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ci_number"] is None
+        assert data["ci_id"] is None
+
+    def test_patch_pl_with_no_ci_and_no_ci_fields_succeeds(self):
+        """
+        PATCH non-CI fields on a PL with no linked CI must succeed (200),
+        not raise AttributeError from perform_update's ci.ci_date = ... access.
+        """
+        pl = self._pl_no_ci()
+        resp = auth_client(pl.created_by).patch(
+            pl_detail_url(pl.pk),
+            {"vessel_flight_no": "MV ORPHAN"},
+            format="json",
+        )
+        assert resp.status_code == 200
+        assert resp.json()["vessel_flight_no"] == "MV ORPHAN"
+
+    def test_patch_pl_ci_fields_with_no_ci_does_not_crash(self):
+        """
+        PATCH with ci_date when no CI exists — the view must NOT attempt
+        ci.ci_date = ... on a None object and must return a non-500 response.
+
+        Expected: 200 for the PL fields that were updated, CI fields silently
+        skipped (guard: 'if update_fields and ci is not None' in perform_update).
+        """
+        pl = self._pl_no_ci()
+        resp = auth_client(pl.created_by).patch(
+            pl_detail_url(pl.pk),
+            {"ci_date": "2026-12-31"},
+            format="json",
+        )
+        # Must not be 500. Whether 200 or a validation error is acceptable;
+        # what matters is that no AttributeError is raised.
+        assert resp.status_code != 500
+
+
 # ---- Workflow ---------------------------------------------------------------
 
 @pytest.mark.django_db

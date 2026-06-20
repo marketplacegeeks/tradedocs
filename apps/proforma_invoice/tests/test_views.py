@@ -762,6 +762,36 @@ class TestCompanyAdminPermissions:
         assert resp.status_code == 401
 
 
+# ---- Checker permission-denial tests (Phase 4: Test Coverage) ---------------
+
+@pytest.mark.django_db
+class TestCheckerCannotEditPI:
+    """
+    Verify that a Checker cannot modify Proforma Invoice content fields.
+    Source: permissions matrix (NOTES.md) — CHECKER row for PI: Edit=❌.
+    Enforced in: apps/proforma_invoice/views.py perform_update() (role check).
+    """
+
+    def test_checker_cannot_patch_draft_pi(self):
+        """Checker PATCH on a DRAFT PI must return 403."""
+        pi = ProformaInvoiceFactory(status=DRAFT)
+        resp = auth_client(CheckerFactory()).patch(
+            pi_detail_url(pi.pk),
+            {"buyer_order_no": "CHECKER-EDIT"},
+            format="json",
+        )
+        assert resp.status_code == 403
+
+    def test_checker_cannot_delete_line_item(self):
+        """Checker DELETE on a PI line item must return 403."""
+        pi = ProformaInvoiceFactory(status=DRAFT)
+        item = ProformaInvoiceLineItemFactory(pi=pi)
+        resp = auth_client(CheckerFactory()).delete(
+            pi_line_item_detail_url(pi.pk, item.pk)
+        )
+        assert resp.status_code == 403
+
+
 # ---- Layer 3: Workflow state machine (complete graph) -----------------------
 
 @pytest.mark.django_db
