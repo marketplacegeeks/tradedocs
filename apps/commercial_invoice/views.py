@@ -8,7 +8,7 @@ Constraint #10: All views explicitly declare permission_classes.
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsAnyRole, IsMakerOrAdmin
 from apps.workflow.constants import EDITABLE_STATES
+from apps.workflow.services import WorkflowService
 
 from .models import CommercialInvoice, CommercialInvoiceLineItem
 from .serializers import (
@@ -86,6 +87,69 @@ class CommercialInvoiceViewSet(viewsets.ModelViewSet):
                 and self.request.user.role not in (UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN)):
             raise PermissionDenied("Only the document creator can edit this Commercial Invoice.")
         serializer.save()
+
+    # ---- Bulk workflow action endpoint --------------------------------------
+
+    @action(detail=False, methods=["post"], url_path="bulk-workflow", permission_classes=[IsAnyRole])
+    def bulk_workflow(self, request):
+        """
+        POST /commercial-invoices/bulk-workflow/
+        Body: {"document_ids": [1, 2, 3], "action": "APPROVE", "comment": "Batch approved"}
+        Returns: {"succeeded": [1, 2], "failed": [{"id": 3, "reason": "..."}]}
+
+        Each document is transitioned independently via per-document try/except.
+        WorkflowService.transition() is individually atomic per document (its own internal
+        transaction.atomic()). No outer atomic wrapper is used here — one failure must NOT
+        roll back previously succeeded transitions (per-document isolation).
+        All transitions go through WorkflowService (constraint #11).
+        """
+        document_ids = request.data.get("document_ids", [])
+        action_name = request.data.get("action", "").strip().upper()
+        comment = request.data.get("comment", "")
+
+        if not document_ids or not isinstance(document_ids, list):
+            raise ValidationError({"document_ids": "A non-empty list of document IDs is required."})
+        if not action_name:
+            raise ValidationError({"action": "This field is required."})
+
+        succeeded = []
+        failed = []
+
+        # Fetch all requested documents in one query to avoid N+1.
+        documents = {
+            doc.pk: doc
+            for doc in CommercialInvoice.objects.filter(pk__in=document_ids)
+        }
+
+        for doc_id in document_ids:
+            doc = documents.get(doc_id)
+            if doc is None:
+                failed.append({"id": doc_id, "reason": "Document not found."})
+                continue
+            try:
+                WorkflowService.transition(
+                    document=doc,
+                    document_type="commercial_invoice",
+                    action=action_name,
+                    performed_by=request.user,
+                    comment=comment,
+                )
+                succeeded.append(doc_id)
+            except (ValidationError, PermissionDenied) as exc:
+                # Extract a plain string reason from DRF exception detail.
+                detail = exc.detail
+                if isinstance(detail, dict):
+                    reason = "; ".join(
+                        f"{k}: {v[0] if isinstance(v, list) else v}"
+                        for k, v in detail.items()
+                    )
+                elif isinstance(detail, list):
+                    reason = str(detail[0])
+                else:
+                    reason = str(detail)
+                failed.append({"id": doc_id, "reason": reason})
+
+        return Response({"succeeded": succeeded, "failed": failed}, status=status.HTTP_200_OK)
 
     # ---- Signed copy upload endpoint ----------------------------------------
 

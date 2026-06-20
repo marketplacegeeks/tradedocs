@@ -435,6 +435,69 @@ class PackingListViewSet(viewsets.ModelViewSet):
             pl.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # ---- Bulk workflow action endpoint --------------------------------------
+
+    @action(detail=False, methods=["post"], url_path="bulk-workflow", permission_classes=[IsAnyRole])
+    def bulk_workflow(self, request):
+        """
+        POST /packing-lists/bulk-workflow/
+        Body: {"document_ids": [1, 2, 3], "action": "APPROVE", "comment": "Batch approved"}
+        Returns: {"succeeded": [1, 2], "failed": [{"id": 3, "reason": "..."}]}
+
+        Each PL (and its linked CI) is transitioned independently via per-document try/except.
+        WorkflowService.transition_joint() handles both PL and CI atomically per document.
+        No outer atomic wrapper is used here — one failure must NOT roll back previously
+        succeeded transitions (per-document isolation). All transitions go through
+        WorkflowService (constraint #11).
+        """
+        document_ids = request.data.get("document_ids", [])
+        action_name = request.data.get("action", "").strip().upper()
+        comment = request.data.get("comment", "")
+
+        if not document_ids or not isinstance(document_ids, list):
+            raise ValidationError({"document_ids": "A non-empty list of document IDs is required."})
+        if not action_name:
+            raise ValidationError({"action": "This field is required."})
+
+        succeeded = []
+        failed = []
+
+        # Fetch all requested PackingList documents in one query to avoid N+1.
+        documents = {
+            doc.pk: doc
+            for doc in PackingList.objects.filter(pk__in=document_ids)
+        }
+
+        for doc_id in document_ids:
+            doc = documents.get(doc_id)
+            if doc is None:
+                failed.append({"id": doc_id, "reason": "Document not found."})
+                continue
+            try:
+                # transition_joint handles both PL and CI in one atomic block.
+                WorkflowService.transition_joint(
+                    packing_list=doc,
+                    action=action_name,
+                    performed_by=request.user,
+                    comment=comment,
+                )
+                succeeded.append(doc_id)
+            except (ValidationError, PermissionDenied) as exc:
+                # Extract a plain string reason from DRF exception detail.
+                detail = exc.detail
+                if isinstance(detail, dict):
+                    reason = "; ".join(
+                        f"{k}: {v[0] if isinstance(v, list) else v}"
+                        for k, v in detail.items()
+                    )
+                elif isinstance(detail, list):
+                    reason = str(detail[0])
+                else:
+                    reason = str(detail)
+                failed.append({"id": doc_id, "reason": reason})
+
+        return Response({"succeeded": succeeded, "failed": failed}, status=status.HTTP_200_OK)
+
     # ---- Audit log endpoint -------------------------------------------------
 
     @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAnyRole])
