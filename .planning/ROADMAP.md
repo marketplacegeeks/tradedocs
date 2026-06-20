@@ -96,7 +96,7 @@ Plans:
 
 ---
 
-## Phase 5 — Missing Critical Features 🔴 PENDING
+## Phase 5 — Missing Critical Features ✅ Complete (2026-06-20)
 
 **Goal:** Add the three features that are absent from the system but block operational workflows: audit trail search, bulk document operations, and status-change notifications.
 
@@ -110,11 +110,11 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — AuditLogViewSet (read-only, role-filtered, filterable) + frontend/src/api/auditLog.ts
-- [ ] 05-02-PLAN.md — bulk-workflow @action on PI/PL/CI viewsets + frontend/src/api/bulkWorkflow.ts
-- [ ] 05-03-PLAN.md — Django post_save signal on AuditLog → send_mail notifications + signal tests
+- [x] 05-01-PLAN.md — AuditLogViewSet (read-only, role-filtered, filterable) + frontend/src/api/auditLog.ts
+- [x] 05-02-PLAN.md — bulk-workflow @action on PI/PL/CI viewsets + frontend/src/api/bulkWorkflow.ts
+- [x] 05-03-PLAN.md — Django post_save signal on AuditLog → send_mail notifications + signal tests
 
-**Status:** Ready to execute
+**Status:** Complete — 13/13 must-haves verified (2026-06-20)
 
 ---
 

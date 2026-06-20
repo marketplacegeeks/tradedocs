@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-last_updated: "2026-06-20T10:26:35.236Z"
+status: in_progress
+last_updated: "2026-06-20T00:00:00.000Z"
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 7
-  percent: 70
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 10
+  percent: 77
 ---
 
 # TradeDocs — GSD State
@@ -20,26 +20,24 @@ progress:
 
 ## Current Phase
 
-**Phase 1 — CI Quantity Calculation Bug Fix**  
-Status: Milestone complete
-
-See `.planning/phases/phase-1-ci-quantity-fix/PLAN.md` for full details.
+**Phase 5 — Missing Critical Features** ✅ Complete  
+Next: Phase 6 — Tenant Foundation
 
 ---
 
 ## Last Completed Work (2026-06-20)
 
-- COA spec/result fields changed from `DecimalField` → `CharField` to support text values like `"< 5.0"`, `"> 99"`, `"NMT 5 ppm"`
-- Migration `0005_coaparameter_text_spec_fields` created and committed
-- `container_ref` made optional in PL serializer
-- PDF layout fixes: `splitByRow=False` on all ReportLab tables, `KeepTogether` on PI header block
-- Committed as: `fix(coa): change spec/result fields to CharField to support text values like '< 5.0'`
+Phase 5 — 3 plans, 36 new tests, 681 total passing:
+- `AuditLogViewSet` at `GET /api/v1/audit-logs/` with role-filtered queryset + date/type/actor filters
+- `bulk-workflow` @action on PI/PL/CI viewsets — batch approve/reject with per-document isolation
+- Django `post_save` signal on AuditLog → `send_mail` with deep links; SUBMIT notifies Checkers, outcomes notify creator
+- `frontend/src/api/auditLog.ts` and `bulkWorkflow.ts` typed API clients
 
 ---
 
 ## Test Suite Status
 
-605 tests, 0 failures (as of 2026-06-20 commit)
+681 tests, 0 failures (as of 2026-06-20)
 
 ---
 
