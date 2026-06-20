@@ -15,8 +15,10 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
+from rest_framework.permissions import IsAuthenticated
+
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole, IsSuperAdmin
+from apps.accounts.permissions import IsAnyRole, IsMakerOrAdmin, IsSuperAdmin
 from apps.workflow.constants import DRAFT, EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.serializers import AuditLogSerializer
@@ -73,11 +75,23 @@ class PackingListViewSet(viewsets.ModelViewSet):
     GET  /packing-lists/{id}/audit-log/ — audit history
     """
     permission_classes = [IsAnyRole]
+    # Opt in to the ScopedRateThrottle scope configured in settings.py (100/day).
+    throttle_scope = "document_creation"
     pagination_class = StandardPageNumberPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = PackingListFilterSet
     ordering_fields = ["created_at", "pl_date", "pl_number"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        # IsAuthenticated is explicit because get_permissions() overrides
+        # the global DEFAULT_PERMISSION_CLASSES. Makers and Admins can create,
+        # edit, and delete; Checkers are read-only. hard_delete is Super Admin only.
+        if self.action == "hard_delete":
+            return [IsAuthenticated(), IsSuperAdmin()]
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_queryset(self):
         # List action: only the fields the table needs — no containers, no CI line items.
@@ -451,6 +465,11 @@ class ContainerViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["packing_list"]
 
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
+
     def get_queryset(self):
         return Container.objects.prefetch_related("items__uom").all()
 
@@ -489,7 +508,7 @@ class ContainerViewSet(viewsets.ModelViewSet):
         from apps.commercial_invoice.services import rebuild_ci_line_items
         rebuild_ci_line_items(pl)
 
-    @action(detail=True, methods=["post"], url_path="copy", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["post"], url_path="copy", permission_classes=[IsAuthenticated, IsMakerOrAdmin])
     def copy(self, request, pk=None):
         """
         POST /containers/{id}/copy/
@@ -544,6 +563,11 @@ class ContainerItemViewSet(viewsets.ModelViewSet):
     serializer_class = ContainerItemSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["container", "container__packing_list"]
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_queryset(self):
         return ContainerItem.objects.select_related("uom", "container__packing_list").all()
