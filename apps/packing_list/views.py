@@ -559,10 +559,14 @@ class ContainerItemViewSet(viewsets.ModelViewSet):
         rebuild_ci_line_items(container.packing_list)
 
     def perform_update(self, serializer):
-        self._check_editable(self.get_object().container)
+        # Capture the instance and its container before saving so we don't
+        # issue a second get_object() call after save (which would return a
+        # stale database row if the container FK changed during serializer.save).
+        instance = self.get_object()
+        self._check_editable(instance.container)
         serializer.save()
         from apps.commercial_invoice.services import rebuild_ci_line_items
-        rebuild_ci_line_items(self.get_object().container.packing_list)
+        rebuild_ci_line_items(instance.container.packing_list)
 
     def perform_destroy(self, instance):
         pl = instance.container.packing_list
