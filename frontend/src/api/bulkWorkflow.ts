@@ -27,7 +27,7 @@ export async function bulkWorkflowPI(
   body: BulkWorkflowRequest
 ): Promise<BulkWorkflowResponse> {
   const response = await axiosInstance.post<BulkWorkflowResponse>(
-    "/api/v1/proforma-invoices/bulk-workflow/",
+    "/proforma-invoices/bulk-workflow/",
     body
   );
   return response.data;
@@ -38,7 +38,7 @@ export async function bulkWorkflowPL(
   body: BulkWorkflowRequest
 ): Promise<BulkWorkflowResponse> {
   const response = await axiosInstance.post<BulkWorkflowResponse>(
-    "/api/v1/packing-lists/bulk-workflow/",
+    "/packing-lists/bulk-workflow/",
     body
   );
   return response.data;
@@ -49,7 +49,7 @@ export async function bulkWorkflowCI(
   body: BulkWorkflowRequest
 ): Promise<BulkWorkflowResponse> {
   const response = await axiosInstance.post<BulkWorkflowResponse>(
-    "/api/v1/commercial-invoices/bulk-workflow/",
+    "/commercial-invoices/bulk-workflow/",
     body
   );
   return response.data;
