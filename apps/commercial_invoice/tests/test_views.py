@@ -276,3 +276,39 @@ class TestCiSignedCopyUpload:
         resp = auth_client(maker).get(f"/api/v1/commercial-invoices/{ci.pk}/")
         assert resp.status_code == 200
         assert resp.data["signed_copy_url"] is not None
+
+
+# ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
+
+@pytest.mark.django_db
+class TestCheckerPermissions:
+    """Prove that the IsMakerOrAdmin get_permissions() guard blocks Checkers from write actions on CI."""
+
+    def test_checker_cannot_patch_ci(self):
+        # CI is created automatically alongside a PL; use CommercialInvoiceFactory
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=DRAFT, created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).patch(ci_detail_url(ci.pk), {"lc_details": "CHECKER-EDIT"}, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_can_list_ci(self):
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(CI_LIST_URL)
+        assert resp.status_code == 200
+
+    def test_checker_can_retrieve_ci(self):
+        maker = MakerFactory()
+        ci = CommercialInvoiceFactory(created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(ci_detail_url(ci.pk))
+        assert resp.status_code == 200
+
+    def test_maker_owner_can_patch_ci(self):
+        # The CI creator who is also the PL creator can patch in DRAFT state
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        ci = CommercialInvoiceFactory(packing_list=pl, status=DRAFT, created_by=maker)
+        resp = auth_client(maker).patch(ci_detail_url(ci.pk), {"lc_details": "LC-TEST-001"}, format="json")
+        assert resp.status_code == 200

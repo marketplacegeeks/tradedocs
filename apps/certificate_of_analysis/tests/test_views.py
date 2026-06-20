@@ -568,3 +568,57 @@ class TestCOAPDF:
         resp = auth_client(checker).get(coa_action_url(coa.id, "pdf"))
         assert resp.status_code == 200
         assert resp["Content-Type"] == "application/pdf"
+
+
+# ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
+
+@pytest.mark.django_db
+class TestCheckerPermissions:
+    """Prove that the IsMakerOrAdmin get_permissions() guard blocks Checkers from write actions on COA."""
+
+    def _minimal_coa_payload(self):
+        """
+        Build the minimum valid POST payload for COA creation.
+        All required writable fields included (derived from CertificateOfAnalysisSerializer).
+        customer must be an Organisation tagged CONSIGNEE; footer_organisation tagged EXPORTER.
+        parameters=[] is accepted — serializer.create() iterates over it with no minimum count.
+        """
+        return {
+            "product_grade": ProductGradeFactory().pk,
+            "customer": make_org_with_tag("CONSIGNEE").pk,
+            "batch_number": "BATCH-TEST-001",
+            "package_count": 10,
+            "package_volume": "1000.000",
+            "package_uom": UOMFactory().pk,
+            "package_type": TypeOfPackageFactory().pk,
+            "date_of_manufacture": "2025-12-22",
+            "date_of_retest": "2026-12-21",
+            "date_time_of_sampling": "2025-12-25T18:00:00Z",
+            "date_time_of_analysis": "2025-12-25T19:25:00Z",
+            "analyst_name": "Test Analyst",
+            "qc_incharge_name": "Test QC",
+            "footer_organisation": make_org_with_tag("EXPORTER").pk,
+            "parameters": [],
+        }
+
+    def test_checker_cannot_create_coa(self):
+        checker = CheckerFactory()
+        resp = auth_client(checker).post(BASE_URL, self._minimal_coa_payload(), format="json")
+        assert resp.status_code == 403
+
+    def test_checker_cannot_patch_coa(self):
+        maker = MakerFactory()
+        coa = CertificateOfAnalysisFactory(created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).patch(coa_detail_url(coa.pk), {"batch_number": "BATCH-X"}, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_can_list_coa(self):
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(BASE_URL)
+        assert resp.status_code == 200
+
+    def test_maker_can_create_coa(self):
+        maker = MakerFactory()
+        resp = auth_client(maker).post(BASE_URL, self._minimal_coa_payload(), format="json")
+        assert resp.status_code == 201
