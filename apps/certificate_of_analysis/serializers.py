@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from rest_framework import serializers
 
 from apps.workflow.models import AuditLog
@@ -119,24 +120,30 @@ class CertificateOfAnalysisSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from .services import generate_document_number
         parameters_data = validated_data.pop("parameters")
-        coa = CertificateOfAnalysis.objects.create(
-            coa_number=generate_document_number(),
-            **validated_data,
-        )
-        for param_data in parameters_data:
-            COAParameter.objects.create(coa=coa, **param_data)
+        # Wrap in atomic so a failure creating any parameter rolls back the COA
+        # record too — avoids orphaned COA rows with zero parameters.
+        with transaction.atomic():
+            coa = CertificateOfAnalysis.objects.create(
+                coa_number=generate_document_number(),
+                **validated_data,
+            )
+            for param_data in parameters_data:
+                COAParameter.objects.create(coa=coa, **param_data)
         return coa
 
     def update(self, instance, validated_data):
         parameters_data = validated_data.pop("parameters", None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if parameters_data is not None:
-            # Replace all parameters wholesale on update
-            instance.parameters.all().delete()
-            for param_data in parameters_data:
-                COAParameter.objects.create(coa=instance, **param_data)
+        # Wrap in atomic so a failure recreating parameters does not leave the
+        # COA with old parameters deleted but new ones only partially written.
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+            if parameters_data is not None:
+                # Replace all parameters wholesale on update
+                instance.parameters.all().delete()
+                for param_data in parameters_data:
+                    COAParameter.objects.create(coa=instance, **param_data)
         return instance
 
 
