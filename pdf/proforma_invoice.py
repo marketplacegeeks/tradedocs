@@ -308,11 +308,11 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     exp_detail_html = "<br/>".join([exp_name] + exp_detail_parts)
 
     story.append(Paragraph(exp_name, style_company_header))
-    doc_title = "CLIENT INVOICE" if client_invoice else "PROFORMA INVOICE CUM SALES CONTRACT"
+    doc_title = "PROFORMA INVOICE CUM SALES CONTRACT"
     story.append(Paragraph(doc_title, style_title))
 
     # Separator line
-    line_table = Table([[""]], colWidths=[180 * mm])
+    line_table = Table([[""]], colWidths=[180 * mm], splitByRow=False)
     line_table.setStyle(TableStyle([
         ("LINEABOVE", (0, 0), (-1, 0), 1.5, colors.black),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -401,6 +401,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     main_info_table_top = Table(
         main_info_data,
         colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm],
+        splitByRow=False,
     )
     main_info_table_top.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -455,6 +456,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
             ],
         ],
         colWidths=[60 * mm, 60 * mm, 60 * mm],
+        splitByRow=False,
     )
     info_rows_b.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -474,6 +476,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
             Paragraph(f"<b>Incoterms:</b><br/>{incoterm_disp}", style_text),
         ]],
         colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm],
+        splitByRow=False,
     )
     info_row_a.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -552,6 +555,8 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     li_table = Table(
         li_rows,
         colWidths=[10 * mm, 24 * mm, 24 * mm, 40 * mm, 27 * mm, 31 * mm, 24 * mm],
+        splitByRow=False,
+        repeatRows=1,
     )
     li_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -665,7 +670,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         ])
 
     if totals_rows:
-        totals_table = Table(totals_rows, colWidths=[140 * mm, 40 * mm])
+        totals_table = Table(totals_rows, colWidths=[140 * mm, 40 * mm], splitByRow=False)
         totals_table.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
@@ -688,6 +693,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     words_table = Table(
         [[Paragraph(f"<b>Amount in Words:</b> {amount_to_words(final_total, currency=currency_code)}", style_text)]],
         colWidths=[180 * mm],
+        splitByRow=False,
     )
     words_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -705,15 +711,15 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
 
     validity_data = [
         [
-            Paragraph(f"<b>Validity for Acceptance:</b> {safe(invoice.validity_for_acceptance)}", style_text),
-            Paragraph(f"<b>Validity for Shipment:</b> {safe(invoice.validity_for_shipment)}", style_text),
+            Paragraph(f"<b>Validity for Acceptance:</b> {fmt_date(invoice.validity_for_acceptance)}", style_text),
+            Paragraph(f"<b>Validity for Shipment:</b> {fmt_date(invoice.validity_for_shipment)}", style_text),
         ],
         [
             Paragraph(f"<b>Partial Shipment:</b> {bool_yn(invoice.partial_shipment)}", style_text),
             Paragraph(f"<b>Transshipment:</b> {bool_yn(invoice.transshipment)}", style_text),
         ],
     ]
-    validity_table = Table(validity_data, colWidths=[90 * mm, 90 * mm])
+    validity_table = Table(validity_data, colWidths=[90 * mm, 90 * mm], splitByRow=False)
     validity_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
@@ -742,6 +748,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     decl_table = Table(
         [[Paragraph(decl_text, style_text)]],
         colWidths=[180 * mm],
+        splitByRow=False,
     )
     decl_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
@@ -790,7 +797,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         )
 
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
-        bank_box = Table(bank_rows, colWidths=[180 * mm])
+        bank_box = Table(bank_rows, colWidths=[180 * mm], splitByRow=False)
         bank_box.setStyle(TableStyle([
             # Use all 4 explicit line commands instead of BOX so that when the
             # table splits across pages every fragment keeps all 4 borders.
@@ -818,6 +825,7 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
         tc_header = Table(
             [[Paragraph("<b>Additional Terms &amp; Conditions</b>", style_label_white)]],
             colWidths=[180 * mm],
+            splitByRow=False,
         )
         tc_header.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
