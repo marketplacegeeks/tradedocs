@@ -42,3 +42,17 @@ class IsDocumentOwner(BasePermission):
             return request.user and request.user.is_authenticated
         return bool(request.user and request.user.is_authenticated and
                     obj.created_by_id == request.user.id)
+
+
+class IsMakerOrAdmin(BasePermission):
+    """
+    Grants write access to MAKER, COMPANY_ADMIN, and SUPER_ADMIN.
+    Used by document viewsets to block Checkers from create/update/destroy actions.
+    Checkers have read-only access to all documents; only Makers (and Admins) create/edit.
+    """
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in (UserRole.MAKER, *_ADMIN_ROLES)
+        )

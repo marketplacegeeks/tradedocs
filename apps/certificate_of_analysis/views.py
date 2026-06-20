@@ -10,8 +10,10 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
+from rest_framework.permissions import IsAuthenticated
+
 from apps.accounts.models import UserRole
-from apps.accounts.permissions import IsAnyRole
+from apps.accounts.permissions import IsAnyRole, IsMakerOrAdmin
 from apps.workflow.constants import EDITABLE_STATES
 from apps.workflow.models import AuditLog
 from apps.workflow.services import WorkflowService
@@ -37,6 +39,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
     PATCH /coas/{id}/ — update (only in DRAFT/REWORK)
     """
     permission_classes = [IsAnyRole]
+    throttle_scope = "document_creation"
     pagination_class = StandardPageNumberPagination
     serializer_class = CertificateOfAnalysisSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -44,6 +47,17 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
     search_fields = ["coa_number", "batch_number"]
     ordering_fields = ["created_at", "coa_number"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        """
+        Write actions (create/update/destroy) require IsMakerOrAdmin.
+        Workflow actions (submit/approve/reject/rework) and reads use any authenticated role —
+        Checkers need to approve/reject, so workflow actions are unrestricted by role here.
+        WorkflowService validates role internally for each action.
+        """
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAuthenticated(), IsMakerOrAdmin()]
+        return [IsAuthenticated(), IsAnyRole()]
 
     def get_queryset(self):
         return (
@@ -75,7 +89,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Checkers cannot edit COAs.")
         serializer.save()
 
-    @action(detail=True, methods=["post"], url_path="submit", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["post"], url_path="submit", permission_classes=[IsAuthenticated, IsAnyRole])
     def submit(self, request, pk=None):
         """POST /coas/{id}/submit/ — Maker submits for approval."""
         coa = self.get_object()
@@ -91,7 +105,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": new_status})
 
-    @action(detail=True, methods=["post"], url_path="approve", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["post"], url_path="approve", permission_classes=[IsAuthenticated, IsAnyRole])
     def approve(self, request, pk=None):
         """POST /coas/{id}/approve/ — Checker approves."""
         coa = self.get_object()
@@ -103,7 +117,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": new_status})
 
-    @action(detail=True, methods=["post"], url_path="reject", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["post"], url_path="reject", permission_classes=[IsAuthenticated, IsAnyRole])
     def reject(self, request, pk=None):
         """POST /coas/{id}/reject/ — Checker permanently rejects (comment required)."""
         coa = self.get_object()
@@ -117,7 +131,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": new_status})
 
-    @action(detail=True, methods=["post"], url_path="rework", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["post"], url_path="rework", permission_classes=[IsAuthenticated, IsAnyRole])
     def rework(self, request, pk=None):
         """POST /coas/{id}/rework/ — Checker sends back for rework (comment required)."""
         coa = self.get_object()
@@ -131,7 +145,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
         )
         return Response({"status": new_status})
 
-    @action(detail=True, methods=["get"], url_path="pdf", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["get"], url_path="pdf", permission_classes=[IsAuthenticated, IsAnyRole])
     def pdf(self, request, pk=None):
         """GET /coas/{id}/pdf/ — Streams COA PDF. Never writes to disk (Rule #9)."""
         from pdf.certificate_of_analysis import generate_coa_pdf
@@ -144,7 +158,7 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
             filename=f"{coa.coa_number}.pdf",
         )
 
-    @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAnyRole])
+    @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAuthenticated, IsAnyRole])
     def audit_log(self, request, pk=None):
         """GET /coas/{id}/audit-log/"""
         coa = self.get_object()

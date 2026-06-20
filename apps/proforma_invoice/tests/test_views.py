@@ -1650,3 +1650,75 @@ class TestProformaInvoiceListDropdownFields:
             "the PL-creation form will always fail with 'Exporter is required'"
         )
         assert row["exporter"] == pi.exporter_id
+
+
+# ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
+
+@pytest.mark.django_db
+class TestCheckerPermissions:
+    """Prove that the IsMakerOrAdmin get_permissions() guard blocks Checkers from write actions."""
+
+    def test_checker_cannot_create_pi(self):
+        checker = CheckerFactory()
+        # Minimal valid PI payload (status and pi_number are set by the server)
+        payload = {
+            "exporter": OrganisationFactory().pk,
+            "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
+        }
+        resp = auth_client(checker).post(PI_LIST_URL, payload, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_cannot_patch_pi(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).patch(pi_detail_url(pi.pk), {"buyer_order_no": "CHECKER-EDIT"}, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_can_list_pi(self):
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(PI_LIST_URL)
+        assert resp.status_code == 200
+
+    def test_checker_can_retrieve_pi(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(pi_detail_url(pi.pk))
+        assert resp.status_code == 200
+
+    def test_maker_can_create_pi(self):
+        maker = MakerFactory()
+        payload = {
+            "exporter": OrganisationFactory().pk,
+            "consignee": OrganisationFactory().pk,
+            "currency": CurrencyFactory().pk,
+        }
+        resp = auth_client(maker).post(PI_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
+
+    def test_maker_can_patch_own_draft_pi(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker, status=DRAFT)
+        resp = auth_client(maker).patch(pi_detail_url(pi.pk), {"buyer_order_no": "MAKER-EDIT"}, format="json")
+        assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+class TestSelfApprovalPrevented:
+    """FR-08.2: The creator of a PI cannot approve it (unless they are Company Admin).
+    WorkflowService.transition() enforces this — confirmed present at lines 75-81 of services.py."""
+
+    def test_maker_cannot_self_approve(self):
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
+        resp = auth_client(maker).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
+        assert resp.status_code == 403
+
+    def test_company_admin_can_self_approve(self):
+        admin = CompanyAdminFactory()
+        pi = ProformaInvoiceFactory(created_by=admin, status=PENDING_APPROVAL)
+        # Company Admins are trusted to self-approve per NOTES.md
+        resp = auth_client(admin).post(pi_workflow_url(pi.pk), {"action": "APPROVE"}, format="json")
+        assert resp.status_code == 200

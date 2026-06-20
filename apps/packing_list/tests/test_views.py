@@ -986,3 +986,42 @@ class TestSuperAdminPackingListPermissions:
         assert resp.status_code == 204
         assert not PackingList.objects.filter(pk=pl.pk).exists()
         assert not CommercialInvoice.objects.filter(pk=ci.pk).exists()
+
+
+# ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
+
+@pytest.mark.django_db
+class TestCheckerPermissions:
+    """Prove that the IsMakerOrAdmin get_permissions() guard blocks Checkers from write actions."""
+
+    def test_checker_cannot_create_pl(self):
+        # PL creation requires an Approved PI
+        maker = MakerFactory()
+        pi = _approved_pi(maker)
+        checker = CheckerFactory()
+        payload = {
+            "proforma_invoice": pi.pk,
+            "pl_date": "2026-01-01",
+            "ci_date": "2026-01-01",
+        }
+        resp = auth_client(checker).post(PL_LIST_URL, payload, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_cannot_patch_pl(self):
+        maker = MakerFactory()
+        pl = PackingListFactory(created_by=maker)
+        checker = CheckerFactory()
+        resp = auth_client(checker).patch(pl_detail_url(pl.pk), {"vessel_flight_no": "MV-TEST"}, format="json")
+        assert resp.status_code == 403
+
+    def test_checker_can_list_pl(self):
+        checker = CheckerFactory()
+        resp = auth_client(checker).get(PL_LIST_URL)
+        assert resp.status_code == 200
+
+    def test_maker_can_create_pl(self):
+        maker = MakerFactory()
+        pi = _approved_pi(maker)
+        payload = _pl_payload(pi)
+        resp = auth_client(maker).post(PL_LIST_URL, payload, format="json")
+        assert resp.status_code == 201
