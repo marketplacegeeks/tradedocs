@@ -132,6 +132,9 @@ EMAIL_BACKEND = config(
     default="django.core.mail.backends.console.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = config("TRADETOCS_DEFAULT_FROM_EMAIL", default="dev@tradetocs.local")
+# Frontend base URL used to build deep links in notification emails.
+# Override with TRADETOCS_FRONTEND_BASE_URL env var in production.
+FRONTEND_BASE_URL = config("TRADETOCS_FRONTEND_BASE_URL", default="http://localhost:5173")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
