@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/v1/", include("apps.purchase_order.urls")),
     path("api/v1/", include("apps.certificate_of_analysis.urls")),
     path("api/v1/dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("api/v1/", include("apps.workflow.urls")),
     # Report endpoints
     path("api/v1/reports/commodity-sales/", CommoditySalesReportView.as_view(), name="report-commodity-sales"),
     path("api/v1/reports/consignee-business-summary/", ConsigneeBusinessSummaryView.as_view(), name="report-consignee-business-summary"),
