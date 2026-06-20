@@ -230,15 +230,15 @@ def _make_ci_styles():
     )
     style_label = ParagraphStyle(
         "CILabel", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
     )
     style_text = ParagraphStyle(
         "CIText", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
     )
     style_small = ParagraphStyle(
         "CISmall", parent=base["Normal"],
-        fontSize=8, leading=11,
+        fontSize=7, leading=9,
     )
     style_table_header = ParagraphStyle(
         "CITableHeader", parent=base["Normal"],
@@ -247,22 +247,22 @@ def _make_ci_styles():
     )
     style_label_white = ParagraphStyle(
         "CILabelWhite", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
         textColor=colors.white,
     )
     style_text_white = ParagraphStyle(
         "CITextWhite", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
         textColor=colors.white,
     )
     style_label_white_center = ParagraphStyle(
         "CILabelWhiteCenter", parent=base["Normal"],
-        fontSize=9, leading=12, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, fontName="Helvetica-Bold",
         textColor=colors.white, alignment=TA_CENTER,
     )
     style_text_white_center = ParagraphStyle(
         "CITextWhiteCenter", parent=base["Normal"],
-        fontSize=9, leading=12,
+        fontSize=8, leading=10,
         textColor=colors.white, alignment=TA_CENTER,
     )
     return style_company_header, style_title, style_label, style_text, style_small, style_table_header, style_label_white, style_text_white, style_label_white_center, style_text_white_center
@@ -304,8 +304,8 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",   (0, 0), (-1, -1), 6),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
-        ("TOPPADDING",    (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING",    (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]
 
     corp_addr = (
@@ -429,8 +429,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A2B4B")),
     ]))
-    story.append(header_tbl)
-
     office_cell = _exp_cell("Corporate Office", corp_addr)
     reg_cell = _exp_cell("Registered Office Address", reg_addr)
     factory_cell = _exp_cell("Factory Address", factory_addr)
@@ -450,7 +448,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         )
     exp_tbl.hAlign = "LEFT"
     exp_tbl.setStyle(TableStyle(_GRID))
-    story.append(exp_tbl)
 
     buyer_cell = _party_cell_html("Buyer", buyer if buyer else cons)
     cons_cell = _party_cell_html("Consignee", cons)
@@ -471,7 +468,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         )
     party_tbl.hAlign = "LEFT"
     party_tbl.setStyle(TableStyle(_GRID))
-    story.append(party_tbl)
 
     pre_carriage_obj = getattr(pl, "pre_carriage_by", None) if pl else None
     pre_carriage_val = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
@@ -509,7 +505,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     )
     shipping_tbl.hAlign = "LEFT"
     shipping_tbl.setStyle(TableStyle(_GRID))
-    story.append(shipping_tbl)
 
     incoterm_obj = getattr(pl, "incoterms", None) if pl else None
     incoterm_str = safe(getattr(incoterm_obj, "code", "")) if incoterm_obj else ""
@@ -526,8 +521,10 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     )
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID))
-    story.append(terms_tbl)
-    story.append(Spacer(1, 12))
+
+    # Keep header group together so it shifts as a unit on page break
+    story.append(KeepTogether([header_tbl, exp_tbl, party_tbl, shipping_tbl, terms_tbl]))
+    story.append(Spacer(1, 6))
 
     li_header = [
         Paragraph("<b>Sr.</b>", style_table_header),
@@ -614,7 +611,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("BOTTOMPADDING",(0, 1), (-1, -1), 4),
     ]))
     story.append(li_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 4))
 
     total_net_val = Decimal("0.000")
     total_gross_val = Decimal("0.000")
@@ -781,7 +778,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         words_table.hAlign = "LEFT"
         story.append(words_table)
 
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 6))
 
     decl_table = Table(
         [[Paragraph(
@@ -801,7 +798,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     ]))
     decl_table.hAlign = "LEFT"
     story.append(decl_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 6))
 
     bank = getattr(ci, "bank", None)
     if bank:
@@ -848,7 +845,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ]))
         bank_box.hAlign = "LEFT"
         story.append(bank_box)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 4))
 
     return story
 
@@ -860,8 +857,8 @@ def generate_commercial_invoice_pdf_bytes(ci) -> bytes:
         pagesize=A4,
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        topMargin=15 * mm,
-        bottomMargin=20 * mm,
+        topMargin=8 * mm,
+        bottomMargin=10 * mm,
     )
 
     def add_footer(canvas, _doc):

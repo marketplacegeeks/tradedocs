@@ -461,8 +461,6 @@ def build_pl_story(packing_list, styles):
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
     ]))
     header_tbl.hAlign = "LEFT"
-    story.append(header_tbl)
-
     if factory_addr:
         exp_data = [[
             Paragraph(office_cell_html, style_text),
@@ -479,7 +477,6 @@ def build_pl_story(packing_list, styles):
 
     exp_tbl.setStyle(TableStyle(_GRID_STYLE))
     exp_tbl.hAlign = "LEFT"
-    story.append(exp_tbl)
 
     cons = getattr(packing_list, "consignee", None)
     buyer = getattr(packing_list, "buyer", None)
@@ -506,7 +503,6 @@ def build_pl_story(packing_list, styles):
 
     party_tbl.hAlign = "LEFT"
     party_tbl.setStyle(TableStyle(_GRID_STYLE))
-    story.append(party_tbl)
 
     pre_carriage_obj = getattr(packing_list, "pre_carriage_by", None)
     pre_carriage_val = safe(getattr(pre_carriage_obj, "name", "")) if pre_carriage_obj else ""
@@ -549,7 +545,6 @@ def build_pl_story(packing_list, styles):
     shipping_tbl = Table(shipping_data, colWidths=[col_4, col_4, col_4, col_4], splitByRow=False)
     shipping_tbl.hAlign = "LEFT"
     shipping_tbl.setStyle(TableStyle(_GRID_STYLE))
-    story.append(shipping_tbl)
 
     payment_term_obj = getattr(packing_list, "payment_terms", None)
     payment_term_val = safe(getattr(payment_term_obj, "name", "")) if payment_term_obj else ""
@@ -565,9 +560,11 @@ def build_pl_story(packing_list, styles):
     terms_tbl = Table(terms_data, colWidths=[col_3, col_3, col_3], splitByRow=False)
     terms_tbl.hAlign = "LEFT"
     terms_tbl.setStyle(TableStyle(_GRID_STYLE))
-    story.append(terms_tbl)
 
-    story.append(Spacer(1, 12))
+    # Keep header group together so it shifts as a unit on page break
+    story.append(KeepTogether([header_tbl, exp_tbl, party_tbl, shipping_tbl, terms_tbl]))
+
+    story.append(Spacer(1, 6))
 
     total_net = Decimal("0.000")
     total_gross = Decimal("0.000")
@@ -717,7 +714,7 @@ def build_pl_story(packing_list, styles):
         items_table.setStyle(TableStyle(table_style))
 
         story.append(KeepTogether([cont_header, weights_table, items_table]))
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 4))
 
     totals_tbl = Table(
         [[
