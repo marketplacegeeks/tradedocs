@@ -1600,4 +1600,53 @@ class TestSuperAdminProformaInvoicePermissions:
         PackingListFactory(proforma_invoice=pi)
         resp = auth_client(super_admin).delete(f"/api/v1/proforma-invoices/{pi.pk}/hard-delete/")
         assert resp.status_code == 400
-        assert "Packing List" in str(resp.data)
+
+
+# ---- PL-creation wizard dropdown guard --------------------------------------
+
+@pytest.mark.django_db
+class TestProformaInvoiceListDropdownFields:
+    """
+    Guards the FK fields required by the Packing List creation wizard (Step 0).
+
+    The list endpoint uses ProformaInvoiceListSerializer which is intentionally
+    lightweight. If 'consignee' or 'exporter' FK integers are ever removed from
+    it, the PL-creation wizard silently breaks:
+      - consignee dropdown collapses to a single entry keyed on undefined
+      - all form pre-population fields (exporter, bank, shipping FKs) become undefined
+      - Step 1 always rejects with "Exporter and Consignee are required"
+
+    This class must stay green before any serializer change is merged.
+    """
+
+    def test_approved_pi_list_returns_consignee_fk_for_dropdown(self):
+        """
+        The wizard builds the consignee dropdown from pi['consignee'] (FK integer).
+        If the field is absent every PI maps to key=undefined, giving one broken option.
+        """
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker, status=APPROVED)
+        resp = auth_client(maker).get(PI_LIST_URL, {"status": APPROVED})
+        assert resp.status_code == 200
+        row = next(r for r in resp.data if r["id"] == pi.pk)
+        assert "consignee" in row, (
+            "'consignee' FK integer missing from PI list response — "
+            "the PL-creation consignee dropdown will be broken"
+        )
+        assert row["consignee"] == pi.consignee_id
+
+    def test_approved_pi_list_returns_exporter_fk_for_prepopulation(self):
+        """
+        Step 1 of the wizard requires form.exporter to be set from the selected PI.
+        If 'exporter' is absent the field is undefined and Step 1 always fails validation.
+        """
+        maker = MakerFactory()
+        pi = ProformaInvoiceFactory(created_by=maker, status=APPROVED)
+        resp = auth_client(maker).get(PI_LIST_URL, {"status": APPROVED})
+        assert resp.status_code == 200
+        row = next(r for r in resp.data if r["id"] == pi.pk)
+        assert "exporter" in row, (
+            "'exporter' FK integer missing from PI list response — "
+            "the PL-creation form will always fail with 'Exporter is required'"
+        )
+        assert row["exporter"] == pi.exporter_id

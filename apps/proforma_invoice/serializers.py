@@ -101,7 +101,10 @@ class ProformaInvoiceListSerializer(serializers.ModelSerializer):
         model = ProformaInvoice
         fields = [
             "id", "pi_number", "pi_date", "status",
-            "exporter_name", "consignee_name",
+            # FK integers are included so the PL-creation wizard can build
+            # the consignee dropdown and pre-populate form fields correctly.
+            "exporter", "exporter_name",
+            "consignee", "consignee_name",
             "currency_display", "grand_total",
             "created_by", "created_by_name", "created_at",
         ]

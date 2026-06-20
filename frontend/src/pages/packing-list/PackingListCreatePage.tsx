@@ -29,7 +29,7 @@ import { listOrganisations } from "../../api/organisations";
 import { listIncoterms, listPaymentTerms, listUOMs, listPorts, listLocations, listPreCarriageBy, listTypeOfPackages } from "../../api/referenceData";
 import { listCountries } from "../../api/countries";
 import { listBanks } from "../../api/banks";
-import { listProformaInvoices } from "../../api/proformaInvoices";
+import { listProformaInvoices, getProformaInvoice } from "../../api/proformaInvoices";
 import { DOCUMENT_STATUS, INCOTERM_PL_FIELDS } from "../../utils/constants";
 import { extractApiError } from "../../utils/apiErrors";
 
@@ -243,30 +243,35 @@ function Step0({
     setForm({ ...form, consignee: v, proforma_invoice: undefined, _selectedPi: undefined });
   }
 
-  function handlePiChange(v: number) {
-    const pi = (piList as any[]).find((p) => p.id === v);
-    if (pi) {
-      // Pre-populate all PI-derived fields so Step 1 shows them auto-filled and editable.
+  // Fetch the full PI detail on selection so every FK field is available for
+  // pre-population. The list endpoint uses a lightweight serializer that omits
+  // shipping, bank, and party FK integers — reading from it silently sets them
+  // all to undefined, which blocks Step 1 with "Exporter and Consignee are required".
+  async function handlePiChange(v: number) {
+    try {
+      const fullPi = await getProformaInvoice(v);
       setForm({
         ...form,
         proforma_invoice: v,
-        exporter: pi.exporter,
-        consignee: pi.consignee,
-        buyer: pi.buyer ?? null,
-        bank: pi.bank ?? null,
-        pre_carriage_by: pi.pre_carriage_by ?? null,
-        place_of_receipt: pi.place_of_receipt ?? null,
-        place_of_receipt_by_pre_carrier: pi.place_of_receipt_by_pre_carrier ?? null,
-        vessel_flight_no: pi.vessel_flight_no ?? "",
-        port_of_loading: pi.port_of_loading ?? null,
-        port_of_discharge: pi.port_of_discharge ?? null,
-        final_destination: pi.final_destination ?? null,
-        country_of_origin: pi.country_of_origin ?? null,
-        country_of_final_destination: pi.country_of_final_destination ?? null,
-        incoterms: pi.incoterms ?? null,
-        payment_terms: pi.payment_terms ?? null,
-        _selectedPi: pi,
+        exporter: fullPi.exporter,
+        consignee: fullPi.consignee,
+        buyer: fullPi.buyer ?? null,
+        bank: fullPi.bank ?? null,
+        pre_carriage_by: fullPi.pre_carriage_by ?? null,
+        place_of_receipt: fullPi.place_of_receipt ?? null,
+        place_of_receipt_by_pre_carrier: fullPi.place_of_receipt_by_pre_carrier ?? null,
+        vessel_flight_no: fullPi.vessel_flight_no ?? "",
+        port_of_loading: fullPi.port_of_loading ?? null,
+        port_of_discharge: fullPi.port_of_discharge ?? null,
+        final_destination: fullPi.final_destination ?? null,
+        country_of_origin: fullPi.country_of_origin ?? null,
+        country_of_final_destination: fullPi.country_of_final_destination ?? null,
+        incoterms: fullPi.incoterms ?? null,
+        payment_terms: fullPi.payment_terms ?? null,
+        _selectedPi: fullPi,
       });
+    } catch {
+      message.error("Failed to load Proforma Invoice details. Please try again.");
     }
   }
 
@@ -854,7 +859,7 @@ function Step3({
     try {
       const newContainer = await createContainer({
         packing_list: pl.id,
-        container_ref: c.container_ref,
+        container_ref: c.container_ref || "",
         marks_numbers: c.marks_numbers,
         seal_number: c.seal_number,
         tare_weight: "0",
