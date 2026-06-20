@@ -1153,3 +1153,117 @@ class TestCheckerPermissions:
         payload = _pl_payload(pi)
         resp = auth_client(maker).post(PL_LIST_URL, payload, format="json")
         assert resp.status_code == 201
+
+
+# ---- PL+CI PDF URL helper ---------------------------------------------------
+
+def pl_pdf_url(pk):
+    return f"/api/v1/packing-lists/{pk}/pdf/"
+
+
+# ---- PL+CI PDF edge cases ---------------------------------------------------
+
+@pytest.mark.django_db
+class TestPlCiPdfEdgeCases:
+    """
+    Verify the PL+CI PDF generator does not crash on real-world edge-case data:
+    - Very long company names/addresses (>100 chars)
+    - Missing optional fields (bank, incoterms)
+    - Missing product description details
+
+    Risk: ReportLab table cells with unconstrained long strings can overflow the
+    page frame and raise LayoutError or silently produce corrupt PDFs.
+    Constraint #20: PDF is always in-memory, never written to disk.
+    """
+
+    def _make_pl_ci_pair(self, org_name=None, with_bank=True, with_incoterms=True):
+        """
+        Create a minimal APPROVED PI -> PL + CI pair for PDF generation.
+        Returns the packing_list instance.
+        """
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.master_data.tests.factories import (
+            BankFactory as _BankFactory,
+            IncotermFactory,
+            OrganisationFactory as _OrgFactory,
+        )
+
+        maker = MakerFactory()
+        exporter_name = org_name or "Standard Exporter Ltd"
+        exporter = _OrgFactory(name=exporter_name)
+        # Consignee gets a distinct name to avoid the unique constraint on Organisation.name.
+        consignee_name = (org_name + " (Buyer)") if org_name else "Standard Consignee Ltd"
+        consignee = _OrgFactory(name=consignee_name)
+
+        pi = ProformaInvoiceFactory(
+            status="APPROVED",
+            exporter=exporter,
+            consignee=consignee,
+            created_by=maker,
+        )
+        pl_kwargs = {
+            "proforma_invoice": pi,
+            "exporter": exporter,
+            "consignee": consignee,
+            "status": "DRAFT",
+            "created_by": maker,
+        }
+        if with_incoterms:
+            pl_kwargs["incoterms"] = IncotermFactory()
+
+        pl = PackingListFactory(**pl_kwargs)
+
+        ci_kwargs = {
+            "packing_list": pl,
+            "status": "DRAFT",
+            "created_by": maker,
+        }
+        if with_bank:
+            ci_kwargs["bank"] = _BankFactory()
+        else:
+            ci_kwargs["bank"] = None
+
+        CommercialInvoiceFactory(**ci_kwargs)
+        return pl
+
+    def test_pdf_with_very_long_company_name_returns_200(self):
+        """
+        A company name of 120+ characters must not crash the PDF generator.
+        ReportLab must wrap long strings rather than raise LayoutError.
+        """
+        long_name = "Sunrise International Agro Commodities Trading & Export House Pvt Ltd " + "X" * 50
+        pl = self._make_pl_ci_pair(org_name=long_name)
+        resp = auth_client(MakerFactory()).get(pl_pdf_url(pl.pk))
+        assert resp.status_code == 200, (
+            f"PDF generation crashed with long company name ({len(long_name)} chars): "
+            f"{resp.status_code} — check ReportLab table style wordWrap"
+        )
+        assert resp["Content-Type"] == "application/pdf"
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(b"%PDF"), "Response body is not a valid PDF"
+
+    def test_pdf_with_no_bank_returns_200(self):
+        """
+        A PL+CI with no bank (bank=None on CommercialInvoice) must still generate
+        a valid PDF — bank fields are optional on the template.
+        """
+        pl = self._make_pl_ci_pair(with_bank=False)
+        resp = auth_client(MakerFactory()).get(pl_pdf_url(pl.pk))
+        assert resp.status_code == 200, (
+            f"PDF generation crashed with bank=None: {resp.status_code}"
+        )
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(b"%PDF")
+
+    def test_pdf_with_no_incoterms_returns_200(self):
+        """
+        A PL+CI with no incoterms (nullable FK) must still generate a valid PDF.
+        The incoterms field is optional — PDF template must handle None gracefully.
+        """
+        pl = self._make_pl_ci_pair(with_incoterms=False)
+        resp = auth_client(MakerFactory()).get(pl_pdf_url(pl.pk))
+        assert resp.status_code == 200, (
+            f"PDF generation crashed with incoterms=None: {resp.status_code}"
+        )
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(b"%PDF")
