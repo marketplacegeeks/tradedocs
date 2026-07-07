@@ -661,10 +661,14 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     # For client invoice, line_items_total already is the CIF total.
     invoice_total = line_items_total if client_invoice else line_items_total + freight_amount + insurance_amount
 
+    # Weights are shown in the packing list's Material Unit (e.g. MT), not a hardcoded KGS.
+    from pdf.utils import weight_unit_for_packing_list
+    weight_unit = weight_unit_for_packing_list(pl) if pl else "KGS"
+
     # Build left cell: net/gross weight stacked, then optional L/C Details below
     left_inner_rows = [
-        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} KGS", style_text)],
-        [Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} KGS", style_text)],
+        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}", style_text)],
+        [Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}", style_text)],
     ]
     if lc_details_val:
         left_inner_rows.append(

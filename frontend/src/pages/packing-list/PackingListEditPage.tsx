@@ -177,6 +177,13 @@ export default function PackingListEditPage() {
   const { data: uoms = [] } = useQuery({ queryKey: ["uoms"], queryFn: listUOMs });
   const { data: typeOfPackages = [] } = useQuery({ queryKey: ["type-of-packages"], queryFn: listTypeOfPackages });
 
+  // All items in a packing list share one Material Unit — used to label weight
+  // columns (e.g. "(MT)") and to warn on a mismatched item before the API call.
+  const savedItems = (pl?.containers ?? []).flatMap((c: any) => c.items ?? []);
+  const savedUnitAbbrs = new Set(savedItems.map((i: any) => i.uom_abbr).filter(Boolean));
+  const weightUnit = savedUnitAbbrs.size === 1 ? [...savedUnitAbbrs][0] : "";
+  const weightUnitSuffix = weightUnit ? ` (${weightUnit})` : "";
+
   const { data: ci } = useQuery({
     queryKey: ["commercial-invoice", pl?.ci_id],
     queryFn: () => getCommercialInvoice(pl!.ci_id!),
@@ -297,6 +304,18 @@ export default function PackingListEditPage() {
 
   async function saveItem() {
     if (!addingItem) return;
+    // Single-unit rule (mirrors the server): every item in a packing list must
+    // use the same Material Unit. Warn instantly instead of waiting for the API.
+    const conflicting = savedItems.find((i: any) => i.uom && i.uom !== itemForm.uom);
+    if (conflicting) {
+      const existingUnit = conflicting.uom_abbr
+        ?? uoms.find((u: any) => u.id === conflicting.uom)?.abbreviation ?? "another unit";
+      const selectedUnit = uoms.find((u: any) => u.id === itemForm.uom)?.abbreviation ?? "the selected unit";
+      message.error(
+        `All items in a packing list must use the same Material Unit. This packing list already uses '${existingUnit}' — you selected '${selectedUnit}'.`
+      );
+      return;
+    }
     try {
       await createContainerItem({
         container: addingItem.containerId,
@@ -582,7 +601,7 @@ export default function PackingListEditPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
                 <thead>
                   <tr>
-                    {["Item Code", "Desc", "HSN", "Batch No.", "No. of Pkg", "Type of Pkg", "Material Unit", "Qty/Pkg", "Wt/Unit Pkg", "Net Mat Wt", "Gross Wt", ""].map((h) => (
+                    {["Item Code", "Desc", "HSN", "Batch No.", "No. of Pkg", "Type of Pkg", "Material Unit", `Qty/Pkg${weightUnitSuffix}`, `Wt/Unit Pkg${weightUnitSuffix}`, `Net Mat Wt${weightUnitSuffix}`, `Gross Wt${weightUnitSuffix}`, ""].map((h) => (
                       <th key={h} style={TH}>{h}</th>
                     ))}
                   </tr>

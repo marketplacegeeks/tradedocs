@@ -687,6 +687,87 @@ class TestContainerItemCRUD:
         auth_client(maker).post(item_list_url(), payload, format="json")
         assert CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM001").exists()
 
+    def test_item_with_different_unit_rejected(self):
+        """All items in a packing list must share one Material Unit (blocked on save)."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        container = ContainerFactory(packing_list=pl)
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        kg = UOMFactory(abbreviation="KG", name="Kilogram")
+        pkg = TypeOfPackageFactory()
+        # First item fixes the packing list's unit as MT.
+        ContainerItemFactory(container=container, uom=mt)
+        payload = {
+            "container": container.pk,
+            "item_code": "ITEM002",
+            "description": "Barley",
+            "uom": kg.pk,
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
+        }
+        resp = auth_client(maker).post(item_list_url(), payload, format="json")
+        assert resp.status_code == 400
+
+    def test_item_with_same_unit_allowed(self):
+        """A second item using the same Material Unit saves fine (happy path)."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        container = ContainerFactory(packing_list=pl)
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        pkg = TypeOfPackageFactory()
+        ContainerItemFactory(container=container, uom=mt)
+        payload = {
+            "container": container.pk,
+            "item_code": "ITEM002",
+            "description": "Barley",
+            "uom": mt.pk,
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
+        }
+        resp = auth_client(maker).post(item_list_url(), payload, format="json")
+        assert resp.status_code == 201
+
+    def test_item_with_different_unit_across_containers_rejected(self):
+        """The single-unit rule spans the whole packing list, not just one container."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        container_a = ContainerFactory(packing_list=pl)
+        container_b = ContainerFactory(packing_list=pl)
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        kg = UOMFactory(abbreviation="KG", name="Kilogram")
+        pkg = TypeOfPackageFactory()
+        ContainerItemFactory(container=container_a, uom=mt)
+        payload = {
+            "container": container_b.pk,
+            "item_code": "ITEM002",
+            "description": "Barley",
+            "uom": kg.pk,
+            "type_of_package": pkg.pk,
+            "no_of_packages": "10.000",
+            "qty_per_package": "50.000",
+            "weight_per_unit_packaging": "5.000",
+        }
+        resp = auth_client(maker).post(item_list_url(), payload, format="json")
+        assert resp.status_code == 400
+
+    def test_editing_item_to_different_unit_rejected(self):
+        """Changing one item's unit to differ from its siblings is blocked on save."""
+        maker = MakerFactory()
+        pl = PackingListFactory(status=DRAFT, created_by=maker)
+        container = ContainerFactory(packing_list=pl)
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        kg = UOMFactory(abbreviation="KG", name="Kilogram")
+        ContainerItemFactory(container=container, uom=mt)
+        item2 = ContainerItemFactory(container=container, uom=mt)
+        resp = auth_client(maker).patch(
+            item_detail_url(item2.pk), {"uom": kg.pk}, format="json"
+        )
+        assert resp.status_code == 400
+
 
 # ---- Signed copy upload — Packing List (FR-08.4) ----------------------------
 
@@ -1014,15 +1095,20 @@ class TestPlExtendedCoverage:
 
     # ---- 11. CI aggregation: different UOM → separate line items ------------
 
-    def test_ci_line_items_separate_for_different_uom(self):
-        """Same item_code but different UOM must produce 2 separate line items."""
+    def test_second_item_with_different_uom_is_rejected(self):
+        """
+        Single-unit rule: a packing list uses one Material Unit, so the same
+        item_code cannot be re-added under a different UOM. The second save is
+        blocked and only one CI line item remains.
+        (Replaces the former 'separate line item per UOM' behaviour.)
+        """
         from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
         from apps.commercial_invoice.models import CommercialInvoiceLineItem
         maker = MakerFactory()
         pl = PackingListFactory(status=DRAFT, created_by=maker)
         ci = CommercialInvoiceFactory(packing_list=pl, created_by=maker)
-        uom_a = UOMFactory()
-        uom_b = UOMFactory()
+        uom_a = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        uom_b = UOMFactory(abbreviation="KG", name="Kilogram")
         container = ContainerFactory(packing_list=pl)
         pkg = TypeOfPackageFactory()
         base = {
@@ -1034,10 +1120,12 @@ class TestPlExtendedCoverage:
             "qty_per_package": "10.000",
             "weight_per_unit_packaging": "1.000",
         }
-        auth_client(maker).post(item_list_url(), {**base, "uom": uom_a.pk}, format="json")
-        auth_client(maker).post(item_list_url(), {**base, "uom": uom_b.pk}, format="json")
+        r1 = auth_client(maker).post(item_list_url(), {**base, "uom": uom_a.pk}, format="json")
+        r2 = auth_client(maker).post(item_list_url(), {**base, "uom": uom_b.pk}, format="json")
+        assert r1.status_code == 201
+        assert r2.status_code == 400
         line_items = CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM-SPLIT")
-        assert line_items.count() == 2
+        assert line_items.count() == 1
 
     # ---- 12. Incoterms null is allowed on PATCH -----------------------------
 
@@ -1267,3 +1355,29 @@ class TestPlCiPdfEdgeCases:
         )
         body = b"".join(resp.streaming_content)
         assert body.startswith(b"%PDF")
+
+    def test_pdfs_with_items_render_selected_unit(self):
+        """
+        With real container items (unit = MT), the combined PL+CI PDF, its client
+        variant, and the CIF client-invoice PDF must all generate without crashing.
+        Exercises the per-item and totals weight-rendering paths that label weights
+        with the packing list's Material Unit instead of a hardcoded 'KGS'.
+        """
+        pl = self._make_pl_ci_pair()
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        pkg = TypeOfPackageFactory()
+        container = ContainerFactory(packing_list=pl)
+        # Numeric fields use the factory's Decimal defaults (weights are computed on save).
+        ContainerItemFactory(container=container, uom=mt, type_of_package=pkg)
+        client = auth_client(MakerFactory())
+
+        # Combined PL+CI PDF (government + client variants).
+        for variant in ("government", "client"):
+            resp = client.get(pl_pdf_url(pl.pk), {"variant": variant})
+            assert resp.status_code == 200, f"PL+CI PDF crashed for variant={variant}"
+            assert b"".join(resp.streaming_content).startswith(b"%PDF")
+
+        # CIF client-invoice PDF.
+        resp = client.get(f"/api/v1/packing-lists/{pl.pk}/client-invoice-pdf/")
+        assert resp.status_code == 200, "Client-invoice PDF crashed with items present"
+        assert b"".join(resp.streaming_content).startswith(b"%PDF")

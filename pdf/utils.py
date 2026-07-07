@@ -24,6 +24,32 @@ def format_decimal(value, dp=2, prefix=''):
     return f'{prefix}{fmt.format(value)}'
 
 
+def weight_unit_for_packing_list(packing_list, fallback='KGS'):
+    """
+    Return the Material Unit (UOM abbreviation) to label weight figures with on
+    a packing list's documents — e.g. 'MT' instead of a hardcoded 'KGS'.
+
+    Every item in a packing list shares one Material Unit (enforced when items
+    are saved), so all weight totals are expressed in that unit. If the list has
+    no items, or — for legacy data created before the single-unit rule — items
+    disagree, fall back to `fallback` ('KGS') rather than mislabelling a figure
+    with a single wrong unit.
+    """
+    abbreviations = set()
+    try:
+        for container in packing_list.containers.all():
+            for item in container.items.all():
+                if item.uom_id:
+                    abbr = (item.uom.abbreviation or '').strip()
+                    if abbr:
+                        abbreviations.add(abbr)
+    except Exception:
+        return fallback
+    if len(abbreviations) == 1:
+        return next(iter(abbreviations))
+    return fallback
+
+
 def strip_html(html_content):
     """
     Convert Tiptap/rich-text HTML to plain text suitable for a ReportLab Paragraph.
