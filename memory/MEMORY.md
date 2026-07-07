@@ -44,8 +44,14 @@
 - COA uses PI_TRANSITIONS (same workflow state machine as PI) — registered in WorkflowService
 - COA master data migration is 0018_coa_master_data (0016/0017 already existed before it)
 
+## Packing List — Material Unit rules (added 2026-07-07)
+- Weights are NOT always KGS. Makers pick a Material Unit (UOM: MT/KG/LBS/…) from a dropdown and enter `qty_per_package` / `weight_per_unit_packaging` in THAT unit. So `net_material_weight` / `item_gross_weight` are in the selected unit.
+- **One unit per packing list is enforced**: `ContainerItemSerializer.validate()` rejects any item whose `uom` differs from other items in the same PL (on every create/edit). Frontend mirrors this with an instant client-side check in the create/edit item forms.
+- PDFs/screens label weights with the PL's unit via `pdf.utils.weight_unit_for_packing_list(pl)` (falls back to "KGS" for empty/legacy mixed-unit data). Used in cif_client_invoice_generator, commercial_invoice_generator, packing_list_generator, and PackingList detail/create/edit pages.
+- Known separate issue (NOT yet fixed, user deferred): PackingListDetailPage's on-screen "Invoice Total (Amount Payable)" shows line-items only (FOB), dropping freight+insurance for CIF — the CI PDF is correct. See PackingListDetailPage.tsx:463.
+
 ## Active Task
-None — COA feature just completed.
+None — Material Unit consistency fix complete (branch fix/packing-list-material-unit-consistency, merged to main).
 
 ## Failed / Unresolved
 - None known.
