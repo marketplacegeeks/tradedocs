@@ -70,6 +70,36 @@ class ContainerItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Weight per unit packaging must be zero or greater.")
         return value
 
+    def validate(self, attrs):
+        """
+        Enforce one Material Unit per packing list.
+
+        Every item in a packing list must use the same UOM so the document-level
+        Net/Gross Weight totals (which sum across all items) always have a single,
+        correct unit. This runs on every item create and update.
+        """
+        attrs = super().validate(attrs)
+        # On create, container + uom come from the payload; on a partial update
+        # (PATCH) fall back to the values already on the item being edited.
+        container = attrs.get("container") or getattr(self.instance, "container", None)
+        uom = attrs.get("uom") or getattr(self.instance, "uom", None)
+        if container is not None and uom is not None:
+            # Any sibling item in the same packing list using a different unit blocks the save.
+            siblings = ContainerItem.objects.filter(
+                container__packing_list_id=container.packing_list_id
+            ).exclude(uom=uom)
+            if self.instance is not None:
+                siblings = siblings.exclude(pk=self.instance.pk)
+            other = siblings.select_related("uom").first()
+            if other is not None:
+                # Top-level (non-field) error so it reads naturally to the maker.
+                raise serializers.ValidationError(
+                    "All items in a packing list must use the same Material Unit. "
+                    f"This packing list already uses '{other.uom.abbreviation}' — "
+                    f"you selected '{uom.abbreviation}'."
+                )
+        return attrs
+
 
 # ---- Container serializer ---------------------------------------------------
 

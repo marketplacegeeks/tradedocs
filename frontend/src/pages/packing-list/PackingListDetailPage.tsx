@@ -256,7 +256,12 @@ function ContainersTab({ pl }: { pl: PackingList }) {
 
   return (
     <>
-      {pl.containers.map((container, idx) => (
+      {pl.containers.map((container, idx) => {
+        // All items in a packing list share one Material Unit, so weights are
+        // shown in that unit (e.g. MT) instead of a hardcoded "kg".
+        const units = new Set(container.items.map((i) => i.uom_abbr).filter(Boolean));
+        const weightUnit = units.size === 1 ? [...units][0] : "kg";
+        return (
         <div key={container.id} style={{ ...CARD, marginBottom: 20 }}>
           <p style={SECTION_TITLE}>
             Container {idx + 1}: {container.container_ref || "—"}
@@ -265,7 +270,7 @@ function ContainersTab({ pl }: { pl: PackingList }) {
             <Field label="Container Ref" value={container.container_ref} />
             <Field label="Marks & Numbers" value={container.marks_numbers} />
             <Field label="Seal Number" value={container.seal_number} />
-            <Field label="Gross Weight" value={`${container.gross_weight} kg`} />
+            <Field label="Gross Weight" value={`${container.gross_weight} ${weightUnit}`} />
           </div>
 
           {container.items.length > 0 && (
@@ -279,10 +284,10 @@ function ContainersTab({ pl }: { pl: PackingList }) {
                   <th style={TH}>Quantity of Items</th>
                   <th style={TH}>Type of Package</th>
                   <th style={TH}>Material Unit</th>
-                  <th style={TH}>Net Weight Per Item</th>
-                  <th style={TH}>Weight per empty package</th>
-                  <th style={TH}>Net Material Wt</th>
-                  <th style={TH}>Gross Weight</th>
+                  <th style={TH}>Net Weight Per Item ({weightUnit})</th>
+                  <th style={TH}>Weight per empty package ({weightUnit})</th>
+                  <th style={TH}>Net Material Wt ({weightUnit})</th>
+                  <th style={TH}>Gross Weight ({weightUnit})</th>
                 </tr>
               </thead>
               <tbody>
@@ -305,7 +310,8 @@ function ContainersTab({ pl }: { pl: PackingList }) {
             </table>
           )}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }

@@ -315,6 +315,10 @@ def build_pl_story(packing_list, styles):
 
     PAGE_W = 180 * mm
 
+    # Weights are shown in the packing list's Material Unit (e.g. MT), not a hardcoded KGS.
+    from pdf.utils import weight_unit_for_packing_list
+    weight_unit = weight_unit_for_packing_list(packing_list)
+
     exp = getattr(packing_list, "exporter", None)
     exporter_name = safe(getattr(exp, "name", ""))
 
@@ -618,10 +622,10 @@ def build_pl_story(packing_list, styles):
         weights_table = Table(
             [[
                 Paragraph("<b>Net Weight</b>", style_label),
-                Paragraph(f"{_fmt_decimal(net_val, 1)} KGS" if net_val is not None else "-", style_text),
+                Paragraph(f"{_fmt_decimal(net_val, 1)} {weight_unit}" if net_val is not None else "-", style_text),
                 "",  # merged into net weight value cell
                 Paragraph("<b>Gross Weight</b>", style_label),
-                Paragraph(f"{_fmt_decimal(gross_val, 1)} KGS" if gross_val is not None else "-", style_text),
+                Paragraph(f"{_fmt_decimal(gross_val, 1)} {weight_unit}" if gross_val is not None else "-", style_text),
                 "",  # merged into gross weight value cell
             ]],
             colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],
@@ -673,10 +677,10 @@ def build_pl_story(packing_list, styles):
                 Paragraph(f"<b>QTY</b><br/>{_fmt_qty(getattr(it, 'no_of_packages', None)) or '-'}", style_small),
                 Paragraph(f"<b>PKG TYPE</b><br/>{pkg_display or '-'}", style_small),
                 Paragraph(f"<b>UNIT</b><br/>{uom_display or '-'}", style_small),
-                Paragraph(f"<b>NET WT/ITEM (KGS)</b><br/>{_fmt_decimal(getattr(it, 'qty_per_package', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>Tare Wt/Item (KGS)</b><br/>{_fmt_decimal(getattr(it, 'weight_per_unit_packaging', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>NET WT (KGS)</b><br/>{_fmt_decimal(getattr(it, 'net_material_weight', None), 1) or '-'}", style_small),
-                Paragraph(f"<b>GROSS WT (KGS)</b><br/>{_fmt_decimal(getattr(it, 'item_gross_weight', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>NET WT/ITEM ({weight_unit})</b><br/>{_fmt_decimal(getattr(it, 'qty_per_package', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>Tare Wt/Item ({weight_unit})</b><br/>{_fmt_decimal(getattr(it, 'weight_per_unit_packaging', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>NET WT ({weight_unit})</b><br/>{_fmt_decimal(getattr(it, 'net_material_weight', None), 1) or '-'}", style_small),
+                Paragraph(f"<b>GROSS WT ({weight_unit})</b><br/>{_fmt_decimal(getattr(it, 'item_gross_weight', None), 1) or '-'}", style_small),
             ]
 
             item_rows.append(row1)
@@ -719,10 +723,10 @@ def build_pl_story(packing_list, styles):
     totals_tbl = Table(
         [[
             Paragraph("<b>Total Net Weight</b>", style_label_white),
-            Paragraph(f"{_fmt_decimal(total_net, 1)} KGS", style_text_white),
+            Paragraph(f"{_fmt_decimal(total_net, 1)} {weight_unit}", style_text_white),
             "",  # merged into net weight value cell
             Paragraph("<b>Total Gross Weight</b>", style_label_white),
-            Paragraph(f"{_fmt_decimal(total_gross, 1)} KGS", style_text_white),
+            Paragraph(f"{_fmt_decimal(total_gross, 1)} {weight_unit}", style_text_white),
             "",  # merged into gross weight value cell
         ]],
         colWidths=[30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm],

@@ -46,6 +46,7 @@ from pdf.commercial_invoice_generator import (
     _INCOTERM_VISIBLE_FIELDS,
     _ALL_CI_FIELDS,
 )
+from pdf.utils import weight_unit_for_packing_list
 
 _GRID = [
     ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
@@ -464,9 +465,11 @@ def build_cif_client_story(ci, styles) -> list:
             pass
 
     lc_details_val = safe(getattr(ci, "lc_details", ""))
+    # Weights are shown in the packing list's Material Unit (e.g. MT), not a hardcoded KGS.
+    weight_unit = weight_unit_for_packing_list(pl) if pl else "KGS"
 
     left_inner_rows = [
-        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} KGS", style_text)],
+        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}", style_text)],
     ]
     if lc_details_val:
         left_inner_rows.append(
@@ -483,7 +486,7 @@ def build_cif_client_story(ci, styles) -> list:
 
     # Right cell: Total Gross Weight
     right_inner = Table(
-        [[Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} KGS", style_text)]],
+        [[Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}", style_text)]],
         colWidths=[78 * mm],
     )
     right_inner.setStyle(TableStyle([

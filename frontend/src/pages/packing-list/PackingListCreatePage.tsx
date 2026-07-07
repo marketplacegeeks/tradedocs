@@ -842,6 +842,13 @@ function Step3({
 
   const containers = currentPl?.containers ?? pl.containers ?? [];
 
+  // All items in a packing list share one Material Unit, so weight columns are
+  // labelled with that unit (e.g. "(MT)"). Blank until the first item exists.
+  const savedItems = containers.flatMap((c: any) => c.items ?? []);
+  const savedUnitAbbrs = new Set(savedItems.map((i: any) => i.uom_abbr).filter(Boolean));
+  const weightUnit = savedUnitAbbrs.size === 1 ? [...savedUnitAbbrs][0] : "";
+  const weightUnitSuffix = weightUnit ? ` (${weightUnit})` : "";
+
   // Invalidate helper used by onBlur saves
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["packing-list", pl.id] });
@@ -932,6 +939,18 @@ function Step3({
     }
     if (parseFloat(item.weight_per_unit_packaging) <= 0) {
       message.error("Net Weight Per Item must be greater than 0.");
+      return;
+    }
+    // Single-unit rule (mirrors the server): every item in a packing list must
+    // use the same Material Unit. Warn instantly instead of waiting for the API.
+    const conflicting = savedItems.find((i: any) => i.uom && i.uom !== item.uom);
+    if (conflicting) {
+      const existingUnit = conflicting.uom_abbr
+        ?? uoms.find((u: any) => u.id === conflicting.uom)?.abbreviation ?? "another unit";
+      const selectedUnit = uoms.find((u: any) => u.id === item.uom)?.abbreviation ?? "the selected unit";
+      message.error(
+        `All items in a packing list must use the same Material Unit. This packing list already uses '${existingUnit}' — you selected '${selectedUnit}'.`
+      );
       return;
     }
     try {
@@ -1101,10 +1120,10 @@ function Step3({
                   <th style={TH}>Quantity of Items</th>
                   <th style={TH}>Type of Package</th>
                   <th style={TH}>Material Unit</th>
-                  <th style={TH}>Net Weight Per Item</th>
-                  <th style={TH}>Weight per empty package</th>
-                  <th style={TH}>Net Material Wt</th>
-                  <th style={TH}>Gross Weight</th>
+                  <th style={TH}>Net Weight Per Item{weightUnitSuffix}</th>
+                  <th style={TH}>Weight per empty package{weightUnitSuffix}</th>
+                  <th style={TH}>Net Material Wt{weightUnitSuffix}</th>
+                  <th style={TH}>Gross Weight{weightUnitSuffix}</th>
                   <th style={{ ...TH, width: 36 }}></th>
                 </tr>
               </thead>
@@ -1177,7 +1196,15 @@ function Step3({
                         size="small"
                         style={{ width: 80 }}
                         defaultValue={item.uom}
-                        onChange={(v) => updateContainerItem(item.id, { uom: v }).then(invalidate)}
+                        onChange={(v) =>
+                          updateContainerItem(item.id, { uom: v })
+                            .then(invalidate)
+                            .catch((err) => {
+                              // e.g. the single-unit-per-packing-list rule blocked the change.
+                              message.error(extractApiError(err, "Failed to change Material Unit."));
+                              invalidate(); // revert the dropdown to the saved unit
+                            })
+                        }
                         showSearch
                         optionFilterProp="label"
                         options={uoms.map((u: any) => ({ value: u.id, label: u.abbreviation })).sort((a, b) => a.label.localeCompare(b.label))}
