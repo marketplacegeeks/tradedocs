@@ -30,7 +30,7 @@ def rebuild_ci_line_items(packing_list):
         return  # CI not yet created — nothing to rebuild
 
     # Aggregate all ContainerItems across all containers for this PL.
-    # total_quantity is the sum of net_material_weight (no_of_packages × qty_per_package)
+    # total_quantity is the sum of no_of_packages (the package count, not the weight)
     # across all items with the same item_code + uom.
     groups = defaultdict(lambda: {
         "total_quantity": 0,
@@ -42,7 +42,8 @@ def rebuild_ci_line_items(packing_list):
     for container in packing_list.containers.prefetch_related("items__uom").all():
         for item in container.items.all():
             key = (item.item_code, item.uom_id)
-            groups[key]["total_quantity"] += item.net_material_weight
+            # Use no_of_packages (item count), not net_material_weight (KGS), for quantity.
+            groups[key]["total_quantity"] += item.no_of_packages
             groups[key]["uom_id"] = item.uom_id
             # Use the first non-empty value for description and hsn_code.
             if not groups[key]["description"]:

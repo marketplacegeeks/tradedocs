@@ -1083,15 +1083,15 @@ class TestPlExtendedCoverage:
             "uom": uom.pk,
             "type_of_package": pkg.pk,
             "no_of_packages": "10.000",
-            "qty_per_package": "20.000",   # net_material_weight = 200 per container
+            "qty_per_package": "20.000",
             "weight_per_unit_packaging": "2.000",
         }
         auth_client(maker).post(item_list_url(), {**payload_base, "container": c1.pk}, format="json")
         auth_client(maker).post(item_list_url(), {**payload_base, "container": c2.pk}, format="json")
         line_items = CommercialInvoiceLineItem.objects.filter(ci=ci, item_code="ITEM-AGG")
         assert line_items.count() == 1
-        # total_quantity = sum of net_material_weight = 200 + 200 = 400
-        assert Decimal(line_items.first().total_quantity) == Decimal("400.000")
+        # total_quantity = sum of no_of_packages = 10 + 10 = 20
+        assert Decimal(line_items.first().total_quantity) == Decimal("20.000")
 
     # ---- 11. CI aggregation: different UOM → separate line items ------------
 
