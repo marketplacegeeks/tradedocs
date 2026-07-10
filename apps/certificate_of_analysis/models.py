@@ -56,8 +56,8 @@ class CertificateOfAnalysis(models.Model):
     date_time_of_sampling = models.DateTimeField()
     date_time_of_analysis = models.DateTimeField()
 
-    analyst_name = models.CharField(max_length=150)
-    qc_incharge_name = models.CharField(max_length=150)
+    analyst_name = models.CharField(max_length=150, blank=True, default="")
+    qc_incharge_name = models.CharField(max_length=150, blank=True, default="")
 
     # Footer organisation: Organisation tagged CONSIGNEE or EXPORTER
     footer_organisation = models.ForeignKey(

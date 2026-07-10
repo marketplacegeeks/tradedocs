@@ -11,7 +11,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
+from reportlab.platypus import (
+    BaseDocTemplate, PageTemplate, Frame, NextPageTemplate,
+    Table, TableStyle, Paragraph, Spacer,
+)
 
 NAVY = colors.HexColor('#1A2B4B')
 LIGHT_GREY = colors.HexColor('#F0F0F0')
@@ -79,7 +82,6 @@ def generate_coa_pdf(coa) -> BytesIO:
     Returns a BytesIO buffer ready to stream — never written to disk.
     """
     from apps.workflow.constants import APPROVED
-    from datetime import date as date_class
 
     buf = BytesIO()
 
@@ -187,7 +189,7 @@ def generate_coa_pdf(coa) -> BytesIO:
         canvas.drawCentredString(A4[0] / 2, 8 * mm, f"Page {canvas.getPageNumber()}")
         canvas.restoreState()
 
-    doc = SimpleDocTemplate(
+    doc = BaseDocTemplate(
         buf,
         pagesize=A4,
         leftMargin=15 * mm,
@@ -196,40 +198,75 @@ def generate_coa_pdf(coa) -> BytesIO:
         bottomMargin=20 * mm,
     )
 
-    PAGE_W = 180 * mm
-    col_third = PAGE_W / 3
+    PAGE_W = doc.width
 
-    story = []
-
-    # -------------------------------------------------------------------------
-    # 1. Company header block
-    # -------------------------------------------------------------------------
-    story.append(Paragraph(org_name, style_company))
-    if cin:
-        story.append(Paragraph(f"CIN: {cin}", style_small))
-    for addr_info in org_addresses:
-        story.append(Paragraph(
-            f"<b>{addr_info['type']} Address:</b> {addr_info['text']}",
-            style_small,
-        ))
     # IEC Code and GSTIN shown once, side by side, after all addresses
     iec_gstin_parts = []
     if org_iec_code:
         iec_gstin_parts.append(f"IEC Code: {org_iec_code}")
     if org_tax_info:
         iec_gstin_parts.append(org_tax_info)
-    if iec_gstin_parts:
-        story.append(Paragraph("    ".join(iec_gstin_parts), style_small))
 
-    # Hairline separator (matches PL style)
-    sep = Table([[""]], colWidths=[PAGE_W], splitByRow=False)
-    sep.setStyle(TableStyle([
-        ("LINEABOVE",      (0, 0), (-1, 0), 1.5, colors.black),
-        ("TOPPADDING",     (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING",  (0, 0), (-1, -1), 0),
-    ]))
-    story.append(sep)
-    story.append(Spacer(1, 6))
+    def _build_header_flowables():
+        """Builds the company header block (name, CIN, addresses, IEC/GSTIN,
+        hairline separator). Called once for the first page (as part of the
+        normal flowable story) and again, fresh, every time a later page is
+        drawn (so the header repeats on page 2+)."""
+        flows = [Paragraph(org_name, style_company)]
+        if cin:
+            flows.append(Paragraph(f"CIN: {cin}", style_small))
+        for addr_info in org_addresses:
+            flows.append(Paragraph(
+                f"<b>{addr_info['type']} Address:</b> {addr_info['text']}",
+                style_small,
+            ))
+        if iec_gstin_parts:
+            flows.append(Paragraph("    ".join(iec_gstin_parts), style_small))
+
+        sep = Table([[""]], colWidths=[PAGE_W], splitByRow=False)
+        sep.setStyle(TableStyle([
+            ("LINEABOVE",      (0, 0), (-1, 0), 1.5, colors.black),
+            ("TOPPADDING",     (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+        flows.append(sep)
+        flows.append(Spacer(1, 6))
+        return flows
+
+    # Height the header block occupies, so later-page frames can reserve
+    # exactly that much space at the top before body content starts.
+    header_height = sum(f.wrap(PAGE_W, doc.height)[1] for f in _build_header_flowables())
+
+    def _draw_repeated_header(canvas, _doc):
+        """Draws the company header at the top of page 2+ (page 1 already
+        gets it from the normal flowable story)."""
+        canvas.saveState()
+        cursor_y = A4[1] - doc.topMargin
+        for flow in _build_header_flowables():
+            w, h = flow.wrap(PAGE_W, cursor_y)
+            cursor_y -= h
+            flow.drawOn(canvas, doc.leftMargin, cursor_y)
+        canvas.restoreState()
+
+    def _on_later_page(canvas, doc_):
+        _draw_repeated_header(canvas, doc_)
+        _on_page(canvas, doc_)
+
+    frame_first = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="first")
+    frame_later = Frame(
+        doc.leftMargin, doc.bottomMargin, doc.width, doc.height - header_height, id="later",
+    )
+    doc.addPageTemplates([
+        PageTemplate(id="First", frames=[frame_first], onPage=_on_page),
+        PageTemplate(id="Later", frames=[frame_later], onPage=_on_later_page),
+    ])
+
+    story = [NextPageTemplate("Later")]
+
+    # -------------------------------------------------------------------------
+    # 1. Company header block (page 1 — later pages repeat it via _on_later_page)
+    # -------------------------------------------------------------------------
+    story.extend(_build_header_flowables())
 
     # -------------------------------------------------------------------------
     # 2. Document title + COA number
@@ -386,48 +423,11 @@ def generate_coa_pdf(coa) -> BytesIO:
     story.append(Spacer(1, 8 * mm))
 
     # -------------------------------------------------------------------------
-    # 6. Signature section — analyst and QC incharge
+    # 6. Closing note — replaces the analyst / QC incharge signature section
     # -------------------------------------------------------------------------
-    if coa.status == APPROVED:
-        sig_date = _fmt_date(coa.updated_at.date())
-    else:
-        sig_date = _fmt_date(date_class.today())
-
-    analyst_col = (
-        "<b>Analyst</b><br/>"
-        f"{_safe(coa.analyst_name)}<br/>"
-        f"Date : {sig_date}<br/>"
-        "<br/><br/><br/>"
-        "_________________________"
-    )
-    qc_col = (
-        "<b>QC Incharge</b><br/>"
-        f"{_safe(coa.qc_incharge_name)}<br/>"
-        f"Date : {sig_date}<br/>"
-        "<br/><br/><br/>"
-        "_________________________"
-    )
-
-    sig_data = [[
-        Paragraph(analyst_col, style_sig),
-        Paragraph("", style_sig),   # Center column: company seal placeholder
-        Paragraph(qc_col, style_sig),
-    ]]
-    sig_table = Table(sig_data, colWidths=[col_third, col_third, col_third], splitByRow=False)
-    sig_table.setStyle(TableStyle([
-        ("BOX",           (0, 0), (-1, -1), 1.2, colors.black),
-        ("INNERGRID",     (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
-    ]))
-    sig_table.hAlign = "LEFT"
-    story.append(KeepTogether([sig_table]))
+    story.append(Paragraph("Based on factory results", style_sig))
 
     canvasmaker = _DraftWatermarkCanvas if is_draft else Canvas
-    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page, canvasmaker=canvasmaker)
+    doc.build(story, canvasmaker=canvasmaker)
     buf.seek(0)
     return buf

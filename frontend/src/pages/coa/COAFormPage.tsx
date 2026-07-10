@@ -117,8 +117,6 @@ export default function COAFormPage() {
   const [dateOfDespatch, setDateOfDespatch] = useState("");
   const [dateTimeOfSampling, setDateTimeOfSampling] = useState("");
   const [dateTimeOfAnalysis, setDateTimeOfAnalysis] = useState("");
-  const [analystName, setAnalystName] = useState("");
-  const [qcInchargeName, setQcInchargeName] = useState("");
 
   // ---- Test parameters table state ----------------------------------------
   const [rows, setRows] = useState<COAParameter[]>([blankRow(1)]);
@@ -218,8 +216,6 @@ export default function COAFormPage() {
     // datetime-local inputs need "YYYY-MM-DDTHH:MM" format — strip seconds if present
     setDateTimeOfSampling(existingCOA.date_time_of_sampling?.slice(0, 16) ?? "");
     setDateTimeOfAnalysis(existingCOA.date_time_of_analysis?.slice(0, 16) ?? "");
-    setAnalystName(existingCOA.analyst_name);
-    setQcInchargeName(existingCOA.qc_incharge_name);
     if (existingCOA.parameters.length > 0) {
       setRows(existingCOA.parameters.map(normalizeRow));
     }
@@ -414,8 +410,8 @@ export default function COAFormPage() {
       date_of_despatch: dateOfDespatch || null,
       date_time_of_sampling: dateTimeOfSampling,
       date_time_of_analysis: dateTimeOfAnalysis,
-      analyst_name: analystName,
-      qc_incharge_name: qcInchargeName,
+      analyst_name: "",
+      qc_incharge_name: "",
       // Convert empty strings to null for DecimalFields — Django rejects "" for numeric fields.
       parameters: rows.map((r) => ({
         ...r,
@@ -772,30 +768,6 @@ export default function COAFormPage() {
               format="DD MMM YYYY"
               style={{ width: "100%" }}
               placeholder="Select date"
-            />
-          </div>
-
-          {/* Analyst Name */}
-          <div>
-            <FieldLabel text="Analyst Name" required />
-            <input
-              type="text"
-              value={analystName}
-              onChange={(e) => setAnalystName(e.target.value)}
-              placeholder="Full name"
-              style={inputStyle}
-            />
-          </div>
-
-          {/* QC Incharge Name */}
-          <div>
-            <FieldLabel text="QC Incharge Name" required />
-            <input
-              type="text"
-              value={qcInchargeName}
-              onChange={(e) => setQcInchargeName(e.target.value)}
-              placeholder="Full name"
-              style={inputStyle}
             />
           </div>
         </div>
