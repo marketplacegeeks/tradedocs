@@ -327,7 +327,7 @@ export default function ProductTestTemplatePage() {
                     {row.spec_type === "QUANTITATIVE" ? (
                       <input
                         style={inputStyle}
-                        type="number"
+                        type="text"
                         value={row.spec_min}
                         onChange={(e) => updateRow(idx, { spec_min: e.target.value })}
                         placeholder="Min"
@@ -342,7 +342,7 @@ export default function ProductTestTemplatePage() {
                     {row.spec_type === "QUANTITATIVE" ? (
                       <input
                         style={inputStyle}
-                        type="number"
+                        type="text"
                         value={row.spec_max}
                         onChange={(e) => updateRow(idx, { spec_max: e.target.value })}
                         placeholder="Max"

@@ -539,9 +539,10 @@ class ProductTestTemplateRow(models.Model):
         "UOM", on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
     )
     spec_type = models.CharField(max_length=20, choices=SPEC_TYPE_CHOICES)
-    # Use decimal_places=6 for trace-level chemical measurements
-    spec_min = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
-    spec_max = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    # CharField allows values like "< 5.0" or "> 99.5" in addition to plain numbers.
+    # Matches COAParameter.spec_min / spec_max which are already CharField.
+    spec_min = models.CharField(max_length=50, blank=True, default="")
+    spec_max = models.CharField(max_length=50, blank=True, default="")
     spec_description = models.TextField(blank=True)
     test_method = models.ForeignKey(
         TestMethod, on_delete=models.PROTECT, null=True, blank=True, related_name="template_rows"
