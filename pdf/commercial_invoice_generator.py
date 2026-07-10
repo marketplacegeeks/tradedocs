@@ -592,7 +592,6 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     li_table = Table(
         li_rows,
         colWidths=[10 * mm, 22 * mm, 24 * mm, 20 * mm, 46 * mm, 18 * mm, 20 * mm, 20 * mm],
-        splitByRow=False,
         repeatRows=1,
     )
     li_table.hAlign = "LEFT"

@@ -555,7 +555,6 @@ def generate_proforma_invoice_pdf_bytes(invoice, client_invoice=False) -> bytes:
     li_table = Table(
         li_rows,
         colWidths=[10 * mm, 24 * mm, 24 * mm, 40 * mm, 27 * mm, 31 * mm, 24 * mm],
-        splitByRow=False,
         repeatRows=1,
     )
     li_table.setStyle(TableStyle([
