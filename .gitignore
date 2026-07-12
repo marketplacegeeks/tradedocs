@@ -18,6 +18,10 @@ media/
 
 # Playwright MCP artifacts (screenshots, PDFs, console logs)
 .playwright-mcp/
+
+# Playwright E2E test output
+frontend/test-results/
+frontend/playwright-report/
 railway_exports/banks.csv
 railway_exports/commercial_invoice_line_items.csv
 railway_exports/commercial_invoices.csv
