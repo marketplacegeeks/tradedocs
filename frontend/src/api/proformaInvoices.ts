@@ -264,6 +264,34 @@ export async function downloadPiClientPdf(piId: number, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// ---- Word download ------------------------------------------------------------
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+export async function downloadPiWord(piId: number, filename: string) {
+  const response = await axiosInstance.get(`/proforma-invoices/${piId}/word/`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(new Blob([response.data], { type: DOCX_MIME }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadPiClientWord(piId: number, filename: string) {
+  const response = await axiosInstance.get(`/proforma-invoices/${piId}/word/?variant=client`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(new Blob([response.data], { type: DOCX_MIME }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // Super Admin only — permanently removes the PI from the database.
 export async function hardDeleteProformaInvoice(id: number): Promise<void> {
   await axiosInstance.delete(`/proforma-invoices/${id}/hard-delete/`);

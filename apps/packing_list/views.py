@@ -325,11 +325,13 @@ class PackingListViewSet(viewsets.ModelViewSet):
 
         from datetime import date
         from apps.workflow.constants import APPROVED
+        from apps.manual_edits.services import record_first_generation
 
         pl = self.get_object()
         variant = request.query_params.get("variant", "government")
 
         buffer = generate_pl_ci_pdf(pl, client_invoice=(variant == "client"))
+        record_first_generation("packing_list", pl.pk, pl.pl_number)
 
         today = date.today().strftime("%d%m%Y")
         consignee_name = ""
@@ -342,6 +344,45 @@ class PackingListViewSet(viewsets.ModelViewSet):
             as_attachment=True,
             filename=filename,
             content_type="application/pdf",
+        )
+
+    # ---- Word endpoint -------------------------------------------------------
+
+    @action(detail=True, methods=["get"], url_path="word", permission_classes=[IsAnyRole])
+    def word(self, request, pk=None):
+        """
+        GET /packing-lists/{id}/word/
+        Streams the combined PL+CI Word (.docx) document — the Word equivalent
+        of the pdf() action above.
+
+        FR-08.3: Word available in all states for all roles; DRAFT watermark applied
+        to non-Approved documents by the Word generator.
+        Constraint #9: Word doc is generated in-memory and streamed; never written to disk.
+        """
+        from django.http import FileResponse
+        from pdf.packing_list_word import generate_pl_ci_docx
+
+        from datetime import date
+        from apps.workflow.constants import APPROVED
+        from apps.manual_edits.services import record_first_generation
+
+        pl = self.get_object()
+        variant = request.query_params.get("variant", "government")
+
+        buffer = generate_pl_ci_docx(pl, client_invoice=(variant == "client"))
+        record_first_generation("packing_list", pl.pk, pl.pl_number)
+
+        today = date.today().strftime("%d%m%Y")
+        consignee_name = ""
+        if pl.consignee:
+            consignee_name = "_" + pl.consignee.name.replace(" ", "")
+        draft_part = "" if pl.status == APPROVED else "_draft"
+        filename = f"{today}{draft_part}_PL&CI{consignee_name}.docx"
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
 
     # ---- Client Invoice PDF endpoint (CIF-adjusted rates) -------------------
@@ -358,10 +399,14 @@ class PackingListViewSet(viewsets.ModelViewSet):
         from pdf.cif_client_invoice_generator import generate_cif_client_invoice_pdf
         from datetime import date
         from apps.workflow.constants import APPROVED
+        from apps.manual_edits.services import record_first_generation
 
         pl = self.get_object()
 
         buffer = generate_cif_client_invoice_pdf(pl)
+        ci = getattr(pl, "commercial_invoice", None)
+        if ci:
+            record_first_generation("commercial_invoice", ci.pk, ci.ci_number)
 
         today = date.today().strftime("%d%m%Y")
         consignee_name = ""

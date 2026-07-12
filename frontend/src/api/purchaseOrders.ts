@@ -240,6 +240,19 @@ export async function downloadPurchaseOrderPdf(poId: number, filename: string): 
   URL.revokeObjectURL(url);
 }
 
+/** Download the PO as a Word (.docx) document and trigger a browser file save. */
+export async function downloadPurchaseOrderWord(poId: number, filename: string): Promise<void> {
+  const response = await api.get(`/purchase-orders/${poId}/word/`, { responseType: "blob" });
+  const url = URL.createObjectURL(
+    new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // ---- Line item functions ----------------------------------------------------
 
 export async function listLineItems(poId: number): Promise<PurchaseOrderLineItem[]> {

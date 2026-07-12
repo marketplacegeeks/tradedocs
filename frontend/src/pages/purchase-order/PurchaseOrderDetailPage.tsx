@@ -5,13 +5,14 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal } from "antd";
-import { ArrowLeft, Download, Clock, Edit2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Clock, Edit2, Trash2 } from "lucide-react";
 
 import {
   getPurchaseOrder,
   workflowPurchaseOrder,
   getPurchaseOrderAuditLog,
   downloadPurchaseOrderPdf,
+  downloadPurchaseOrderWord,
   hardDeletePurchaseOrder,
 } from "../../api/purchaseOrders";
 import WorkflowActionButton from "../../components/common/WorkflowActionButton";
@@ -339,6 +340,32 @@ export default function PurchaseOrderDetailPage() {
             }}
           >
             <Download size={14} strokeWidth={1.5} /> Download PDF
+          </button>
+
+          <button
+            onClick={() => {
+              const today = new Date();
+              const dd = String(today.getDate()).padStart(2, "0");
+              const mm = String(today.getMonth() + 1).padStart(2, "0");
+              const yyyy = today.getFullYear();
+              const dateStr = `${dd}${mm}${yyyy}`;
+              const vendorSlug = (po.vendor_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+              const isDraft = po.status !== DOCUMENT_STATUS.APPROVED;
+              const filename = isDraft
+                ? `${dateStr}_Draft_PurchaseOrder_${vendorSlug}.docx`
+                : `${dateStr}_PurchaseOrder_${vendorSlug}.docx`;
+              downloadPurchaseOrderWord(poId, filename).catch(() =>
+                message.error("Word download failed. Please try again.")
+              );
+            }}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "var(--pastel-green)", color: "var(--pastel-green-text)",
+              border: "none", borderRadius: 8, padding: "8px 14px",
+              fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            <FileText size={14} strokeWidth={1.5} /> Download Word
           </button>
 
           {user?.role === ROLES.SUPER_ADMIN && (

@@ -570,6 +570,46 @@ class TestCOAPDF:
         assert resp["Content-Type"] == "application/pdf"
 
 
+# ---- Word endpoint ----------------------------------------------------------
+
+@pytest.mark.django_db
+class TestCOAWord:
+
+    def test_word_endpoint_returns_docx_content_type(self):
+        maker = MakerFactory()
+        coa = CertificateOfAnalysisFactory(created_by=maker, status=DRAFT)
+        COAParameterFactory(
+            coa=coa,
+            spec_type="QUALITATIVE",
+            spec_description="Clear",
+            result_text="Complies",
+        )
+        client = auth_client(maker)
+        resp = client.get(coa_action_url(coa.id, "word"))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    def test_unauthenticated_cannot_access_word(self):
+        maker = MakerFactory()
+        coa = CertificateOfAnalysisFactory(created_by=maker, status=DRAFT)
+        client = APIClient()
+        resp = client.get(coa_action_url(coa.id, "word"))
+        assert resp.status_code == 401
+
+    def test_checker_can_access_word(self):
+        maker = MakerFactory()
+        checker = CheckerFactory()
+        coa = CertificateOfAnalysisFactory(created_by=maker, status=APPROVED)
+        COAParameterFactory(coa=coa, spec_type="QUALITATIVE", spec_description="OK", result_text="Complies")
+        resp = auth_client(checker).get(coa_action_url(coa.id, "word"))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+
 # ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
 
 @pytest.mark.django_db

@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/v1/", include("apps.commercial_invoice.urls")),
     path("api/v1/", include("apps.purchase_order.urls")),
     path("api/v1/", include("apps.certificate_of_analysis.urls")),
+    path("api/v1/", include("apps.manual_edits.urls")),
     path("api/v1/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("api/v1/", include("apps.workflow.urls")),
     # Report endpoints

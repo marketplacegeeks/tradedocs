@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "apps.commercial_invoice",
     "apps.purchase_order",
     "apps.certificate_of_analysis",
+    "apps.manual_edits",
 ]
 
 MIDDLEWARE = [

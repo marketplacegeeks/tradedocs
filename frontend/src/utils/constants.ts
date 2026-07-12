@@ -208,3 +208,40 @@ export const SPEC_TYPE_LABELS: Record<SpecType, string> = {
   QUANTITATIVE: "Quantitative",
   QUALITATIVE: "Qualitative",
 };
+
+// Document types shown on the Manual Edits page. Matches AuditLog.document_type
+// and apps.manual_edits.services.DOCUMENT_MODELS on the backend.
+export const MANUAL_EDIT_DOCUMENT_TYPES = {
+  PROFORMA_INVOICE: "proforma_invoice",
+  PACKING_LIST: "packing_list",
+  COMMERCIAL_INVOICE: "commercial_invoice",
+  PURCHASE_ORDER: "purchase_order",
+  CERTIFICATE_OF_ANALYSIS: "certificate_of_analysis",
+} as const;
+
+export type ManualEditDocumentType =
+  (typeof MANUAL_EDIT_DOCUMENT_TYPES)[keyof typeof MANUAL_EDIT_DOCUMENT_TYPES];
+
+export const DOCUMENT_TYPE_LABELS: Record<ManualEditDocumentType, string> = {
+  proforma_invoice: "Proforma Invoice",
+  packing_list: "Packing List",
+  commercial_invoice: "Commercial Invoice",
+  purchase_order: "Purchase Order",
+  certificate_of_analysis: "Certificate of Analysis",
+};
+
+export const DOCUMENT_TYPE_SHORT_LABELS: Record<ManualEditDocumentType, string> = {
+  proforma_invoice: "PI",
+  packing_list: "PL",
+  commercial_invoice: "CI",
+  purchase_order: "PO",
+  certificate_of_analysis: "COA",
+};
+
+export const DOCUMENT_TYPE_CHIP: Record<ManualEditDocumentType, string> = {
+  proforma_invoice: "chip-blue",
+  packing_list: "chip-purple",
+  commercial_invoice: "chip-green",
+  purchase_order: "chip-orange",
+  certificate_of_analysis: "chip-pink",
+};

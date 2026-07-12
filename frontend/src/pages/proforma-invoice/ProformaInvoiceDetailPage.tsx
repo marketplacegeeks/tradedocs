@@ -20,6 +20,8 @@ import {
   triggerWorkflowAction,
   downloadPiPdf,
   downloadPiClientPdf,
+  downloadPiWord,
+  downloadPiClientWord,
   getAuditLog,
   uploadSignedCopy,
   hardDeleteProformaInvoice,
@@ -901,6 +903,35 @@ export default function ProformaInvoiceDetailPage() {
           >
             <Download size={14} strokeWidth={1.5} /> Download PDF
           </button>
+          <button
+            onClick={() => {
+              if (incotermsCode === "CIF") {
+                setCifDownloadModalOpen(true);
+              } else {
+                const today = new Date();
+                const dd = String(today.getDate()).padStart(2, "0");
+                const mm = String(today.getMonth() + 1).padStart(2, "0");
+                const yyyy = today.getFullYear();
+                const dateStr = `${dd}${mm}${yyyy}`;
+                const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+                const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+                const filename = isDraft
+                  ? `${dateStr}_Draft_ProformaInvoice_${consigneeName}.docx`
+                  : `${dateStr}_ProformaInvoice_${consigneeName}.docx`;
+                downloadPiWord(piId, filename).catch(() =>
+                  message.error("Word download failed. Please try again.")
+                );
+              }
+            }}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "var(--pastel-blue)", color: "var(--pastel-blue-text)",
+              border: "none", borderRadius: 8, padding: "8px 14px",
+              fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            <FileText size={14} strokeWidth={1.5} /> Download Word
+          </button>
           {user?.role === ROLES.SUPER_ADMIN && (
             <button
               onClick={confirmHardDelete}
@@ -1028,53 +1059,99 @@ export default function ProformaInvoiceDetailPage() {
 
       {/* CIF download type selection modal */}
       <Modal
-        title="Download Invoice PDF"
+        title="Download Invoice"
         open={cifDownloadModalOpen}
         onCancel={() => setCifDownloadModalOpen(false)}
         footer={null}
       >
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)", marginBottom: 20 }}>
-          This is a CIF shipment. Choose the invoice type to download.
+          This is a CIF shipment. Choose the invoice type and file format to download.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button
-            onClick={() => {
-              setCifDownloadModalOpen(false);
-              const today = new Date();
-              const dd = String(today.getDate()).padStart(2, "0");
-              const mm = String(today.getMonth() + 1).padStart(2, "0");
-              const yyyy = today.getFullYear();
-              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
-              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
-              const filename = isDraft
-                ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}.pdf`
-                : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}.pdf`;
-              downloadPiPdf(piId, filename).catch(() => message.error("PDF download failed."));
-            }}
-            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
-          >
+          <div style={{ padding: "14px 18px", borderRadius: 10, border: "1px solid var(--border-medium)", background: "var(--bg-surface)" }}>
             <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Government Invoice</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Standard Proforma Invoice with FOB rates + cost breakdown</span>
-          </button>
-          <button
-            onClick={() => {
-              setCifDownloadModalOpen(false);
-              const today = new Date();
-              const dd = String(today.getDate()).padStart(2, "0");
-              const mm = String(today.getMonth() + 1).padStart(2, "0");
-              const yyyy = today.getFullYear();
-              const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
-              const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
-              const filename = isDraft
-                ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}_Client.pdf`
-                : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}_Client.pdf`;
-              downloadPiClientPdf(piId, filename).catch(() => message.error("PDF download failed."));
-            }}
-            style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--primary)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
-          >
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: "4px 0 12px" }}>Standard Proforma Invoice with FOB rates + cost breakdown</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setCifDownloadModalOpen(false);
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, "0");
+                  const mm = String(today.getMonth() + 1).padStart(2, "0");
+                  const yyyy = today.getFullYear();
+                  const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+                  const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+                  const filename = isDraft
+                    ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}.pdf`
+                    : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}.pdf`;
+                  downloadPiPdf(piId, filename).catch(() => message.error("PDF download failed."));
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-medium)", background: "var(--pastel-green)", color: "var(--pastel-green-text)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500 }}
+              >
+                <Download size={14} strokeWidth={1.5} /> PDF
+              </button>
+              <button
+                onClick={() => {
+                  setCifDownloadModalOpen(false);
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, "0");
+                  const mm = String(today.getMonth() + 1).padStart(2, "0");
+                  const yyyy = today.getFullYear();
+                  const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+                  const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+                  const filename = isDraft
+                    ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}.docx`
+                    : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}.docx`;
+                  downloadPiWord(piId, filename).catch(() => message.error("Word download failed."));
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-medium)", background: "var(--pastel-blue)", color: "var(--pastel-blue-text)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500 }}
+              >
+                <FileText size={14} strokeWidth={1.5} /> Word
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: "14px 18px", borderRadius: 10, border: "1px solid var(--primary)", background: "var(--bg-surface)" }}>
             <span style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 600, color: "var(--primary)" }}>Client Invoice</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>CIF-adjusted rates with freight &amp; insurance allocated per line item</span>
-          </button>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--text-muted)", margin: "4px 0 12px" }}>CIF-adjusted rates with freight &amp; insurance allocated per line item</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setCifDownloadModalOpen(false);
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, "0");
+                  const mm = String(today.getMonth() + 1).padStart(2, "0");
+                  const yyyy = today.getFullYear();
+                  const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+                  const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+                  const filename = isDraft
+                    ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}_Client.pdf`
+                    : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}_Client.pdf`;
+                  downloadPiClientPdf(piId, filename).catch(() => message.error("PDF download failed."));
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--primary)", background: "var(--pastel-green)", color: "var(--pastel-green-text)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500 }}
+              >
+                <Download size={14} strokeWidth={1.5} /> PDF
+              </button>
+              <button
+                onClick={() => {
+                  setCifDownloadModalOpen(false);
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, "0");
+                  const mm = String(today.getMonth() + 1).padStart(2, "0");
+                  const yyyy = today.getFullYear();
+                  const consigneeName = (pi.consignee_name ?? "").replace(/[^a-zA-Z0-9]/g, "");
+                  const isDraft = pi.status !== DOCUMENT_STATUS.APPROVED;
+                  const filename = isDraft
+                    ? `${dd}${mm}${yyyy}_Draft_ProformaInvoice_${consigneeName}_Client.docx`
+                    : `${dd}${mm}${yyyy}_ProformaInvoice_${consigneeName}_Client.docx`;
+                  downloadPiClientWord(piId, filename).catch(() => message.error("Word download failed."));
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--primary)", background: "var(--pastel-blue)", color: "var(--pastel-blue-text)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500 }}
+              >
+                <FileText size={14} strokeWidth={1.5} /> Word
+              </button>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

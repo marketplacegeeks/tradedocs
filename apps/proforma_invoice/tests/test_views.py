@@ -49,6 +49,10 @@ def pi_pdf_url(pk):
     return f"/api/v1/proforma-invoices/{pk}/pdf/"
 
 
+def pi_word_url(pk):
+    return f"/api/v1/proforma-invoices/{pk}/word/"
+
+
 def pi_audit_url(pk):
     return f"/api/v1/proforma-invoices/{pk}/audit-log/"
 
@@ -669,6 +673,58 @@ class TestPdfDownload:
         assert resp.status_code == 200
         body = b"".join(resp.streaming_content)
         assert body.startswith(b"%PDF")
+
+
+@pytest.mark.django_db
+class TestWordDownload:
+    """
+    Word download endpoint.
+    GET /proforma-invoices/{id}/word/ — streams a .docx in memory; all roles; all statuses.
+    Mirrors TestPdfDownload above.
+    """
+
+    WORD_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+    def test_maker_can_download_word_government(self):
+        """Any authenticated Maker gets a 200 docx response for the government variant (default)."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_word_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == self.WORD_CONTENT_TYPE
+
+    def test_maker_can_download_word_client_variant(self):
+        """?variant=client is accepted and returns a docx response."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_word_url(pi.pk) + "?variant=client")
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == self.WORD_CONTENT_TYPE
+
+    def test_checker_can_download_word(self):
+        """Checkers can also download at any status."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(CheckerFactory()).get(pi_word_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == self.WORD_CONTENT_TYPE
+
+    def test_unauthenticated_cannot_download_word(self):
+        """Unauthenticated requests must be rejected."""
+        pi = ProformaInvoiceFactory()
+        resp = APIClient().get(pi_word_url(pi.pk))
+        assert resp.status_code == 401
+
+    def test_word_filename_matches_pi_number(self):
+        """Content-Disposition header must use the PI number as the filename."""
+        pi = ProformaInvoiceFactory()
+        resp = auth_client(MakerFactory()).get(pi_word_url(pi.pk))
+        assert resp.status_code == 200
+        assert f"{pi.pi_number}.docx" in resp["Content-Disposition"]
+
+    def test_word_downloadable_for_pending_approval_status(self):
+        """Word doc is accessible at every workflow stage, not just DRAFT."""
+        pi = ProformaInvoiceFactory(status=PENDING_APPROVAL)
+        resp = auth_client(CheckerFactory()).get(pi_word_url(pi.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == self.WORD_CONTENT_TYPE
 
 
 # ============================================================================

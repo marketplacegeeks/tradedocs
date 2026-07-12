@@ -181,14 +181,40 @@ class ProformaInvoiceViewSet(viewsets.ModelViewSet):
         """
         from pdf.proforma_invoice import generate_pi_pdf  # local import; pdf/ package
 
+        from apps.manual_edits.services import record_first_generation
+
         pi = self.get_object()
         variant = request.query_params.get("variant", "government")
         pdf_buffer = generate_pi_pdf(pi, client_invoice=(variant == "client"))
+        record_first_generation("proforma_invoice", pi.pk, pi.pi_number)
         response = FileResponse(
             pdf_buffer,
             content_type="application/pdf",
             as_attachment=True,
             filename=f"{pi.pi_number}.pdf",
+        )
+        return response
+
+    # ---- Word endpoint -------------------------------------------------------
+
+    @action(detail=True, methods=["get"], url_path="word", permission_classes=[IsAnyRole])
+    def word(self, request, pk=None):
+        """
+        GET /proforma-invoices/{id}/word/
+        Streams the PI Word document in memory. Constraint #20: never writes to disk.
+        """
+        from pdf.proforma_invoice_word import generate_pi_docx  # local import; pdf/ package
+        from apps.manual_edits.services import record_first_generation
+
+        pi = self.get_object()
+        variant = request.query_params.get("variant", "government")
+        docx_buffer = generate_pi_docx(pi, client_invoice=(variant == "client"))
+        record_first_generation("proforma_invoice", pi.pk, pi.pi_number)
+        response = FileResponse(
+            docx_buffer,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            filename=f"{pi.pi_number}.docx",
         )
         return response
 

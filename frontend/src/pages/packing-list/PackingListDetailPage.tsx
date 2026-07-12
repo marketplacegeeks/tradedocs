@@ -64,7 +64,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message, Modal, Input } from "antd";
 import AuditLogDrawer from "../../components/AuditLogDrawer";
-import { ArrowLeft, Edit2, Clock, Trash2, FileDown, Upload, Paperclip } from "lucide-react";
+import { ArrowLeft, Edit2, Clock, Trash2, FileDown, FileText, Upload, Paperclip } from "lucide-react";
 
 import {
   getPackingList,
@@ -75,6 +75,8 @@ import {
   updateCILineItem,
   downloadPackingListPDF,
   downloadClientInvoicePDF,
+  downloadPackingListWord,
+  downloadClientInvoiceWord,
   uploadPlSignedCopy,
   uploadCiSignedCopy,
   hardDeletePackingList,
@@ -652,6 +654,8 @@ export default function PackingListDetailPage() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [cifDownloadModalOpen, setCifDownloadModalOpen] = useState(false);
+  // Which file format the CIF download-choice modal is currently offering (PDF or Word).
+  const [cifDownloadFormat, setCifDownloadFormat] = useState<"pdf" | "word">("pdf");
 
   const { data: pl, isLoading } = useQuery({
     queryKey: ["packing-list", Number(id)],
@@ -794,6 +798,7 @@ export default function PackingListDetailPage() {
             <button
               onClick={() => {
                 if (isCIF) {
+                  setCifDownloadFormat("pdf");
                   setCifDownloadModalOpen(true);
                 } else {
                   downloadPackingListPDF(pl.id, `${pl.pl_number}.pdf`).catch(() =>
@@ -804,6 +809,24 @@ export default function PackingListDetailPage() {
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-green)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-green-text)" }}
             >
               <FileDown size={14} /> Download PDF
+            </button>
+          )}
+
+          {canDownloadPDF && (
+            <button
+              onClick={() => {
+                if (isCIF) {
+                  setCifDownloadFormat("word");
+                  setCifDownloadModalOpen(true);
+                } else {
+                  downloadPackingListWord(pl.id, `${pl.pl_number}.docx`).catch(() =>
+                    message.error("Could not download Word document.")
+                  );
+                }
+              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--pastel-green)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--pastel-green-text)" }}
+            >
+              <FileText size={14} /> Download Word
             </button>
           )}
 
@@ -936,9 +959,10 @@ export default function PackingListDetailPage() {
         entries={auditLog}
       />
 
-      {/* CIF download type selection modal */}
+      {/* CIF download type selection modal — offers Government vs Client Invoice,
+          for whichever file format (PDF or Word) the user clicked. */}
       <Modal
-        title="Download Invoice PDF"
+        title={cifDownloadFormat === "word" ? "Download Invoice Word Document" : "Download Invoice PDF"}
         open={cifDownloadModalOpen}
         onCancel={() => setCifDownloadModalOpen(false)}
         footer={null}
@@ -950,9 +974,15 @@ export default function PackingListDetailPage() {
           <button
             onClick={() => {
               setCifDownloadModalOpen(false);
-              downloadPackingListPDF(pl.id, `${pl.pl_number}_Government.pdf`).catch(() =>
-                message.error("Could not download PDF.")
-              );
+              if (cifDownloadFormat === "word") {
+                downloadPackingListWord(pl.id, `${pl.pl_number}_Government.docx`).catch(() =>
+                  message.error("Could not download Word document.")
+                );
+              } else {
+                downloadPackingListPDF(pl.id, `${pl.pl_number}_Government.pdf`).catch(() =>
+                  message.error("Could not download PDF.")
+                );
+              }
             }}
             style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--border-medium)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
           >
@@ -962,9 +992,15 @@ export default function PackingListDetailPage() {
           <button
             onClick={() => {
               setCifDownloadModalOpen(false);
-              downloadClientInvoicePDF(pl.id, `${pl.pl_number}_Client.pdf`).catch(() =>
-                message.error("Could not download PDF.")
-              );
+              if (cifDownloadFormat === "word") {
+                downloadClientInvoiceWord(pl.id, `${pl.pl_number}_Client.docx`).catch(() =>
+                  message.error("Could not download Word document.")
+                );
+              } else {
+                downloadClientInvoicePDF(pl.id, `${pl.pl_number}_Client.pdf`).catch(() =>
+                  message.error("Could not download PDF.")
+                );
+              }
             }}
             style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "14px 18px", borderRadius: 10, border: "1px solid var(--primary)", background: "var(--bg-surface)", cursor: "pointer", textAlign: "left" }}
           >

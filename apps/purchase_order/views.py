@@ -156,14 +156,38 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         Streams the PO PDF in memory. Constraint #20: never writes to disk.
         """
         from pdf.purchase_order import generate_po_pdf  # local import; pdf/ package
+        from apps.manual_edits.services import record_first_generation
 
         po = self.get_object()
         pdf_buffer = generate_po_pdf(po)
+        record_first_generation("purchase_order", po.pk, po.po_number)
         response = FileResponse(
             pdf_buffer,
             content_type="application/pdf",
             as_attachment=True,
             filename=f"{po.po_number}.pdf",
+        )
+        return response
+
+    # ---- Word (.docx) endpoint -----------------------------------------------
+
+    @action(detail=True, methods=["get"], url_path="word", permission_classes=[IsAnyRole])
+    def word(self, request, pk=None):
+        """
+        GET /purchase-orders/{id}/word/
+        Streams the PO as a Word document in memory. Constraint #20: never writes to disk.
+        """
+        from pdf.purchase_order_word import generate_po_docx  # local import; pdf/ package
+        from apps.manual_edits.services import record_first_generation
+
+        po = self.get_object()
+        docx_buffer = generate_po_docx(po)
+        record_first_generation("purchase_order", po.pk, po.po_number)
+        response = FileResponse(
+            docx_buffer,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            filename=f"{po.po_number}.docx",
         )
         return response
 

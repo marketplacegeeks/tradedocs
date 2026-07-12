@@ -34,6 +34,8 @@ import COADetailPage from "./pages/coa/COADetailPage";
 import ProductTestTemplatePage from "./pages/master-data/ProductTestTemplatePage";
 import COAMasterPage from "./pages/master-data/COAMasterPage";
 
+import ManualEditsPage from "./pages/manual-edits/ManualEditsPage";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import { ROLES } from "./utils/constants";
@@ -210,6 +212,9 @@ export default function App() {
         <Route path="/purchase-orders/new" element={<PurchaseOrderFormPage />} />
         <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
         <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
+
+        {/* Manual Edits — all roles */}
+        <Route path="/manual-edits" element={<ManualEditsPage />} />
 
         {/* User Management — Company Admin and Super Admin */}
         <Route

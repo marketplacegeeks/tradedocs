@@ -34,6 +34,16 @@ interface AddressRow {
   taxCode: string;
 }
 
+// Excel auto-formats dial code columns as plain numbers (91, not "+91"). The backend's
+// phone validator does raw string concatenation (code + number) and needs E.164 format,
+// so a missing "+" silently breaks validation. Normalize it here rather than requiring
+// the sheet to be typed a specific way.
+function normalizeDialCode(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return raw.startsWith('+') ? raw : `+${raw}`;
+}
+
 function loadFixture(): { orgs: OrgRow[]; addressesByOrg: Map<string, AddressRow[]> } {
   const wb = readFile(FIXTURE_PATH);
 
@@ -72,7 +82,7 @@ function loadFixture(): { orgs: OrgRow[]; addressesByOrg: Map<string, AddressRow
         country: String(r.country ?? ''),
         email: String(r.email ?? ''),
         contactName: String(r.contactName ?? ''),
-        phoneCountryCode: String(r.phoneCountryCode ?? ''),
+        phoneCountryCode: normalizeDialCode(r.phoneCountryCode),
         phoneNumber: String(r.phoneNumber ?? ''),
         iecCode: String(r.iecCode ?? ''),
         taxType: String(r.taxType ?? ''),
@@ -158,12 +168,17 @@ async function createOrganisation(page: Page, org: OrgRow, addresses: AddressRow
   }
 
   await page.getByRole('button', { name: 'Create Organisation' }).click();
-  await expect(page.getByText('Organisation created.')).toBeVisible();
+  // Don't assert on the success toast — antd auto-dismisses it in ~3s and the exact
+  // save latency varies, so the toast can disappear before a fixed-timeout check runs.
+  // The onSuccess handler navigates back to the list page, which is a durable signal.
+  await page.waitForURL('**/master-data/organisations', { timeout: 15_000 });
 }
 
 const { orgs, addressesByOrg } = loadFixture();
 
-test.describe.serial('Create organisations from Excel fixture', () => {
+// Not .serial: each organisation is independent, so one bad row (e.g. a typo that fails
+// validation) shouldn't skip every organisation listed after it in the sheet.
+test.describe('Create organisations from Excel fixture', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });

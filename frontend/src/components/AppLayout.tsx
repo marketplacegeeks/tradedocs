@@ -8,7 +8,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Dropdown, message } from "antd";
 import {
   FileText, Package, Database, Users, BarChart2,
-  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard, GraduationCap, FlaskConical,
+  Building2, LogOut, ChevronDown, Menu, X, ChevronsLeft, ShoppingBag, LayoutDashboard, GraduationCap, FlaskConical, FileEdit,
 } from "lucide-react";
 
 import { useAuth } from "../store/AuthContext";
@@ -46,6 +46,12 @@ const NAV_ITEMS = [
     key: "/coas",
     icon: FlaskConical,
     label: "Certificate of Analysis",
+    roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    key: "/manual-edits",
+    icon: FileEdit,
+    label: "Manual Edits",
     roles: [ROLES.MAKER, ROLES.CHECKER, ROLES.COMPANY_ADMIN, ROLES.SUPER_ADMIN],
   },
   {

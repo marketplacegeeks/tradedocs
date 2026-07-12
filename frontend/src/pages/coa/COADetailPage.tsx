@@ -4,12 +4,13 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal, Input, message, Spin } from "antd";
-import { Download, History, Pencil } from "lucide-react";
+import { Download, FileText, History, Pencil } from "lucide-react";
 import dayjs from "dayjs";
 
 import {
   getCOA,
   getCOAPdf,
+  getCOAWord,
   getCOAAuditLog,
   submitCOA,
   approveCOA,
@@ -117,6 +118,7 @@ export default function COADetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [wordLoading, setWordLoading] = useState(false);
 
   // ---- Queries ------------------------------------------------------------
 
@@ -217,6 +219,28 @@ export default function COADetailPage() {
       message.error("Failed to download PDF.");
     } finally {
       setPdfLoading(false);
+    }
+  }
+
+  async function handleDownloadWord() {
+    if (!coa) return;
+    setWordLoading(true);
+    try {
+      const res = await getCOAWord(coa.id);
+      const url = URL.createObjectURL(
+        new Blob([res.data], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${coa.coa_number}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error("Failed to download Word document.");
+    } finally {
+      setWordLoading(false);
     }
   }
 
@@ -345,6 +369,29 @@ export default function COADetailPage() {
           >
             <Download size={14} strokeWidth={1.5} />
             {pdfLoading ? "Downloading…" : "Download PDF"}
+          </button>
+
+          {/* Download Word */}
+          <button
+            onClick={handleDownloadWord}
+            disabled={wordLoading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              background: "transparent",
+              border: "1px solid var(--border-medium)",
+              borderRadius: 8,
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              cursor: wordLoading ? "not-allowed" : "pointer",
+              opacity: wordLoading ? 0.6 : 1,
+            }}
+          >
+            <FileText size={14} strokeWidth={1.5} />
+            {wordLoading ? "Downloading…" : "Download Word"}
           </button>
 
           {/* Edit button (DRAFT / REWORK) */}

@@ -260,6 +260,40 @@ export async function downloadClientInvoicePDF(id: number, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
+// Downloads the combined PL+CI Word (.docx) document and triggers a browser save-as dialog.
+export async function downloadPackingListWord(id: number, filename: string) {
+  const response = await axiosInstance.get(`/packing-lists/${id}/word/`, {
+    responseType: "blob",
+  });
+  const url = window.URL.createObjectURL(
+    new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+// Downloads the CIF-adjusted client invoice version of the PL+CI Word (.docx) document.
+export async function downloadClientInvoiceWord(id: number, filename: string) {
+  const response = await axiosInstance.get(`/packing-lists/${id}/word/?variant=client`, {
+    responseType: "blob",
+  });
+  const url = window.URL.createObjectURL(
+    new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 // ---- Container endpoints ----------------------------------------------------
 
 export function listContainers(packingListId: number) {

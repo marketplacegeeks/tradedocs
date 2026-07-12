@@ -1381,3 +1381,100 @@ class TestPlCiPdfEdgeCases:
         resp = client.get(f"/api/v1/packing-lists/{pl.pk}/client-invoice-pdf/")
         assert resp.status_code == 200, "Client-invoice PDF crashed with items present"
         assert b"".join(resp.streaming_content).startswith(b"%PDF")
+
+
+# ---- PL+CI Word (.docx) endpoint --------------------------------------------
+
+def pl_word_url(pk):
+    return f"/api/v1/packing-lists/{pk}/word/"
+
+
+_DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+# .docx files are zip archives — the zip local-file-header magic bytes.
+_DOCX_MAGIC = b"PK\x03\x04"
+
+
+@pytest.mark.django_db
+class TestPlCiWordEndpoint:
+    """
+    Word (.docx) download mirrors the pdf() action's happy-path and permission
+    behaviour (FR-08.3: available in all states for all authenticated roles).
+    """
+
+    def _make_pl_ci_pair(self, with_bank=True, with_incoterms=True):
+        from apps.commercial_invoice.tests.factories import CommercialInvoiceFactory
+        from apps.master_data.tests.factories import (
+            BankFactory as _BankFactory,
+            IncotermFactory,
+            OrganisationFactory as _OrgFactory,
+        )
+
+        maker = MakerFactory()
+        exporter = _OrgFactory(name="Word Export Ltd")
+        consignee = _OrgFactory(name="Word Consignee Ltd")
+
+        pi = ProformaInvoiceFactory(
+            status="APPROVED",
+            exporter=exporter,
+            consignee=consignee,
+            created_by=maker,
+        )
+        pl_kwargs = {
+            "proforma_invoice": pi,
+            "exporter": exporter,
+            "consignee": consignee,
+            "status": "DRAFT",
+            "created_by": maker,
+        }
+        if with_incoterms:
+            pl_kwargs["incoterms"] = IncotermFactory()
+
+        pl = PackingListFactory(**pl_kwargs)
+
+        ci_kwargs = {
+            "packing_list": pl,
+            "status": "DRAFT",
+            "created_by": maker,
+        }
+        ci_kwargs["bank"] = _BankFactory() if with_bank else None
+
+        CommercialInvoiceFactory(**ci_kwargs)
+        return pl
+
+    def test_word_government_variant_returns_200(self):
+        """Happy path: default (government) variant streams a valid .docx."""
+        pl = self._make_pl_ci_pair()
+        resp = auth_client(MakerFactory()).get(pl_word_url(pl.pk))
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == _DOCX_CONTENT_TYPE
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(_DOCX_MAGIC), "Response body is not a valid .docx (zip) file"
+
+    def test_word_client_variant_returns_200(self):
+        """Happy path: ?variant=client streams the CIF-adjusted Client Invoice + PL .docx."""
+        pl = self._make_pl_ci_pair()
+        resp = auth_client(MakerFactory()).get(pl_word_url(pl.pk), {"variant": "client"})
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == _DOCX_CONTENT_TYPE
+        body = b"".join(resp.streaming_content)
+        assert body.startswith(_DOCX_MAGIC)
+
+    def test_word_with_items_returns_200(self):
+        """Container items (real weights/UOM) must not crash the Word generator."""
+        pl = self._make_pl_ci_pair()
+        mt = UOMFactory(abbreviation="MT", name="Metric Tonne")
+        pkg = TypeOfPackageFactory()
+        container = ContainerFactory(packing_list=pl)
+        ContainerItemFactory(container=container, uom=mt, type_of_package=pkg)
+
+        client = auth_client(MakerFactory())
+        for variant in ("government", "client"):
+            resp = client.get(pl_word_url(pl.pk), {"variant": variant})
+            assert resp.status_code == 200, f"Word doc crashed for variant={variant}"
+            assert b"".join(resp.streaming_content).startswith(_DOCX_MAGIC)
+
+    def test_word_requires_authentication(self):
+        """Permission-denial: unauthenticated requests must be rejected."""
+        pl = self._make_pl_ci_pair()
+        resp = APIClient().get(pl_word_url(pl.pk))
+        assert resp.status_code in (401, 403)

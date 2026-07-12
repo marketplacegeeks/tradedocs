@@ -140,6 +140,9 @@ export const reworkCOA = (id: number, comment: string) =>
 export const getCOAPdf = (id: number) =>
   axiosInstance.get(`/coas/${id}/pdf/`, { responseType: "blob" });
 
+export const getCOAWord = (id: number) =>
+  axiosInstance.get(`/coas/${id}/word/`, { responseType: "blob" });
+
 export const getCOAAuditLog = (id: number) =>
   axiosInstance.get(`/coas/${id}/audit-log/`);
 

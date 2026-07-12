@@ -146,13 +146,30 @@ class CertificateOfAnalysisViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         """GET /coas/{id}/pdf/ — Streams COA PDF. Never writes to disk (Rule #9)."""
         from pdf.certificate_of_analysis import generate_coa_pdf
+        from apps.manual_edits.services import record_first_generation
         coa = self.get_object()
         pdf_buffer = generate_coa_pdf(coa)
+        record_first_generation("certificate_of_analysis", coa.pk, coa.coa_number)
         return FileResponse(
             pdf_buffer,
             content_type="application/pdf",
             as_attachment=True,
             filename=f"{coa.coa_number}.pdf",
+        )
+
+    @action(detail=True, methods=["get"], url_path="word", permission_classes=[IsAuthenticated, IsAnyRole])
+    def word(self, request, pk=None):
+        """GET /coas/{id}/word/ — Streams COA Word doc. Never writes to disk (Rule #9)."""
+        from pdf.certificate_of_analysis_word import generate_coa_docx
+        from apps.manual_edits.services import record_first_generation
+        coa = self.get_object()
+        docx_buffer = generate_coa_docx(coa)
+        record_first_generation("certificate_of_analysis", coa.pk, coa.coa_number)
+        return FileResponse(
+            docx_buffer,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            filename=f"{coa.coa_number}.docx",
         )
 
     @action(detail=True, methods=["get"], url_path="audit-log", permission_classes=[IsAuthenticated, IsAnyRole])

@@ -231,6 +231,42 @@ class TestPurchaseOrderEditRestrictions:
 
 
 @pytest.mark.django_db
+class TestPurchaseOrderPDF:
+    def test_pdf_endpoint_returns_pdf_content_type(self, api_client):
+        maker = MakerFactory()
+        po = PurchaseOrderFactory(created_by=maker)
+        PurchaseOrderLineItemFactory(purchase_order=po)
+        auth(api_client, maker)
+        response = api_client.get(reverse("purchase-order-pdf", kwargs={"pk": po.pk}))
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/pdf"
+
+    def test_unauthenticated_cannot_access_pdf(self, api_client):
+        po = PurchaseOrderFactory()
+        response = api_client.get(reverse("purchase-order-pdf", kwargs={"pk": po.pk}))
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestPurchaseOrderWord:
+    def test_word_endpoint_returns_docx_content_type(self, api_client):
+        maker = MakerFactory()
+        po = PurchaseOrderFactory(created_by=maker)
+        PurchaseOrderLineItemFactory(purchase_order=po)
+        auth(api_client, maker)
+        response = api_client.get(reverse("purchase-order-word", kwargs={"pk": po.pk}))
+        assert response.status_code == 200
+        assert response["Content-Type"] == (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    def test_unauthenticated_cannot_access_word(self, api_client):
+        po = PurchaseOrderFactory()
+        response = api_client.get(reverse("purchase-order-word", kwargs={"pk": po.pk}))
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
 class TestSuperAdminPurchaseOrderPermissions:
     """SUPER_ADMIN must have the same access as COMPANY_ADMIN on all PO endpoints."""
 
