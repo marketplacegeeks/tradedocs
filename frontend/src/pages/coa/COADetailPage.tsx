@@ -498,8 +498,6 @@ export default function COADetailPage() {
           <InfoField label="Date & Time of Analysis" value={coa.date_time_of_analysis ? `${dayjs(coa.date_time_of_analysis).format("DD MMM YYYY hh:mm A")} ${tzAbbr}` : "—"} />
           <InfoField label="Date of Retest" value={dayjs(coa.date_of_retest).format("DD MMM YYYY")} />
           <InfoField label="Date of Despatch" value={coa.date_of_despatch ? dayjs(coa.date_of_despatch).format("DD MMM YYYY") : "—"} />
-          <InfoField label="Analyst Name" value={coa.analyst_name} />
-          <InfoField label="QC Incharge Name" value={coa.qc_incharge_name} />
         </div>
       </div>
 
