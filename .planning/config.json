@@ -7,5 +7,8 @@
   "dev_server": {
     "backend": "source .venv/bin/activate && python manage.py runserver 8000",
     "frontend": "cd frontend && npm run dev"
+  },
+  "workflow": {
+    "_auto_chain_active": false
   }
 }

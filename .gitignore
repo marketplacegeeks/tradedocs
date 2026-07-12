@@ -9,6 +9,9 @@ dist/
 build/
 node_modules/
 frontend/dist/
+.DS_Store
+.coverage
+.vite/
 
 # Ignore user-uploaded media files (signed copies, etc.)
 media/

@@ -16,15 +16,15 @@
 
 ---
 
-## Phase 1 — CI Quantity Calculation Bug Fix 🔴 PENDING
+## Phase 1 — CI Quantity Calculation Bug Fix ✅ Complete (2026-07-10)
 
 **Goal:** Fix the Commercial Invoice `total_quantity` calculation so it sums `no_of_packages` (item count) instead of `net_material_weight` (KGS), then update tests.
 
-**Requires:** User business decision — Option A (by item count) or Option B (by weight in UOM). Recommendation is **Option A**.
+**Decision:** Option A (by item count) — approved and implemented.
 
 **Contents:** `.planning/phases/phase-1-ci-quantity-fix/PLAN.md`
 
-**Status:** Awaiting sign-off, then 1-line backend fix + test update
+**Status:** Complete — `apps/commercial_invoice/services.py` now sums `no_of_packages`; test updated in `apps/packing_list/tests/test_views.py`. Commit `4b878da`.
 
 ---
 
