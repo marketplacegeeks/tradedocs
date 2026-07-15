@@ -53,6 +53,16 @@ CONTENT_W = PAGE_W - 2 * MARGIN_H
 
 def setup_page(document):
     """Apply A4 size + margins matching the PDF layout to every section."""
+    # python-docx's default template bakes 10pt space-after + 1.15x line spacing
+    # into every paragraph (word/styles.xml docDefaults) — reportlab's PDFs have
+    # no such padding, so leaving this in place makes every table cell taller in
+    # Word than in the PDF and pushes content onto extra pages. Zero it here,
+    # once, since every generator calls setup_page() right after Document().
+    normal = document.styles["Normal"]
+    normal.paragraph_format.space_before = Pt(0)
+    normal.paragraph_format.space_after = Pt(0)
+    normal.paragraph_format.line_spacing = 1.0
+
     for section in document.sections:
         section.page_width = PAGE_W
         section.page_height = PAGE_H

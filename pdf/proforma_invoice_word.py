@@ -214,7 +214,6 @@ def generate_proforma_invoice_docx_bytes(invoice, client_invoice=False) -> bytes
         # (r1,c1,r2,c2), matching the four verified SPAN commands above.
         spans=[(0, 0, 1, 1), (2, 0, 3, 1), (2, 2, 3, 2), (2, 3, 3, 3)],
     )
-    document.add_paragraph()
 
     # ========================================================================
     # SECTION 3: MAIN INFO TABLE (BOTTOM HALF) — info_rows_b (3x2) + info_row_a (4x1)
