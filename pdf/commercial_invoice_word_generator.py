@@ -426,7 +426,7 @@ def build_ci_word_section(document, ci, client_invoice=False, pi=None):
 
     breakdown_header = f"COST BREAKDOWN ({incoterm_str})" if incoterm_str else "COST BREAKDOWN"
     breakdown_lines = [f"<b>{breakdown_header}</b>"]
-    if incoterm_str != "EXW":
+    if incoterm_str != "CIF":
         breakdown_lines.append(f"FOB Value (Line Items): {currency_code} {_fmt_money(line_items_total)}")
     if show_freight:
         breakdown_lines.append(f"Freight: {currency_code} {_fmt_money(freight_amount)}")

@@ -691,8 +691,8 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         # Header spans both sub-columns
         [Paragraph(f"<b>{breakdown_header}</b>", style_text), Paragraph("", style_text)],
     ]
-    # EXW: line items total IS the EXW value — no separate FOB row
-    if incoterm_str != "EXW":
+    # CIF: FOB value line item is not shown in the cost breakdown
+    if incoterm_str != "CIF":
         breakdown_rows.append([
             Paragraph("FOB Value (Line Items):", style_text),
             Paragraph(f"{currency_code} {_fmt_money(line_items_total)}", style_amt),
