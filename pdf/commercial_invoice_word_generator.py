@@ -415,15 +415,26 @@ def build_ci_word_section(document, ci, client_invoice=False, pi=None):
 
     weight_unit = weight_unit_for_packing_list(pl) if pl else "KGS"
 
-    # ---- totals_charges_tbl: weights (left) | cost breakdown (right) --------
-    left_lines = [
-        f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}",
-        f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}",
-    ]
+    # ---- weight_row_tbl: Total Net Weight | Total Gross Weight --------------
+    weight_rows = [[
+        {"html": f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}"},
+        {"html": f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}"},
+    ]]
+    weight_spans = None
     if lc_details_val:
-        left_lines.append(f"<b>L/C Details:</b> {lc_details_val}")
-    left_html = "<br/>".join(left_lines)
+        weight_rows.append([
+            {"html": f"<b>L/C Details:</b> {lc_details_val}"},
+            None,
+        ])
+        weight_spans = [(1, 0, 1, 1)]
+    build_grid_table(
+        document,
+        weight_rows,
+        col_widths=[col_2, col_2],
+        spans=weight_spans,
+    )
 
+    # ---- breakdown_tbl (full width) ------------------------------------------
     breakdown_header = f"COST BREAKDOWN ({incoterm_str})" if incoterm_str else "COST BREAKDOWN"
     breakdown_lines = [f"<b>{breakdown_header}</b>"]
     if incoterm_str != "CIF":
@@ -436,12 +447,12 @@ def build_ci_word_section(document, ci, client_invoice=False, pi=None):
 
     build_grid_table(
         document,
-        [[{"html": left_html}, {"html": breakdown_html}]],
-        col_widths=[col_2, col_2],
+        [[{"html": breakdown_html}]],
+        col_widths=[CONTENT_W],
     )
 
     # ---- invoice_total_tbl (navy) --------------------------------------------
-    invoice_total_label = "Total CIF Amount (Payable)" if client_invoice else "Invoice Total (Amount Payable)"
+    invoice_total_label = "Total Amount Payable" if client_invoice else "Invoice Total (Amount Payable)"
     build_grid_table(
         document,
         [[
