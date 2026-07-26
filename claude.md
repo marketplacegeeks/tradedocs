@@ -6,11 +6,8 @@ Three document types: Proforma Invoice → Packing List → Commercial Invoice.
 Maker creates, Checker approves, Company Admin manages everything.
 
 ## Authoritative Documents (Read Before Any Task)
-- `.planning/PROJECT.md` — current project overview, tech stack, what's built, roles.
-- `.planning/ROADMAP.md` — phase breakdown and requirement mapping.
-- `.planning/STATE.md` — current progress / open work.
-- `.planning/codebase/*.md` — live codebase map (architecture, structure, conventions, testing, integrations, concerns, stack) — regenerate with `/gsd-map-codebase` when it drifts.
-- `requirements.md` / `technical_architecture.md` — original PRD v1.5 and tech-arch doc, restored 2026-07-26 for historical reference. Where they conflict with `.planning/`, `.planning/` wins.
+- `requirements.md` — PRD v1.2. All functional requirements, user stories, validation rules.
+- `technical_architecture.md` — Tech stack, DB schema, API structure, 30 hard constraints. **Section 9 is law.**
 
 ## Non-Negotiable Technical Rules
 These come from technical_architecture.md Section 9. Never violate them:

@@ -480,27 +480,49 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
 
     # Build dynamic column headers and data based on transaction_type.
     # Optional columns (item_code, hsn, manufacturer) are omitted when all items are blank.
-    if tx_type in ("IGST", "CGST_SGST"):
-        # Tax breakdown now lives in the separate "Tax Details" table (Section 7B) —
-        # this table shows only the totals a buyer needs at a glance.
+    if tx_type == "IGST":
         headers = [Paragraph("<b>#</b>", style_th), Paragraph("<b>Description</b>", style_th)]
-        col_widths = [8*mm, 42*mm]
+        col_widths = [8*mm, 48*mm]
         if has_hsn:
-            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(16*mm)
+            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(18*mm)
         if has_mfr:
-            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(14*mm)
+            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(16*mm)
         headers += [
             Paragraph("<b>Qty</b>", style_th),
             Paragraph("<b>Unit Price</b>", style_th),
             Paragraph("<b>Taxable Amt</b>", style_th),
-            Paragraph("<b>Total Tax</b>", style_th),
-            Paragraph("<b>Gross Value</b>", style_th),
+            Paragraph("<b>IGST %</b>", style_th),
+            Paragraph("<b>IGST Amt</b>", style_th),
+            Paragraph("<b>Total</b>", style_th),
         ]
         # Remaining width is distributed among numeric columns
         used = sum(col_widths)
         remaining = 180*mm - used
-        col_widths += [_w(remaining, 5, i) for i in range(5)]
+        col_widths += [_w(remaining, 6, i) for i in range(6)]
         opt_start = 2 + int(has_hsn) + int(has_mfr)  # index where numeric cols start
+        right_cols = set(range(opt_start, len(headers)))
+
+    elif tx_type == "CGST_SGST":
+        headers = [Paragraph("<b>#</b>", style_th), Paragraph("<b>Description</b>", style_th)]
+        col_widths = [7*mm, 38*mm]
+        if has_hsn:
+            headers.append(Paragraph("<b>HSN Code</b>", style_th)); col_widths.append(15*mm)
+        if has_mfr:
+            headers.append(Paragraph("<b>Mfr</b>", style_th)); col_widths.append(13*mm)
+        headers += [
+            Paragraph("<b>Qty</b>", style_th),
+            Paragraph("<b>Unit Price</b>", style_th),
+            Paragraph("<b>Taxable Amt</b>", style_th),
+            Paragraph("<b>CGST %</b>", style_th),
+            Paragraph("<b>CGST Amt</b>", style_th),
+            Paragraph("<b>SGST %</b>", style_th),
+            Paragraph("<b>SGST Amt</b>", style_th),
+            Paragraph("<b>Total</b>", style_th),
+        ]
+        used = sum(col_widths)
+        remaining = 180*mm - used
+        col_widths += [_w(remaining, 8, i) for i in range(8)]
+        opt_start = 2 + int(has_hsn) + int(has_mfr)
         right_cols = set(range(opt_start, len(headers)))
 
     else:
@@ -533,7 +555,6 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     total_igst     = Decimal("0.00")
     total_cgst     = Decimal("0.00")
     total_sgst     = Decimal("0.00")
-    total_tax_sum  = Decimal("0.00")
 
     for idx, item in enumerate(line_items, start=1):
         uom_obj = getattr(item, "uom", None)
@@ -543,7 +564,6 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         try:
             grand_total   += Decimal(str(item_total))
             total_taxable += Decimal(str(item.taxable_amount or 0))
-            total_tax_sum += Decimal(str(item.total_tax or 0))
             if tx_type == "IGST":
                 total_igst += Decimal(str(item.igst_amount or 0))
             elif tx_type == "CGST_SGST":
@@ -552,7 +572,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
         except Exception:
             pass
 
-        if tx_type in ("IGST", "CGST_SGST"):
+        if tx_type == "IGST":
             row = [Paragraph(str(idx), style_text), Paragraph(_safe(item.description), style_text)]
             if has_hsn:
                 row.append(Paragraph(_safe(item.hsn_code), style_text))
@@ -562,7 +582,24 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
                 Paragraph(qty_str, style_right),
                 Paragraph(_fmt_cur(item.unit_price, cur_sym), style_right),
                 Paragraph(_fmt_cur(item.taxable_amount, cur_sym), style_right),
-                Paragraph(_fmt_cur(item.total_tax, cur_sym), style_right),
+                Paragraph(_safe(item.igst_percent) or "—", style_right),
+                Paragraph(_fmt_cur(item.igst_amount, cur_sym) if item.igst_amount else "—", style_right),
+                Paragraph(_fmt_cur(item_total, cur_sym), style_right_bold),
+            ]
+        elif tx_type == "CGST_SGST":
+            row = [Paragraph(str(idx), style_text), Paragraph(_safe(item.description), style_text)]
+            if has_hsn:
+                row.append(Paragraph(_safe(item.hsn_code), style_text))
+            if has_mfr:
+                row.append(Paragraph(_safe(item.manufacturer), style_text))
+            row += [
+                Paragraph(qty_str, style_right),
+                Paragraph(_fmt_cur(item.unit_price, cur_sym), style_right),
+                Paragraph(_fmt_cur(item.taxable_amount, cur_sym), style_right),
+                Paragraph(_safe(item.cgst_percent) or "—", style_right),
+                Paragraph(_fmt_cur(item.cgst_amount, cur_sym) if item.cgst_amount else "—", style_right),
+                Paragraph(_safe(item.sgst_percent) or "—", style_right),
+                Paragraph(_fmt_cur(item.sgst_amount, cur_sym) if item.sgst_amount else "—", style_right),
                 Paragraph(_fmt_cur(item_total, cur_sym), style_right_bold),
             ]
         else:
@@ -585,11 +622,17 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
     totals_row = [Paragraph("", style_text)] * n_cols
     totals_row[1] = Paragraph("<b>Grand Total</b>", style_label_white)
 
-    if tx_type in ("IGST", "CGST_SGST"):
-        # Columns from opt_start: Qty | UnitPrice | TaxableAmt | TotalTax | GrossValue
+    if tx_type == "IGST":
+        # Columns from opt_start: Qty | UnitPrice | TaxableAmt | IGST% | IGSTAmt | Total
         totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold_white)
-        totals_row[opt_start + 3] = Paragraph(f"<b>{_fmt_cur(total_tax_sum, cur_sym)}</b>", style_right_bold_white)
-        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_igst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 5] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
+    elif tx_type == "CGST_SGST":
+        # Columns from opt_start: Qty | UnitPrice | TaxableAmt | CGST% | CGSTAmt | SGST% | SGSTAmt | Total
+        totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(total_taxable, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 4] = Paragraph(f"<b>{_fmt_cur(total_cgst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 6] = Paragraph(f"<b>{_fmt_cur(total_sgst, cur_sym)}</b>", style_right_bold_white)
+        totals_row[opt_start + 7] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
     else:
         # ZERO_RATED — Columns from opt_start: Qty | UnitPrice | Total
         totals_row[opt_start + 2] = Paragraph(f"<b>{_fmt_cur(grand_total, cur_sym)}</b>", style_right_bold_white)
@@ -697,123 +740,6 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
         story.append(bank_box)
-        story.append(Spacer(1, 8))
-
-    # ========================================================================
-    # SECTION 7B: TAX DETAILS TABLE (IGST / CGST_SGST only — per-item tax breakdown)
-    # ========================================================================
-
-    if tx_type in ("IGST", "CGST_SGST") and line_items:
-        td_title = Table(
-            [[Paragraph("<b>Tax Details</b>", style_label_white)]],
-            colWidths=[180 * mm],
-        )
-        td_title.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
-            ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        story.append(td_title)
-
-        # Columns: # | Description | HSN Code | Gross Value | CGST(%/Amt) | IGST(%/Amt) | SGST(%/Amt) | Total Tax
-        td_fixed_widths = [8*mm, 32*mm, 16*mm, 22*mm]
-        td_remaining = 180*mm - sum(td_fixed_widths)
-        td_pct_w = 9*mm
-        td_amt_w = (td_remaining - td_pct_w * 3) / 4  # CGST Amt, IGST Amt, SGST Amt, Total Tax
-        td_col_widths = td_fixed_widths + [
-            td_pct_w, td_amt_w, td_pct_w, td_amt_w, td_pct_w, td_amt_w, td_amt_w,
-        ]
-
-        def _pct_or_dash(v):
-            return f"{v}%" if v is not None else "—"
-
-        def _amt_or_dash(v):
-            return _fmt_cur(v, cur_sym) if v is not None else "—"
-
-        group_header_row = [
-            "", "", "", "",
-            Paragraph("<b>CGST</b>", style_th), "",
-            Paragraph("<b>IGST</b>", style_th), "",
-            Paragraph("<b>SGST</b>", style_th), "",
-            Paragraph("<b>Total Tax</b>", style_th),
-        ]
-        col_header_row = [
-            Paragraph("<b>#</b>", style_th),
-            Paragraph("<b>Description</b>", style_th),
-            Paragraph("<b>HSN Code</b>", style_th),
-            Paragraph("<b>Gross Value</b>", style_th),
-            Paragraph("<b>%</b>", style_th),
-            Paragraph("<b>Amount</b>", style_th),
-            Paragraph("<b>%</b>", style_th),
-            Paragraph("<b>Amount</b>", style_th),
-            Paragraph("<b>%</b>", style_th),
-            Paragraph("<b>Amount</b>", style_th),
-            "",
-        ]
-
-        td_rows = [group_header_row, col_header_row]
-        for idx, item in enumerate(line_items, start=1):
-            td_rows.append([
-                Paragraph(str(idx), style_text),
-                Paragraph(_safe(item.description), style_text),
-                Paragraph(_safe(item.hsn_code), style_text),
-                Paragraph(_fmt_cur(item.total, cur_sym), style_right),
-                Paragraph(_pct_or_dash(item.cgst_percent), style_right),
-                Paragraph(_amt_or_dash(item.cgst_amount), style_right),
-                Paragraph(_pct_or_dash(item.igst_percent), style_right),
-                Paragraph(_amt_or_dash(item.igst_amount), style_right),
-                Paragraph(_pct_or_dash(item.sgst_percent), style_right),
-                Paragraph(_amt_or_dash(item.sgst_amount), style_right),
-                Paragraph(f"<b>{_fmt_cur(item.total_tax, cur_sym)}</b>", style_right_bold),
-            ])
-
-        def _total_or_dash(v, applicable):
-            return f"<b>{_fmt_cur(v, cur_sym)}</b>" if applicable else "—"
-
-        td_totals_row = [
-            "", "", "", "",
-            "",
-            Paragraph(_total_or_dash(total_cgst, tx_type == "CGST_SGST"), style_right_bold_white),
-            "",
-            Paragraph(_total_or_dash(total_igst, tx_type == "IGST"), style_right_bold_white),
-            "",
-            Paragraph(_total_or_dash(total_sgst, tx_type == "CGST_SGST"), style_right_bold_white),
-            Paragraph(f"<b>{_fmt_cur(total_tax_sum, cur_sym)}</b>", style_right_bold_white),
-        ]
-        td_rows.append(td_totals_row)
-
-        td_table = Table(td_rows, colWidths=td_col_widths, repeatRows=2)
-        td_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 1), colors.HexColor("#1A2B4B")),
-            ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
-            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            # Header cells that are identical across both header rows span vertically
-            ("SPAN", (0, 0), (0, 1)),
-            ("SPAN", (1, 0), (1, 1)),
-            ("SPAN", (2, 0), (2, 1)),
-            ("SPAN", (3, 0), (3, 1)),
-            ("SPAN", (10, 0), (10, 1)),
-            # CGST / IGST / SGST group headers span their %+Amount sub-columns
-            ("SPAN", (4, 0), (5, 0)),
-            ("SPAN", (6, 0), (7, 0)),
-            ("SPAN", (8, 0), (9, 0)),
-            # Totals row styling (matches Grand Total row on the line items table)
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#1A2B4B")),
-            ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
-        ]))
-        story.append(td_table)
         story.append(Spacer(1, 8))
 
     # ========================================================================

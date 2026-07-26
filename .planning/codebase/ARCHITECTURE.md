@@ -1,225 +1,217 @@
 # Architecture
 
-**Analysis Date:** 2026-07-26
+**Analysis Date:** 2026-06-20
 
 ## Pattern Overview
 
-**Overall:** Django REST Framework (DRF) monolith with modular apps + React SPA frontend. Multi-document workflow with shared business rules enforced through a centralized WorkflowService.
+**Overall:** Django REST Framework backend with React TypeScript frontend, following a **multi-tier layered architecture** with domain-driven app separation.
 
 **Key Characteristics:**
-- Single source of truth for all status transitions via `apps/workflow/services.py:WorkflowService`
-- Document-centric design: Proforma Invoice → Packing List → Commercial Invoice (linear dependency chain)
-- Role-based access control (SUPER_ADMIN, COMPANY_ADMIN, CHECKER, MAKER) enforced at both API and frontend levels
-- Decimal arithmetic throughout (no floating-point) for monetary and weight fields
-- In-memory PDF generation streamed directly (ReportLab)
-- JWT authentication with token refresh interceptor on frontend
-- Soft-delete pattern: entities marked `is_active=False` rather than hard-deleted
+- Monolithic Django backend with modular Django apps (accounts, master_data, proforma_invoice, packing_list, commercial_invoice, workflow, purchase_order, certificate_of_analysis)
+- REST API-first design with explicit permission classes on every endpoint
+- Workflow state machine enforced through a centralized `WorkflowService` (single source of truth for all document transitions)
+- Frontend driven by React + React Router with context-based auth and React Query for data fetching
+- PDF generation in-memory using ReportLab, streamed directly (never written to disk)
 
 ## Layers
 
-**API Layer (DRF Views):**
-- Purpose: Accept HTTP requests, delegate to services, return JSON responses
-- Location: `apps/{app}/views.py` for each app (e.g., `apps/proforma_invoice/views.py`)
-- Contains: ViewSets, custom APIViews, report views, PDF export endpoints
-- Depends on: Serializers (validation), Services (business logic), Models (data)
-- Used by: React frontend via Axios
+**Presentation (Frontend):**
+- Purpose: React SPA with role-based UI routing and form handling
+- Location: `frontend/src/`
+- Contains: Page components, form components, API client modules, auth context, design utilities
+- Depends on: Backend REST API, localStorage for auth tokens
+- Used by: End users (Makers, Checkers, Company Admins, Super Admins)
 
-**Business Logic Layer (Services):**
-- Purpose: Encapsulate complex workflows, generate document numbers, cascade deletions, coordinate multi-model updates
-- Location: `apps/{app}/services.py`, especially `apps/workflow/services.py` (the critical enforcement point)
-- Contains: `WorkflowService.transition()` (all status changes), document number generation with `select_for_update()`, permanent rejection cascades
-- Depends on: Models, constants, transaction management
-- Used by: Views (requested by HTTP), signals (on model events)
+**API Gateway (Django REST Framework):**
+- Purpose: REST endpoint layer that validates requests, enforces permissions, serializes responses
+- Location: `apps/*/views.py`, `apps/*/urls.py`
+- Contains: ViewSets, APIViews, custom permission classes, serializers for request/response validation
+- Depends on: Models, Services, Workflow Service
+- Used by: Frontend via Axios HTTP calls; reports service
 
-**Data Layer (Models):**
-- Purpose: Define entity structure, constraints, relationships
-- Location: `apps/{app}/models.py`
-- Contains: Django ORM models with ForeignKeys (PROTECT on master data), DecimalField for amounts/weights, status fields tied to workflow.constants
-- Depends on: Django ORM, workflow constants for status choices
-- Used by: Serializers (representation), Views (querying), Services (manipulation)
+**Business Logic (Services & Models):**
+- Purpose: Core domain logic isolated from HTTP concerns
+- Location: `apps/*/services.py`, `apps/*/models.py`
+- Contains: Document generation logic, workflow transitions, validation rules, document numbering
+- Depends on: Database, transaction.atomic() for consistency
+- Used by: Views, Workflow Service, other services
 
-**Serializer Layer (DRF):**
-- Purpose: Validate input, transform model instances to JSON, handle nested relations
-- Location: `apps/{app}/serializers.py`
-- Contains: ModelSerializer subclasses, nested serializers (e.g., LineItems within PI), validation methods
-- Depends on: Models, utils
-- Used by: Views (during request/response)
+**Data Access (Models & ORM):**
+- Purpose: Django ORM models representing domain entities
+- Location: `apps/*/models.py`
+- Contains: ProformaInvoice, PackingList, CommercialInvoice, User, Organisation, and related models
+- Depends on: PostgreSQL database, Django migrations
+- Used by: Services, Views, Admin interface
 
-**PDF Generation Layer (ReportLab):**
-- Purpose: Generate in-memory PDFs for export (never written to disk per Constraint #20)
-- Location: `pdf/{document_type}.py` and `pdf/{document_type}_generator.py` and `pdf/{document_type}_word.py`
-- Contains: ReportLab flowables and styles (PDF), python-docx document builders (Word .docx)
-- Depends on: Models (via queries from views/services)
-- Used by: DRF views (stream as FileResponse)
+**Master Data (Reference Tables):**
+- Purpose: Lookup tables for organisations, countries, ports, banks, payment terms, incoterms, UOMs
+- Location: `apps/master_data/models.py`
+- Contains: Country, Port, Location, Organisation, Bank, Incoterm, UOM, PaymentTerm, PreCarriageBy, Currency, CurrencyRate
+- Depends on: Database
+- Used by: All document types via foreign keys with `on_delete=PROTECT`
 
-**Frontend API Client Layer (Axios):**
-- Purpose: Centralized HTTP communication, token management, retry logic
-- Location: `frontend/src/api/{resource}.ts` (one file per API resource)
-- Contains: Axios instance with interceptors (token attach, 401 refresh), typed API methods
-- Depends on: localStorage (tokens), axiosInstance
-- Used by: React components, AuthContext
+**Workflow Coordination:**
+- Purpose: Centralized state machine enforcing all status transitions and audit trails
+- Location: `apps/workflow/services.py`, `apps/workflow/models.py`
+- Contains: WorkflowService (handles PI, PL+CI joint, PO, COA transitions), AuditLog model (immutable records)
+- Depends on: Models, User roles
+- Used by: All document views when submitting, approving, rejecting, reworking documents
 
-**Frontend UI Layer (React/TypeScript):**
-- Purpose: Render pages, capture user input, display workflow state
-- Location: `frontend/src/pages/{feature}/` for page containers, `frontend/src/components/` for shared UI
-- Contains: React functional components, forms (Formik or similar), data tables
-- Depends on: API client layer, constants (status/role strings), AuthContext
-- Used by: Browser
+**PDF Generation:**
+- Purpose: In-memory PDF rendering and streaming
+- Location: `pdf/` (separate from Django apps)
+- Contains: Generators for PI, PL, CI, PO, COA using ReportLab
+- Depends on: Models, serializer data
+- Used by: Document detail views via @action endpoints that return FileResponse
 
 ## Data Flow
 
-**Document Creation (PI → PL → CI):**
+**Document Creation & Submission Flow:**
 
-1. User (Maker) navigates to "Create Proforma Invoice" → `frontend/src/pages/proforma-invoice/Create.tsx`
-2. Form submission calls `frontend/src/api/proformaInvoices.ts:create(payload)`
-3. Axios POST to `http://localhost:8000/api/v1/proforma-invoices/` with JWT token
-4. `apps/proforma_invoice/views.py:ProformaInvoiceViewSet.create()` receives request
-5. `ProformaInvoiceSerializer.create()` validates and saves model instance
-6. `apps/proforma_invoice/models.py:ProformaInvoice.save()` triggers signal (if any) or service call generates `pi_number` via `select_for_update()`
-7. Response includes `pi_id` and `pi_number`
-8. Frontend stores PI ID, user can now add line items (nested POST to same resource)
-9. User submits for approval → calls `frontend/src/api/proformaInvoices.ts:submitForApproval(piId, comment)`
-10. POST to `/api/v1/proforma-invoices/{id}/submit-for-approval/` with comment
-11. `ProformaInvoiceViewSet.submit_for_approval()` calls `WorkflowService.transition(document=pi, action="SUBMIT", performed_by=user, comment=comment)`
-12. `WorkflowService.transition()` inside `transaction.atomic()`:
-    - Validates transition is legal given current status
-    - Validates user has permission (role check)
-    - Validates comment if required
-    - Updates `pi.status = "PENDING_APPROVAL"`
-    - Creates `AuditLog` entry with all audit metadata
-    - If rejected at this stage, cascades to linked PLs/CIs
-13. Response includes new status; frontend updates list view
+1. User (Maker) fills out form in React component (`frontend/src/pages/proforma-invoice/ProformaInvoiceCreatePage.tsx`)
+2. Form submits POST to `POST /api/v1/proforma-invoices/` → `ProformaInvoiceViewSet.create()`
+3. View calls serializer `ProformaInvoiceSerializer.create()` which:
+   - Calls `ProformaInvoiceService.generate_document_number()` to get unique PI-YYYY-NNNN
+   - Creates ProformaInvoice record with status=DRAFT, created_by=request.user
+   - Creates linked LineItem and Charge records
+4. Response returns created document to frontend
+5. User clicks "Submit for Approval" → POST to `POST /api/v1/proforma-invoices/{id}/submit-action/`
+6. View calls `WorkflowService.transition()` which:
+   - Validates action is allowed from current status (DRAFT → PENDING_APPROVAL)
+   - Validates user role (MAKER can submit)
+   - Validates comment if required
+   - Updates document.status = PENDING_APPROVAL in transaction.atomic()
+   - Creates AuditLog entry (same transaction)
+7. Frontend polls or receives notification; document appears in Checker's queue
 
-**Document Approval (Checker Role):**
+**Document Approval Flow:**
 
-1. Checker navigates to "Pending Approval" tab (filtered list by status)
-2. Selects PI, clicks "Approve"
-3. Frontend POST to `/api/v1/proforma-invoices/{id}/approve/` with optional comment
-4. `ProformaInvoiceViewSet.approve()` calls `WorkflowService.transition()` with action="APPROVE"
-5. Same atomic transaction: status → "APPROVED", AuditLog created
-6. If rejection after approval: cascade (PERMANENTLY_REJECT status flows to linked documents via `_cascade_permanently_rejected()`)
+1. Checker views document detail page, sees "Approve" button
+2. Clicks button → POST to `/api/v1/proforma-invoices/{id}/approve-action/` with comment
+3. View calls `WorkflowService.transition()` with action="APPROVE"
+4. Service validates:
+   - Current status is PENDING_APPROVAL
+   - User role is CHECKER (or COMPANY_ADMIN)
+   - Creator ≠ Approver (unless admin)
+5. Updates status to APPROVED, writes AuditLog
+6. PDF can now be generated via `GET /api/v1/proforma-invoices/{id}/download-pdf/`
 
-**Packing List Creation (from PI):**
+**PDF Streaming Flow:**
 
-1. User selects an APPROVED PI, clicks "Create Packing List"
-2. Frontend wizard (`frontend/src/pages/packing-list/Create.tsx`) guides through steps:
-   - Step 1: Auto-populated from PI (exporter, consignee, etc.)
-   - Step 2-4: Containers and items
-   - Step 5: Incoterms, cost breakdown (freight, insurance, etc.)
-3. POST to `/api/v1/packing-lists/` with nested containers
-4. `apps/packing_list/views.py:PackingListViewSet.create()` receives request
-5. Service creates both PackingList AND CommercialInvoice in same transaction (FR-14M.12)
-6. Both records created in DRAFT, share workflow (joint approval)
-
-**PDF Export:**
-
-1. User views PI detail, clicks "Download PDF"
-2. Frontend calls `frontend/src/api/proformaInvoices.ts:exportPDF(piId)`
-3. GET `/api/v1/proforma-invoices/{id}/export-pdf/`
-4. `ProformaInvoiceViewSet.export_pdf()` queries PI + line items + charges
-5. Calls `pdf/proforma_invoice_generator.py:ProformaInvoiceGenerator(pi=instance).generate()`
-6. ReportLab builds flowables in memory (no disk write)
-7. Returns `FileResponse(buffer, content_type='application/pdf')`
-8. Browser downloads file
+1. Frontend calls `GET /api/v1/proforma-invoices/{id}/download-pdf/`
+2. View retrieves document, calls `pdf.proforma_invoice.generate()` passing model instance
+3. ReportLab generator builds PDF in-memory (BytesIO)
+4. View returns `FileResponse(pdf_buffer, content_type='application/pdf', filename='...')`
+5. Browser receives binary stream and triggers download
 
 **State Management:**
 
-- **Backend:** Status is the source of truth in DB; AuditLog records every transition
-- **Frontend:** AuthContext holds current user + role; components fetch status from API on mount; local component state for form input only
-- **JWT:** Access token in localStorage, refreshed automatically on 401 via interceptor
+- Frontend auth: `AuthContext` in `frontend/src/store/AuthContext.tsx` stores user + tokens in localStorage
+- Status enum: `DOCUMENT_STATUS` in `frontend/src/utils/constants.ts` (mirrors backend `apps/workflow/constants.py`)
+- Backend status: Stored in `document.status` CharField (choices from `DOCUMENT_STATUS_CHOICES`)
+- Audit trail: Every transition recorded in `AuditLog` with from_status, to_status, performed_by, performed_at, comment
 
 ## Key Abstractions
 
-**WorkflowService (apps/workflow/services.py):**
-- Purpose: Centralized gateway for all status transitions
-- Examples: `ProformaInvoice.status`, `PackingList.status`, `CommercialInvoice.status`
-- Pattern: Static methods accepting document instance + action; returns new status; throws PermissionDenied or ValidationError on rule violation
+**WorkflowService (Transition State Machine):**
+- Purpose: Single authority for all document status transitions
+- Examples: `apps/workflow/services.py`
+- Pattern: Static method `transition(document, document_type, action, performed_by, comment)` that:
+  - Looks up allowed transitions in transition table (PI_TRANSITIONS, PLCI_TRANSITIONS, PO_TRANSITIONS)
+  - Checks user role permission
+  - Validates mandatory comments (REJECT, REWORK, PERMANENTLY_REJECT)
+  - Performs transition inside `transaction.atomic()` with AuditLog creation
+  - Cascades PERMANENTLY_REJECTED status to linked documents
 
-**Transition Tables (apps/workflow/constants.py):**
-- Purpose: Define state machine rules (which roles can perform which actions from each state)
-- Examples: `PI_TRANSITIONS` (Proforma Invoice), `PLCI_TRANSITIONS` (PL+CI joint), `PO_TRANSITIONS` (Purchase Order)
-- Pattern: Nested dict `{current_status: {action_name: (next_status, [allowed_roles])}}`
+**Document Number Generation:**
+- Purpose: Guarantee unique, formatted document numbers
+- Examples: `apps/proforma_invoice/services.py`, `apps/packing_list/services.py`, `apps/commercial_invoice/services.py`
+- Pattern: `select_for_update()` lock on all records for current year, count, return `PI-YYYY-NNNN`, `PL-YYYY-NNNN`, `CI-YYYY-NNNN`
 
-**AuditLog (apps/workflow/models.py):**
-- Purpose: Immutable record of all transitions with metadata
-- Pattern: Created alongside every status change in the same `transaction.atomic()`
-- Fields: `document_type`, `document_id`, `document_number`, `action`, `from_status`, `to_status`, `comment`, `performed_by`, `timestamp`
+**Serializer Layering:**
+- Purpose: Separate read vs. write serialization, embed nested relationships
+- Examples: `ProformaInvoiceListSerializer` (list only), `ProformaInvoiceSerializer` (create/update with nested items)
+- Pattern: Read-only fields for computed totals, writable fields for input, nested serializers for line items/charges
 
-**Document Number Generation (per app service):**
-- Purpose: Auto-generate unique formatted numbers (`PI-2026-0001`, `PL-2026-0042`, etc.)
-- Pattern: Query max existing number for year using `select_for_update()` to prevent race conditions
-- Location: Service methods in each app (e.g., `ProformaInvoiceService.generate_document_number()`)
+**Master Data ForeignKey Pattern:**
+- Purpose: Prevent accidental deletion of reference data that documents depend on
+- Examples: All FK to `master_data.Organisation`, `master_data.Country`, `master_data.Port` use `on_delete=PROTECT`
+- Pattern: Ensures data integrity; trying to delete referenced master data raises IntegrityError
 
-**TypeScript Constants (frontend/src/utils/constants.ts):**
-- Purpose: Mirror backend enums to avoid hardcoding status/role strings in components
-- Examples: `DOCUMENT_STATUS.DRAFT`, `ROLES.MAKER`, `INCOTERM_SELLER_FIELDS["CIF"]`
-- Pattern: Centralized export; imported by components, API clients, forms
-
-**Organisation Master Data (apps/master_data/models.py):**
-- Purpose: Centralized registry of exporters, consignees, buyers, notify parties; supports soft-delete
-- Pattern: `is_active=False` marks deleted records; ForeignKey `on_delete=PROTECT` prevents orphaning
-- Related models: `Address`, `BankAccount`, `BankAccountDetails` (hierarchical data model)
+**Soft Delete (is_active):**
+- Purpose: Never hard-delete users or organisations; retain audit history
+- Examples: `User.is_active`, `Organisation.is_active`
+- Pattern: Queries filter `is_active=True` by default, but data is never removed from DB
 
 ## Entry Points
 
-**Backend API Entry:**
-- Location: `tradetocs/urls.py` (Django root URL config)
-- Triggers: HTTP requests from frontend or external clients
-- Responsibilities: Route `/api/v1/{path}` to appropriate viewset/view; return JSON
+**Backend Entry:**
+- Location: `tradetocs/urls.py` (main URL router)
+- Triggers: HTTP request from frontend
+- Responsibilities: Route to appropriate app URL pattern, load middleware
 
 **Frontend Entry:**
-- Location: `frontend/src/main.tsx` (Vite app bootstrap)
+- Location: `frontend/src/main.tsx` (React root)
 - Triggers: Browser page load
-- Responsibilities: Initialize React app, AuthContext, render App.tsx router
+- Responsibilities: Initialize providers (Router, Query, Auth, Ant Design), render App component
 
-**Authentication Entry:**
-- Location: `apps/accounts/views.py:TokenObtainPairView` (DRF-SimpleJWT)
-- Triggers: POST `/api/v1/auth/token/` with email + password
-- Responsibilities: Validate credentials, return access + refresh tokens
+**API Entry Points (Key):**
+- `POST /api/v1/auth/login/` → `TokenObtainPairView` (JWT token pair)
+- `GET /api/v1/auth/me/` → `MeView` (current user profile)
+- `POST /api/v1/proforma-invoices/` → `ProformaInvoiceViewSet.create()` (create PI)
+- `POST /api/v1/proforma-invoices/{id}/submit-action/` → workflow transition action
+- `POST /api/v1/packing-lists/` → `PackingListViewSet.create()` (creates PL + CI together)
+- `GET /api/v1/proforma-invoices/{id}/download-pdf/` → stream PDF
 
-**Dashboard/Reporting Entry:**
-- Location: `apps/workflow/dashboard_views.py:DashboardView`
-- Triggers: GET `/api/v1/dashboard/`
-- Responsibilities: Return counts (pending approval, approved, rework, etc.) for each document type
+**Dashboard Entry:**
+- Location: `GET /api/v1/dashboard/` → `DashboardView` in `apps/workflow/dashboard_views.py`
+- Triggers: User navigates to dashboard
+- Responsibilities: Aggregate pending documents, counts by status, summary for each user role
 
 ## Error Handling
 
-**Strategy:** Fail fast with descriptive messages; use DRF exception classes.
+**Strategy:** REST exception handling via DRF's `@api_view` decorator and explicit exception raising in views/services.
 
 **Patterns:**
-- **ValidationError:** Raised when serializer validation fails or business rule violated (e.g., missing comment on reject action)
-  - Response: HTTP 400 with `{"detail": "..."}` or field-specific errors
-- **PermissionDenied:** Raised when user role insufficient or workflow state forbids action
-  - Response: HTTP 403 with `{"detail": "Your role (MAKER) is not allowed to perform 'APPROVE'."}`
-- **ObjectDoesNotExist:** Caught in service layer when related model missing (e.g., no CI linked to PL)
-  - Response: HTTP 400 with descriptive message
-- **FileResponse (PDF):** Streamed directly; if PDF generation fails mid-stream, HTTP error sent before file buffer exhausted
+
+- **Validation Error:** `rest_framework.exceptions.ValidationError` for business rule violations (e.g., missing comment on REJECT)
+  - Returns HTTP 400 with detail dict keyed by field name
+  - Example: `{"comment": "A comment is required when performing 'REWORK'."}`
+
+- **Permission Denied:** `rest_framework.exceptions.PermissionDenied` for role-based access violations
+  - Returns HTTP 403
+  - Example: "Your role (MAKER) is not allowed to perform 'APPROVE'."
+
+- **Not Found:** DRF's automatic 404 when model instance doesn't exist
+  - Returns HTTP 404
+
+- **Integrity Error:** DB constraint violation (e.g., duplicate pi_number, FK PROTECT)
+  - Caught and wrapped as 400 ValidationError with detail message
+  - Prevents leaking database error details to frontend
 
 ## Cross-Cutting Concerns
 
-**Logging:** 
-- AuditLog table: Every status transition logged with user, timestamp, from/to status, action, comment
-- No separate logging service; audit data IS the logging mechanism
+**Logging:** Console logging via Python `logging` module; structured logs in production via Django settings
 
-**Validation:**
-- Serializer-level: Field type checks, required fields, range validation (e.g., decimal precision)
-- Service-level: Business rule checks (workflow transitions, comment requirements, cascade rules)
-- Database-level: Constraints on unique fields (pi_number, pl_number, etc.), on_delete policies
+**Validation:** 
+- **Model-level:** DecimalField constraints (max_digits, decimal_places) for monetary and weight fields
+- **Serializer-level:** DRF field validators, custom `validate_*` methods for business rules
+- **View-level:** WorkflowService and custom permission classes for state/role validation
 
-**Authentication:**
-- Backend: JWT via rest_framework_simplejwt; every endpoint decorated with `@permission_classes([IsAuthenticated])` or similar
-- Frontend: localStorage stores access/refresh tokens; Axios interceptor attaches bearer token to every request; 401 triggers refresh + retry
+**Authentication:** 
+- Backend: JWT (SimpleJWT) stored in access_token / refresh_token cookies
+- Frontend: Tokens stored in localStorage; `AuthContext` tracks user identity
+- Every API endpoint (except /login/) requires `Authorization: Bearer <token>` header or 401 response
 
 **Authorization:**
-- Granular permission classes in `apps/accounts/permissions.py`: `IsMakerOrAdmin`, `IsChecker`, `IsSuperAdmin`, `IsAnyRole`
-- Assigned at ViewSet method level (e.g., `create` requires `IsMakerOrAdmin`)
-- WorkflowService enforces transition rules per role
+- Role-based: `permission_classes` on every view (MAKER, CHECKER, COMPANY_ADMIN, SUPER_ADMIN)
+- Document-level: Can only edit documents you created (creator check in WorkflowService)
+- Custom permission classes: `IsAnyRole`, `IsCompanyAdmin`, `IsSuperAdmin` in `apps/accounts/permissions.py`
 
-**Multi-tenancy (Implicit):**
-- Single tenant instance; all users belong to same organisation context
-- Assumption: Company Admin manages all users; no cross-org visibility
-- If multi-tenant needed in future: add Organisation FK to User model, filter all queries by user.organisation
+**Pagination:** `StandardPageNumberPagination` in `tradetocs/pagination.py` applied to list views
+
+**Filtering:** Django Filter + DRF's `DjangoFilterBackend` for status, created_by, date ranges on list endpoints
 
 ---
 
-*Architecture analysis: 2026-07-26*
+*Architecture analysis: 2026-06-20*

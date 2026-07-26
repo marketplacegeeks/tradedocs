@@ -664,31 +664,24 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     from pdf.utils import weight_unit_for_packing_list
     weight_unit = weight_unit_for_packing_list(pl) if pl else "KGS"
 
-    # Weight row: full-width box with two columns (Net Weight | Gross Weight)
-    weight_row_cells = [
-        [
-            Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}", style_text),
-            Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}", style_text),
-        ],
-    ]
-    weight_row_style = [
-        ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
-        ("INNERGRID",    (0, 0), (-1, -1), 0.5, colors.black),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",   (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
+    # Build left cell: net/gross weight stacked, then optional L/C Details below
+    left_inner_rows = [
+        [Paragraph(f"<b>Total Net Weight:</b> {_fmt_qty(total_net_val)} {weight_unit}", style_text)],
+        [Paragraph(f"<b>Total Gross Weight:</b> {_fmt_qty(total_gross_val)} {weight_unit}", style_text)],
     ]
     if lc_details_val:
-        weight_row_cells.append([
-            Paragraph(f"<b>L/C Details:</b> {lc_details_val}", style_text),
-            Paragraph("", style_text),
-        ])
-        weight_row_style.append(("SPAN", (0, 1), (1, 1)))
-    weight_row_tbl = Table(weight_row_cells, colWidths=[90 * mm, 90 * mm], splitByRow=False)
-    weight_row_tbl.hAlign = "LEFT"
-    weight_row_tbl.setStyle(TableStyle(weight_row_style))
+        left_inner_rows.append(
+            [Paragraph(f"<b>L/C Details:</b> {lc_details_val}", style_text)]
+        )
+    left_inner = Table(left_inner_rows, colWidths=[78 * mm], splitByRow=False)
+    left_inner.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    left_cell_content = left_inner
 
     # Build breakdown as a nested table: label col (left) | amount col (right-aligned)
     breakdown_header = f"COST BREAKDOWN ({incoterm_str})" if incoterm_str else "COST BREAKDOWN"
@@ -715,8 +708,8 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             Paragraph(f"{currency_code} {_fmt_money(insurance_amount)}", style_amt),
         ])
 
-    # Inner widths must fit inside the 180mm outer box (12mm used by outer padding)
-    breakdown_inner = Table(breakdown_rows, colWidths=[128 * mm, 40 * mm], splitByRow=False)
+    # Inner widths must fit inside the 90mm outer cell (12mm used by outer padding)
+    breakdown_inner = Table(breakdown_rows, colWidths=[46 * mm, 32 * mm], splitByRow=False)
     breakdown_inner.setStyle(TableStyle([
         ("SPAN",          (0, 0), (1, 0)),   # header spans both sub-columns
         ("LINEBELOW",     (0, 0), (1, 0), 0.5, colors.black),  # line under header
@@ -728,20 +721,21 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
     ]))
 
     totals_charges_tbl = Table(
-        [[breakdown_inner]],
-        colWidths=[180 * mm],
+        [[left_cell_content, breakdown_inner]],
+        colWidths=[90 * mm, 90 * mm],
         splitByRow=False,
     )
     totals_charges_tbl.hAlign = "LEFT"
     totals_charges_tbl.setStyle(TableStyle([
         ("BOX",          (0, 0), (-1, -1), 1.2, colors.black),
+        ("INNERGRID",    (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN",       (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",  (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING",   (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
     ]))
-    invoice_total_label = "Total Amount Payable" if client_invoice else "Invoice Total (Amount Payable)"
+    invoice_total_label = "Total CIF Amount (Payable)" if client_invoice else "Invoice Total (Amount Payable)"
     invoice_total_tbl = Table(
         [[
             Paragraph(f"<b>{invoice_total_label}</b>", style_label_white),
@@ -763,7 +757,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#1A2B4B")),
         ("TEXTCOLOR",     (0, 0), (-1, -1), colors.white),
     ]))
-    story.append(KeepTogether([weight_row_tbl, totals_charges_tbl, invoice_total_tbl, Spacer(1, 6)]))
+    story.append(KeepTogether([totals_charges_tbl, invoice_total_tbl, Spacer(1, 6)]))
 
     amount_in_words_str = _amount_to_words(invoice_total, currency=currency_code)
     if amount_in_words_str:
