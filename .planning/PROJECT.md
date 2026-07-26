@@ -47,10 +47,9 @@ Documents flow through: `DRAFT → PENDING_APPROVAL → APPROVED` (or `REWORK / 
 
 | File | Purpose |
 |---|---|
-| `requirements/requirements.md` | Full PRD v1.5 — functional requirements |
-| `requirements/technical_architecture.md` | Tech stack, DB schema, **Section 9 constraints (law)** |
-| `requirements/coa.md` | COA feature requirements |
-| `requirements/fr14m_requirements.md` | PL+CI combined form requirements |
+| `requirements.md` | Full PRD v1.5 — functional requirements (historical; `.planning/` wins on conflict) |
+| `technical_architecture.md` | Tech stack, DB schema, Section 9 constraints (historical; `.planning/codebase/` reflects current code) |
+| `.planning/codebase/*.md` | Live-generated codebase map — refresh via `/gsd-map-codebase` |
 | `memory/MEMORY.md` | Session-to-session memory (patterns, gotchas, active tasks) |
 | `.planning/phases/phase-0-reference/` | Permissions matrix, architectural decisions, bug analyses |
 

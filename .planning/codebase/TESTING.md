@@ -1,213 +1,357 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-06-20
+**Analysis Date:** 2026-07-26
 
 ## Test Framework
 
-**Runner:**
-- pytest 9.0.2+
-- Config: `/Users/aniket/Documents/Development/TradeDocs/pytest.ini`
+**Backend (Python):**
+- Runner: `pytest`
+- Config: `pytest.ini` at project root
+- Django integration: `pytest-django`
 
-**Assertion Library:**
-- pytest assertions (built-in `assert` statements)
-
-**Run Commands:**
-```bash
-pytest                                           # Run all tests
-pytest -v                                        # Verbose output
-pytest --tb=short                                # Short traceback format
-pytest apps/proforma_invoice/tests/              # Run app-specific tests
-pytest --cov=apps/proforma_invoice --cov-report=term-missing  # Coverage report
-```
-
-**Configuration (pytest.ini):**
+**Configuration:**
 ```ini
+# pytest.ini
 [pytest]
 DJANGO_SETTINGS_MODULE = tradetocs.settings
-python_files = tests/*.py
-python_classes = Test*
-python_functions = test_*
-addopts = -v --tb=short
+python_files = tests/*.py          # Only files in tests/ dir
+python_classes = Test*             # Classes starting with Test
+python_functions = test_*          # Functions starting with test_
+addopts = -v --tb=short           # Verbose output, short tracebacks
+```
+
+**Frontend (TypeScript):**
+- E2E runner: Playwright
+- Config: `frontend/playwright.config.ts`
+- Unit tests: Not currently implemented (Playwright only)
+
+**Playwright Configuration:**
+```typescript
+// frontend/playwright.config.ts
+{
+  testDir: './tests/e2e',
+  timeout: 30_000,
+  use: { baseURL: 'http://localhost:5173', trace: 'retain-on-failure' },
+  reporter: 'html',
+}
+```
+
+**Run Commands:**
+
+```bash
+# Backend: Run all tests
+pytest
+
+# Backend: Run tests for a specific app
+pytest apps/accounts/tests/
+
+# Backend: Run a specific test file
+pytest apps/accounts/tests/test_views.py
+
+# Backend: Run a specific test class
+pytest apps/accounts/tests/test_views.py::TestLoginView
+
+# Backend: Run a specific test function
+pytest apps/accounts/tests/test_views.py::TestLoginView::test_valid_credentials_return_tokens
+
+# Backend: Watch mode (with pytest-watch)
+ptw
+
+# Backend: Coverage report
+pytest --cov=apps/{app} --cov-report=term-missing
+
+# Frontend: Run E2E tests
+npm --prefix frontend run e2e
+
+# Frontend: Run E2E tests with UI
+npm --prefix frontend run e2e -- --ui
+
+# Frontend: Run E2E tests for a specific file
+npm --prefix frontend run e2e -- tests/e2e/create-organisations.spec.ts
 ```
 
 ## Test File Organization
 
-**Location:** Co-located in `tests/` directory within each app
+**Backend Location:**
+- Pattern: `apps/{app}/tests/` — co-located with the app being tested
+- Structure:
+  ```
+  apps/accounts/tests/
+  ├── __init__.py           # Empty, makes tests/ a package
+  ├── factories.py          # factory-boy factories for all models in the app
+  ├── test_models.py        # Model-level tests (save behavior, properties, constraints)
+  ├── test_views.py         # API endpoint tests (permissions, happy paths, error cases)
+  └── test_bulk_workflow.py # (Optional) Tests for workflows affecting multiple documents
+  ```
 
-**Naming:**
-- `tests/__init__.py` — Empty init file
-- `tests/factories.py` — factory-boy factories for all models
-- `tests/test_models.py` — Model-level tests
-- `tests/test_views.py` — API view and serializer tests
+**Backend Naming:**
+- Test files: `test_*.py`
+- Test classes: `Test*` (e.g., `TestLoginView`, `TestProformaInvoiceModel`)
+- Test functions: `test_*` (e.g., `test_valid_credentials_return_tokens`)
 
-**Structure:**
-```
-apps/{app}/tests/
-├── __init__.py
-├── factories.py
-├── test_models.py
-└── test_views.py
-```
-
-Examples:
-- `apps/proforma_invoice/tests/`
-- `apps/packing_list/tests/`
-- `apps/accounts/tests/`
+**Frontend Location:**
+- Path: `frontend/tests/e2e/`
+- Naming: `*.spec.ts` (e.g., `create-organisations.spec.ts`)
 
 ## Test Structure
 
-**Suite Organization:**
+**Backend: Basic Pytest Class Structure**
 
-From `apps/accounts/tests/test_views.py`:
 ```python
+import pytest
+from django.urls import reverse
+from rest_framework.test import APIClient
+from apps.accounts.tests.factories import MakerFactory
+
 @pytest.mark.django_db
 class TestLoginView:
     def test_valid_credentials_return_tokens(self, api_client):
+        """Happy path: correct email + password return JWT tokens."""
         user = MakerFactory()
         data = get_tokens(api_client, user.email, "testpass123")
         assert "access" in data
         assert "refresh" in data
 
     def test_wrong_password_returns_401(self, api_client):
+        """Error case: wrong password returns 401 Unauthorized."""
         user = MakerFactory()
         response = api_client.post(reverse("auth-login"), {"email": user.email, "password": "wrongpass"})
         assert response.status_code == 401
+
+    def test_unauthenticated_denied(self, api_client):
+        """Permission case: unauthenticated request denied."""
+        response = APIClient().get("/api/v1/users/")
+        assert response.status_code == 401
 ```
 
-**Patterns:**
+**Pytest Fixtures:**
+- `@pytest.mark.django_db` — Marks test as database-accessing
+- `api_client` (pytest fixture) — APIClient instance used by DRF tests
+- `monkeypatch` (pytest fixture) — Mock/patch objects (rarely used, factories preferred)
+- Custom fixtures defined at file/conftest level as `@pytest.fixture`
 
-- Test classes: One class per view/model, named `Test{ModelName}` or `Test{ViewName}`
-- Test methods: Named `test_{scenario}`, describing what is being tested
-- Django DB access: Mark test classes with `@pytest.mark.django_db`
-- Setup: Use factories to create test data (never hardcode IDs)
-- Assertion: Simple pytest assertions, not unittest-style `self.assertEqual()`
+**Backend: Test Patterns**
+
+**Setup (each test is independent):**
+```python
+# Use factories to create test data; factories handle all defaults
+user = MakerFactory()  # Creates a user with role=MAKER, password="testpass123"
+pi = ProformaInvoiceFactory(created_by=user)  # Creates a PI assigned to that user
+```
+
+**Teardown:**
+- Automatic: `@pytest.mark.django_db` rolls back after each test
+- No explicit teardown needed
+
+**Authentication:**
+```python
+def auth_client(user):
+    """Helper: return authenticated APIClient."""
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
+
+# In test:
+maker = MakerFactory()
+response = auth_client(maker).get("/api/v1/proforma-invoices/")
+```
+
+**Assertions:**
+- Use pytest assertions: `assert value == expected`
+- Status codes: `assert response.status_code == 200`
+- Data content: `assert response.data["email"] == user.email`
+- Exceptions: `with pytest.raises(ValidationError):`
 
 ## Mocking
 
-**Framework:** pytest fixtures and factory-boy, no external mocking library configured
+**Framework:** `unittest.mock` (built into Python) — no external mocking library required
 
-**Patterns:**
+**Patterns (Rarely Used):**
+- Prefer factories + real DB over mocking (tests are faster with in-memory SQLite)
+- Mock only external APIs (Stripe, S3) and slow/flaky operations
 
-From `apps/accounts/tests/test_views.py`:
+**Example: Mock datetime**
 ```python
-@pytest.fixture
-def api_client():
-    return APIClient()
+from unittest.mock import patch
+from datetime import date
 
-def get_tokens(client, email, password):
-    """Helper: log in and return access + refresh tokens."""
-    response = client.post(reverse("auth-login"), {"email": email, "password": password})
-    return response.data
+@pytest.mark.django_db
+def test_first_number_for_year(monkeypatch):
+    """First PI of the year should be PI-YYYY-0001."""
+    # Factories handle defaults; monkeypatch rarely needed
+    assert ProformaInvoice.objects.filter(pi_number__startswith="PI-2026-").count() == 0
+    number = generate_document_number()
+    assert number.startswith("PI-")
 ```
 
 **What to Mock:**
-- Database state: Use factories to set up records
-- Authenticated users: Create user via factory and authenticate APIClient
-- External API calls: Not mocked (no external integrations currently)
+- External APIs (Stripe, payment providers) — use factory_boy fixtures instead of real calls
+- File system operations (S3, PDF generation) — mock only if slow/unreliable
 
 **What NOT to Mock:**
-- Django models — test against real database (marked with `@pytest.mark.django_db`)
-- Views — test full request-response cycle via APIClient
-- Serializers — test with real model instances
+- Database queries — test with real in-memory SQLite DB
+- Django models — test with real model instances
+- Your own business logic (services, views) — test the real implementation
+- Helper functions — test real implementations, they're fast
 
 ## Fixtures and Factories
 
-**Test Data:**
+**Factory Pattern (factory_boy):**
+- Location: `apps/{app}/tests/factories.py`
+- Base class: `factory.django.DjangoModelFactory`
+- Each model gets a factory class
 
-From `apps/proforma_invoice/tests/factories.py`:
+**Example Factories:**
+
 ```python
+# apps/accounts/tests/factories.py
+class UserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = User
+
+    email = factory.Sequence(lambda n: f"user{n}@example.com")
+    first_name = factory.Faker("first_name")  # Generates realistic data
+    last_name = factory.Faker("last_name")
+    role = UserRole.MAKER
+    is_active = True
+    phone_country_code = ""
+    phone_number = ""
+
+    @factory.post_generation
+    def password(self, create, extracted, **kwargs):
+        # Custom password handling: allow override with password="mypass"
+        raw = extracted or "testpass123"
+        self.set_password(raw)
+        if create:
+            self.save()
+
+class MakerFactory(UserFactory):
+    role = UserRole.MAKER
+
+class CheckerFactory(UserFactory):
+    role = UserRole.CHECKER
+
+class CompanyAdminFactory(UserFactory):
+    role = UserRole.COMPANY_ADMIN
+    is_staff = True
+```
+
+**Factory Features Used:**
+- `factory.Sequence(lambda n: ...)` — Generate unique values
+- `factory.Faker(...)` — Generate realistic data (names, emails, etc.)
+- `factory.SubFactory(...)` — Create related instances (FK relationships)
+- `factory.post_generation` — Custom logic after model creation (password hashing)
+
+**Example with SubFactory:**
+
+```python
+# apps/proforma_invoice/tests/factories.py
 class ProformaInvoiceFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ProformaInvoice
 
     pi_number = factory.Sequence(lambda n: f"PI-2026-{n + 1:04d}")
     pi_date = factory.LazyFunction(date.today)
-    exporter = factory.SubFactory(OrganisationFactory)
+    exporter = factory.SubFactory(OrganisationFactory)  # Creates a related Organisation
     consignee = factory.SubFactory(OrganisationFactory)
     currency = factory.SubFactory(CurrencyFactory)
+    payment_terms = factory.SubFactory(PaymentTermFactory)
     status = DRAFT
     created_by = factory.SubFactory(MakerFactory)
+
+class ProformaInvoiceLineItemFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ProformaInvoiceLineItem
+
+    pi = factory.SubFactory(ProformaInvoiceFactory)
+    description = factory.Sequence(lambda n: f"Item description {n}")
+    quantity = factory.Faker("pydecimal", left_digits=4, right_digits=3, positive=True)
+    uom = factory.SubFactory(UOMFactory)
+    rate = factory.Faker("pydecimal", left_digits=5, right_digits=2, positive=True)
 ```
 
-**Key patterns:**
-- Use `factory.Sequence()` for auto-incrementing values
-- Use `factory.SubFactory()` for related models — never hardcode IDs
-- Use `factory.LazyFunction()` for computed fields (e.g., today's date)
-- Use `factory.Faker()` for realistic random data (weights, amounts)
-
-**Location:**
-- All factories live in `tests/factories.py` within each app
-- Factories are reusable across test files in the same app
-- Cross-app dependencies: factories import from other apps' factories
-  - Example: `from apps.accounts.tests.factories import MakerFactory`
+**Test Data Location:**
+- Factories live in `apps/{app}/tests/factories.py`
+- Fixtures (seed data) not currently used; factories provide all test data
+- E2E fixtures: `frontend/tests/e2e/fixtures/organisations.xlsx` — spreadsheet of test organisations
 
 ## Coverage
 
-**Requirements:** No specific coverage target enforced — project is bootstrapped
+**Requirements:** No enforced minimum (0% → 100% accepted)
 
 **View Coverage:**
 
-From `apps/proforma_invoice/tests/test_views.py`, every endpoint has:
-1. **One happy-path test** — successful request with expected result
-2. **One permission-denial test** — unauthenticated or unauthorized request
+```bash
+# Generate coverage report for accounts app
+pytest --cov=apps/accounts --cov-report=term-missing
 
-Example from `TestProformaInvoiceCreate`:
-```python
-def test_maker_can_create(self):
-    maker = MakerFactory()
-    resp = auth_client(maker).post(PI_LIST_URL, self._payload(), format="json")
-    assert resp.status_code == 201
-    assert resp.data["status"] == DRAFT
-
-def test_checker_cannot_create(self):
-    resp = auth_client(CheckerFactory()).post(PI_LIST_URL, self._payload(), format="json")
-    assert resp.status_code == 403
+# Shows:
+# - Percentage of lines covered
+# - Lines NOT covered (helpful for identifying untested code paths)
 ```
+
+**Current Coverage Expectations:**
+- Models: >80% (business logic matters)
+- Views: >70% (at minimum: 1 happy path + 1 permission denial per endpoint)
+- Services: >80% (critical domain logic)
+- Serializers: >60% (validation logic important)
+- Permissions: >70% (security-sensitive)
 
 ## Test Types
 
-**Unit Tests:**
-- Scope: Model methods, field validation, computed properties
-- Approach: Test model instance in isolation, use factories for related objects
-- Location: `tests/test_models.py`
-- Example from `apps/proforma_invoice/tests/test_models.py`:
-  ```python
-  def test_amount_is_computed_on_save(self):
-      item = ProformaInvoiceLineItemFactory(
-          quantity=Decimal("10.000"),
-          rate=Decimal("50.00"),
-      )
-      assert item.amount == Decimal("500.00")
-  ```
+**Backend: Unit Tests**
+- Scope: Individual model methods, factories, utility functions
+- Approach: Fast, isolated, no external calls
+- File: `apps/{app}/tests/test_models.py`
+- Example: `test_pi_date_defaults_to_today()`, `test_amount_is_computed_on_save()`
 
-**Integration Tests:**
-- Scope: API endpoints, permission checks, database transactions
-- Approach: Full request-response cycle via DRF's APIClient, test data via factories
-- Location: `tests/test_views.py`
-- Example from `apps/accounts/tests/test_views.py`:
-  ```python
-  def test_valid_credentials_return_tokens(self, api_client):
-      user = MakerFactory()
-      data = get_tokens(api_client, user.email, "testpass123")
-      assert "access" in data
-      assert "refresh" in data
-  ```
+**Backend: Integration Tests (API endpoint tests)**
+- Scope: Full request/response cycle (view → serializer → DB)
+- Approach: Slower, hit DB, test permissions + business logic
+- File: `apps/{app}/tests/test_views.py`
+- Minimum per endpoint: 1 happy path + 1 permission denial
+- Example: `test_maker_can_create()`, `test_checker_cannot_create()`
 
-**E2E Tests:**
-- Framework: Not used — project is backend + frontend separately
-- Frontend testing: No test framework configured (Vite + React, no Jest)
-- Backend testing: Integration tests via pytest + APIClient cover most scenarios
+**Backend: Workflow Tests**
+- Scope: Multi-step workflows affecting multiple document types
+- Approach: Test status transitions across PI → PL → CI
+- File: `apps/{app}/tests/test_bulk_workflow.py`
+- Example: `test_pi_to_pl_to_ci_workflow()`
+
+**Frontend: E2E Tests (Playwright)**
+- Scope: End-to-end user workflows (login → create organisations → view list)
+- Approach: Slow, browser automation, full app stack required
+- File: `frontend/tests/e2e/*.spec.ts`
+- Currently: `create-organisations.spec.ts` — data-driven org creation from Excel
+
+**No Frontend Unit Tests:**
+- React components not unit tested
+- API layer tested implicitly via E2E tests
+- Utilities (like `extractApiError()`) tested manually or via E2E error paths
 
 ## Common Patterns
 
-**Async Testing:**
-
-Not applicable — Django views are synchronous, pytest doesn't require special async handling.
+**Async Testing (Backend):**
+- All Django tests are inherently async-safe via `@pytest.mark.django_db`
+- Async views not currently used (no async endpoints)
 
 **Error Testing:**
 
-From `apps/proforma_invoice/tests/test_models.py`:
 ```python
+# Test that a ValidationError is raised with specific message
+def test_phone_requires_both_fields(self, api_client):
+    admin = CompanyAdminFactory()
+    maker = MakerFactory()
+    tokens = get_tokens(api_client, admin.email, "testpass123")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+    # Providing only country code without a number should return 400
+    response = api_client.patch(
+        reverse("user-detail", kwargs={"pk": maker.pk}),
+        {"phone_country_code": "+91"}  # Missing phone_number
+    )
+    assert response.status_code == 400
+
+# Test that model raises on invalid data
 def test_pi_number_is_unique(self):
     pi1 = ProformaInvoiceFactory()
     with pytest.raises(Exception):
@@ -215,69 +359,109 @@ def test_pi_number_is_unique(self):
         ProformaInvoiceFactory(pi_number=pi1.pi_number)
 ```
 
-From `apps/proforma_invoice/tests/test_views.py`:
+**Status Code Assertions:**
+
 ```python
-def test_maker_can_list(self):
-    maker = MakerFactory()
-    ProformaInvoiceFactory.create_batch(3, created_by=maker)
-    resp = auth_client(maker).get(PI_LIST_URL)
-    assert resp.status_code == 200
-    assert len(resp.data) >= 3
+# Happy path
+assert response.status_code == 200  # GET/PATCH success
+assert response.status_code == 201  # POST success
+assert response.status_code == 204  # DELETE success
 
-def test_unauthenticated_denied(self):
-    resp = APIClient().get(PI_LIST_URL)
-    assert resp.status_code == 401
+# Permission errors
+assert response.status_code == 401  # Unauthenticated
+assert response.status_code == 403  # Forbidden (authenticated but no permission)
+
+# Validation errors
+assert response.status_code == 400  # Bad request (validation failed)
+
+# Not found
+assert response.status_code == 404  # Resource doesn't exist
 ```
 
-## Test Data Patterns
+**Permission Testing Pattern:**
 
-**Bulk Creation:**
-
-From `apps/proforma_invoice/tests/test_views.py`:
 ```python
-ProformaInvoiceFactory.create_batch(3, created_by=maker)
+@pytest.mark.django_db
+class TestProformaInvoiceCreate:
+
+    def _payload(self):
+        """Shared payload for all tests in this class."""
+        exporter = OrganisationFactory()
+        consignee = OrganisationFactory()
+        currency = CurrencyFactory()
+        return {
+            "exporter": exporter.pk,
+            "consignee": consignee.pk,
+            "currency": currency.pk,
+        }
+
+    def test_maker_can_create(self):
+        """Happy path: Maker successfully creates a PI."""
+        maker = MakerFactory()
+        resp = auth_client(maker).post(PI_LIST_URL, self._payload(), format="json")
+        assert resp.status_code == 201
+        assert resp.data["status"] == DRAFT
+        assert resp.data["created_by"] == maker.pk
+
+    def test_checker_cannot_create(self):
+        """Permission denial: Checker cannot create a PI."""
+        resp = auth_client(CheckerFactory()).post(PI_LIST_URL, self._payload(), format="json")
+        assert resp.status_code == 403
+
+    def test_unauthenticated_denied(self):
+        """Permission denial: Unauthenticated user denied."""
+        resp = APIClient().post(PI_LIST_URL, self._payload(), format="json")
+        assert resp.status_code == 401
 ```
 
-**Status-based Tests:**
+**Playwright E2E Pattern (Frontend):**
 
-From `apps/proforma_invoice/tests/test_views.py`:
-```python
-ProformaInvoiceFactory(created_by=maker, status=DRAFT)
-ProformaInvoiceFactory(created_by=maker, status=PENDING_APPROVAL)
-resp = auth_client(maker).get(PI_LIST_URL, {"status": DRAFT})
-assert all(pi["status"] == DRAFT for pi in resp.data)
+```typescript
+import { test, expect, Page } from '@playwright/test';
+
+async function login(page: Page) {
+  await page.goto('/login');
+  await page.getByRole('textbox', { name: 'you@example.com' }).fill(EMAIL);
+  await page.getByRole('textbox', { name: '••••••••' }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('button', { name: 'Master Data' })).toBeVisible();
+}
+
+test.describe('Create organisations from Excel fixture', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  for (const org of organisations) {
+    test(`create organisation: ${org.name}`, async ({ page }) => {
+      await page.goto('/master-data/organisations/new');
+      await page.getByRole('textbox', { name: 'e.g. Sunrise Exports Pvt Ltd' }).fill(org.name);
+      await page.getByRole('button', { name: 'Create Organisation' }).click();
+      await page.waitForURL('**/master-data/organisations', { timeout: 15_000 });
+    });
+  }
+});
 ```
 
-**Authenticated Client Helper:**
+## Test Checklist
 
-From `apps/proforma_invoice/tests/test_views.py`:
-```python
-def auth_client(user):
-    client = APIClient()
-    client.force_authenticate(user=user)
-    return client
-```
+**For Every API Endpoint (minimum coverage):**
+- [ ] One happy-path test (correct input → 200/201 response)
+- [ ] One permission-denial test (wrong role → 403, unauthenticated → 401)
+- [ ] One validation-failure test (bad input → 400) if applicable
+- [ ] One edge-case test (boundary conditions, empty data) if applicable
 
-Used throughout tests to quickly create authenticated requests.
+**For Every Model:**
+- [ ] Test default values (e.g., `status` defaults to `DRAFT`)
+- [ ] Test constraints (uniqueness, FK relationships, cascading deletes)
+- [ ] Test computed fields (e.g., `amount` auto-calculated from `quantity × rate`)
+- [ ] Test string representation (`__str__` method)
 
-## Pre-commit Testing
-
-**Requirement:** All tests must pass before any git commit.
-
-Run before committing:
-```bash
-pytest
-```
-
-Confirm: **0 failures** required for commit to proceed.
-
-## Notable Testing Gaps
-
-- **Frontend**: No test framework configured — React components untested
-- **E2E**: No browser automation (Playwright/Cypress) configured
-- **Mocking external services**: No mocking setup (not needed until integrations added)
-- **Performance tests**: Not implemented
+**For Every Service Function:**
+- [ ] Happy path test
+- [ ] Error case test (validation, permission, state conflict)
+- [ ] Side-effect test (e.g., AuditLog written for status transitions)
 
 ---
 
-*Testing analysis: 2026-06-20*
+*Testing analysis: 2026-07-26*

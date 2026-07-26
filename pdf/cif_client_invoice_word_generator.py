@@ -411,7 +411,7 @@ def build_cif_ci_word_section(document, ci):
     build_grid_table(
         document,
         [[
-            {"html": "<b>CIF Total (Amount Payable)</b>", "bg": "navy"},
+            {"html": "<b>Total Amount Payable</b>", "bg": "navy"},
             {"html": f"<b>{currency_code} {_fmt_money(cif_total)}</b>", "bg": "navy",
              "align": WD_ALIGN_PARAGRAPH.RIGHT},
         ]],

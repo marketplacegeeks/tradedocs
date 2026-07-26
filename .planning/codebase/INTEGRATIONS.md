@@ -1,170 +1,118 @@
 # External Integrations
 
-**Analysis Date:** 2026-06-20
+**Analysis Date:** 2026-07-26
 
 ## APIs & External Services
 
-**None Detected**
-
-No third-party API integrations (Stripe, SendGrid, Slack, etc.) are currently configured.
+**Internal Backend APIs:**
+- REST API endpoints defined in `/apps/*/urls.py`
+- No third-party payment gateways, shipping APIs, or external services integrated
+- API versioning: `api/v1/` (namespace in `tradetocs/urls.py`)
 
 ## Data Storage
 
 **Databases:**
-- PostgreSQL 16 (primary database)
-  - Connection: Via `DATABASE_URL` in production (Railway) or `DB_*` environment variables in development
-  - Client: psycopg2-binary 2.9.11
-  - ORM: Django ORM
-  - Connection string format: `postgres://user:password@host:port/dbname`
+- PostgreSQL (primary)
+  - Connection: `DATABASE_URL` env var (parsed in `tradetocs/settings.py` line 71-84)
+  - Client: Django ORM with psycopg2-binary adapter
+  - Fallback to individual DB_* env vars (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+  - Connection pooling: `conn_max_age=600` (10 minutes)
 
 **File Storage:**
-- Local filesystem in development (`MEDIA_ROOT = BASE_DIR / "media"`, `MEDIA_URL = "/media/"`)
-- Architecture supports swapping to S3 or R2 in production (comment in `tradetocs/settings.py`: "Swap DEFAULT_FILE_STORAGE for S3/R2 in production without touching models")
-- Primarily stores user uploads (e.g., signed document copies)
+- Local filesystem only in development
+  - Media root: `BASE_DIR / media` (configured in `tradetocs/settings.py`)
+  - Static files: `BASE_DIR / staticfiles` (served by WhiteNoiseMiddleware in production)
+  - Signed copy uploads: maximum 3 MB (`SIGNED_COPY_MAX_BYTES` in settings)
+- **Production path:** Comment in `tradetocs/settings.py` line 159 indicates S3/R2 can be swapped in by changing `DEFAULT_FILE_STORAGE` without touching models
 
 **Caching:**
-- None detected. Django cache framework not configured.
+- None detected — no Redis, Memcached, or other caching backend configured
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Custom JWT implementation (no external OAuth/SSO provider)
-  - Library: djangorestframework_simplejwt 5.5.1
-  - Token type: Bearer tokens in HTTP Authorization header
-  - Access token lifetime: Configurable via `TRADETOCS_ACCESS_TOKEN_LIFETIME_MINUTES` (default: 30 minutes)
-  - Refresh token lifetime: Configurable via `TRADETOCS_REFRESH_TOKEN_LIFETIME_DAYS` (default: 7 days)
-  - Refresh mechanism: Rotating refresh tokens with automatic blacklist after rotation (`ROTATE_REFRESH_TOKENS = True`, `BLACKLIST_AFTER_ROTATION = True`)
-
-**User Model:**
-- Custom user model: `apps.accounts.User` (extends AbstractBaseUser)
-  - Login via email (USERNAME_FIELD = "email")
-  - Roles: SUPER_ADMIN, COMPANY_ADMIN, CHECKER, MAKER
-  - Soft-delete via `is_active = False` (never hard-deleted)
-
-**Frontend Token Storage:**
-- localStorage keys: `access_token`, `refresh_token`, `auth_user`
-- HTTP-only cookie support not currently used (stored in localStorage)
-- Axios interceptor (`src/api/axiosInstance.ts`) attaches token to every request
-- Auto-refresh: Triggered on 401 response; failed refresh clears tokens and redirects to `/login`
+- Custom JWT implementation via djangorestframework-simplejwt
+  - Endpoint: `POST /api/v1/auth/login/` (expects email + password)
+  - Token refresh: `POST /api/v1/auth/token/refresh/` (expects refresh token)
+  - Logout: `POST /api/v1/auth/logout/` (blacklists refresh token)
+  - User profile: `GET /api/v1/auth/me/`
+- Implementation files:
+  - Backend: `apps/accounts/views.py` (LoginView, LogoutView, TokenRefreshAPIView, MeView)
+  - Frontend: `frontend/src/api/auth.ts` (login/logout functions)
+  - Frontend interceptor: `frontend/src/api/axiosInstance.ts` (auto-attaches Bearer token, handles 401 refresh)
+- Token lifecycle:
+  - Access token TTL: 30 minutes (configurable via `TRADETOCS_ACCESS_TOKEN_LIFETIME_MINUTES`)
+  - Refresh token TTL: 7 days (configurable via `TRADETOCS_REFRESH_TOKEN_LIFETIME_DAYS`)
+  - Token rotation enabled (ROTATE_REFRESH_TOKENS = True)
+  - Refresh token blacklisting enabled (BLACKLIST_AFTER_ROTATION = True)
+- Authorization:
+  - Role-based: SUPER_ADMIN, COMPANY_ADMIN, CHECKER, MAKER (defined in `apps/accounts/models.py`)
+  - Global default: all DRF endpoints require authentication unless explicitly declared (REST_FRAMEWORK.DEFAULT_PERMISSION_CLASSES in settings)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected. No Sentry, Rollbar, or DataDog integration.
+- None detected — no Sentry, DataDog, or similar integration
 
 **Logs:**
-- Console/stdout logging (Django default configuration)
-- Email logging available via `EMAIL_BACKEND` configuration (default: console backend for dev)
-- No structured logging service detected
+- Django default logging to console
+- No centralized logging backend detected
+- Email backend for notifications: console backend in dev (configurable via `TRADETOCS_EMAIL_BACKEND`)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Railway (inferred from docker-compose.yml and settings comments mentioning Railway PostgreSQL plugin)
-- Gunicorn as WSGI application server
-- Whitenoise for static file serving in production
+- Railway (evidence: DATABASE_URL auto-provisioning comment in settings)
+- Deployment via Gunicorn + Django WSGI application (`tradetocs/wsgi.py`)
 
 **CI Pipeline:**
-- None detected. No GitHub Actions, GitLab CI, or Jenkins configuration found.
-
-**Database Migrations:**
-- Django migrations in each app (`apps/*/migrations/`)
-- Managed via `python manage.py migrate`
+- None detected — no GitHub Actions, GitLab CI, or similar configured in repository root
 
 ## Environment Configuration
 
-**Required Environment Variables (Backend):**
+**Required env vars:**
+- `TRADETOCS_SECRET_KEY` - Django secret key (MUST change in production)
+- `DATABASE_URL` or (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+- `TRADETOCS_ALLOWED_HOSTS` - Comma-separated list for production domain
+- `CORS_ALLOWED_ORIGINS` - Frontend URL(s)
+- `TRADETOCS_FRONTEND_BASE_URL` - For email deep links
+- `VITE_API_BASE_URL` - Frontend API endpoint URL
 
-**Core:**
-- `TRADETOCS_SECRET_KEY` - Django secret key (must be changed from default in production)
-- `TRADETOCS_DEBUG` - Boolean debug flag (False in production)
-- `TRADETOCS_ALLOWED_HOSTS` - Comma-separated list of allowed hosts
+**Optional env vars:**
+- `TRADETOCS_DEBUG` - Debug mode (default: True)
+- `TRADETOCS_ACCESS_TOKEN_LIFETIME_MINUTES` - JWT access token TTL (default: 30)
+- `TRADETOCS_REFRESH_TOKEN_LIFETIME_DAYS` - JWT refresh token TTL (default: 7)
+- `TRADETOCS_EMAIL_BACKEND` - Email service backend (default: console)
+- `TRADETOCS_DEFAULT_FROM_EMAIL` - Sender email (default: dev@tradetocs.local)
 
-**Database:**
-- `DATABASE_URL` - Full connection string (used in production via Railway PostgreSQL plugin)
-- OR individual components (fallback if DATABASE_URL not set):
-  - `DB_NAME` - Database name
-  - `DB_USER` - Database user
-  - `DB_PASSWORD` - Database password
-  - `DB_HOST` - Database host
-  - `DB_PORT` - Database port
-
-**JWT/Authentication:**
-- `TRADETOCS_ACCESS_TOKEN_LIFETIME_MINUTES` - JWT access token lifetime (default: 30)
-- `TRADETOCS_REFRESH_TOKEN_LIFETIME_DAYS` - JWT refresh token lifetime (default: 7)
-
-**CORS:**
-- `CORS_ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins (default: http://localhost:5173,http://127.0.0.1:5173)
-- Constraint #28: Never use `CORS_ALLOW_ALL_ORIGINS = True`
-
-**Email:**
-- `TRADETOCS_EMAIL_BACKEND` - Email backend class (default: django.core.mail.backends.console.EmailBackend)
-- `TRADETOCS_DEFAULT_FROM_EMAIL` - Default from email address (default: dev@tradetocs.local)
-
-**Required Environment Variables (Frontend):**
-- `VITE_API_BASE_URL` - Django API base URL (e.g., http://localhost:8000/api/v1)
-
-**Secrets Location:**
-- `.env` file in project root (git-ignored, contains local environment variables)
-- Production: Railway service environment variables (auto-injected at build/runtime)
+**Secrets location:**
+- Environment variables (sourced from `.env` file in development)
+- `.env` file is gitignored and should never be committed
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None detected. No webhook endpoints configured.
+- None detected — no webhook listeners for external services
 
 **Outgoing:**
-- None detected. No outgoing webhook calls found.
+- Email notifications only (via Django email backend)
+  - Deep links built using `TRADETOCS_FRONTEND_BASE_URL`
+  - Subject to `TRADETOCS_EMAIL_BACKEND` configuration
 
-## API Endpoints
+## Document Generation
 
-**Base URL:** `/api/v1/`
+**PDF Export:**
+- ReportLab 4.4.10 - Used in `pdf/` directory for PDF generation
+  - In-memory generation (streamed, never written to disk per constraint #18 in CLAUDE.md)
+  - Entry points: `pdf/cif_client_invoice_word_generator.py`, `pdf/commercial_invoice_generator.py`, etc.
 
-**Authentication Endpoints:**
-- `POST /auth/token/` - Login (obtain access and refresh tokens)
-- `POST /auth/token/refresh/` - Refresh expired access token
-- `POST /auth/logout/` - Logout (blacklist refresh token)
-- `GET /auth/me/` - Get current user profile
-- `POST /auth/reset-password/` - Request password reset
+**Word (.docx) Export:**
+- python-docx 1.2.0 - Used for DOCX generation
+  - Supports Proforma Invoice, Packing List, Commercial Invoice, Purchase Order, Certificate of Analysis exports
 
-**User Management Endpoints:**
-- `GET /users/` - List users (paginated, filtered)
-- `POST /users/` - Create new user
-- `GET /users/{id}/` - Retrieve user detail
-- `PATCH /users/{id}/` - Update user
-- `DELETE /users/{id}/` - Delete user (soft-delete via is_active=False)
-
-**Core Document Endpoints:**
-- Proforma Invoices: `/proforma-invoices/`, `/proforma-invoices/{id}/line-items/`, etc.
-- Packing Lists: `/packing-lists/`, `/packing-lists/{id}/containers/`, etc.
-- Commercial Invoices: `/commercial-invoices/`
-- Purchase Orders: `/purchase-orders/`
-- Certificate of Analysis: `/coa/`
-
-**Master Data Endpoints:**
-- `/organisations/`, `/banks/`, `/countries/`, `/ports/`, `/incoterms/`, `/payment-terms/`, etc.
-
-**Report/PDF Endpoints:**
-- PDF generation embedded in document endpoints (e.g., `/proforma-invoices/{id}/pdf/`)
-
-**Filtering & Pagination:**
-- DjangoFilterBackend enabled on list endpoints
-- QuerySet filtering available via query parameters
-- Pagination handled by DRF (default pagination class configured)
-
-## Default Configuration Values
-
-**Development Defaults (overridable via env vars):**
-- Database: PostgreSQL on localhost:5432 (user: postgres, password: postgres, db: tradetocs)
-- Frontend API URL: http://localhost:8000/api/v1
-- Frontend Dev Server: http://localhost:5173
-- JWT Access Token: 30 minutes
-- JWT Refresh Token: 7 days
-- CORS Origins: http://localhost:5173, http://127.0.0.1:5173
-- Email Backend: Console (prints to stdout)
-- Debug: True
-- Secret Key: insecure dev key (must change in production)
+**Number Formatting:**
+- num2words 0.5.14 - Converts numeric totals to words in documents
 
 ---
 
-*Integration audit: 2026-06-20*
+*Integration audit: 2026-07-26*
