@@ -15,7 +15,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
-    PageBreak,
+    KeepTogether,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -696,7 +696,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
-        story.append(bank_box)
+        story.append(KeepTogether([bank_box]))
         story.append(Spacer(1, 8))
 
     # ========================================================================
@@ -718,8 +718,6 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             ("TOPPADDING", (0, 0), (-1, -1), 6),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
-        story.append(td_title)
-
         # Columns: # | Description | HSN Code | Gross Value | CGST(%/Amt) | IGST(%/Amt) | SGST(%/Amt) | Total Tax
         td_fixed_widths = [8*mm, 32*mm, 16*mm, 22*mm]
         td_remaining = 180*mm - sum(td_fixed_widths)
@@ -813,7 +811,7 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#1A2B4B")),
             ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
         ]))
-        story.append(td_table)
+        story.append(KeepTogether([td_title, td_table]))
         story.append(Spacer(1, 8))
 
     # ========================================================================
@@ -842,7 +840,6 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
 
     tc_content = _safe(getattr(po, "tc_content", "")).strip()
     if tc_content:
-        story.append(PageBreak())
         tc_header = Table(
             [[Paragraph("<b>Terms &amp; Conditions</b>", style_label_white)]],
             colWidths=[180 * mm],
