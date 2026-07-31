@@ -532,7 +532,7 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
         Paragraph("<b>No &amp; Kind of Packages</b>", style_table_header),
         Paragraph("<b>Item Code</b>", style_table_header),
         Paragraph("<b>Description of Goods</b>", style_table_header),
-        Paragraph("<b>Qty</b>", style_table_header),
+        Paragraph("<b>Net Weight</b>", style_table_header),
         Paragraph(f"<b>Rate ({currency_code})</b>", style_table_header),
         Paragraph(f"<b>Amount ({currency_code})</b>", style_table_header),
     ]

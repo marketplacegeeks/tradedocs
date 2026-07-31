@@ -330,7 +330,7 @@ def build_ci_word_section(document, ci, client_invoice=False, pi=None):
             cif_overrides[it.pk] = (cif_rate, Decimal(str(round(cif_rate * qty, 2))))
 
     headers = ["Sr.", "HSN Code", "No & Kind of Packages", "Item Code", "Description of Goods",
-               "Qty", f"Rate ({currency_code})", f"Amount ({currency_code})"]
+               "Net Weight", f"Rate ({currency_code})", f"Amount ({currency_code})"]
     rows = []
     line_items_total = Decimal("0.00")
 

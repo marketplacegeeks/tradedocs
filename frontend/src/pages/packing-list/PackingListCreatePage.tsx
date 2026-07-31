@@ -1756,7 +1756,7 @@ function Step4({
                   for commercial invoice
                 </div>
               </th>
-              <th style={TH}>Total Qty</th>
+              <th style={TH}>Net Weight</th>
               <th style={TH}>UOM</th>
               <th style={{ ...TH, ...(rateIsCIF ? { color: "#e53e3e" } : {}) }}>
                 {rateIsCIF ? (
@@ -1935,7 +1935,7 @@ function Step4({
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
                       <thead>
                         <tr>
-                          {["#", "HSN Code", "Item Code", "Description", "Qty", "UOM",
+                          {["#", "HSN Code", "Item Code", "Description", "Net Weight", "UOM",
                             `Rate Calculated (${currencyCode})`, `Amount (${currencyCode})`].map((h, i) => (
                             <th key={i} style={{ ...TH, color: i === 6 ? "#e53e3e" : "var(--text-muted)" }}>{h}</th>
                           ))}

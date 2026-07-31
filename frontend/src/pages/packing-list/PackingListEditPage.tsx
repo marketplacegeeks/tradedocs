@@ -665,7 +665,7 @@ export default function PackingListEditPage() {
                 <th style={TH}>Item Code</th>
                 <th style={TH}>Description</th>
                 <th style={TH}>No. & Kind of Packages</th>
-                <th style={TH}>Total Qty</th>
+                <th style={TH}>Net Weight</th>
                 <th style={TH}>UOM</th>
                 <th style={TH}>Rate ({ci.currency_display?.code ?? "USD"} per UOM) *</th>
                 <th style={TH}>Amount ({ci.currency_display?.code ?? "USD"})</th>

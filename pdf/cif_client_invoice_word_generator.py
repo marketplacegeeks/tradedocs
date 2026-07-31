@@ -307,7 +307,7 @@ def build_cif_ci_word_section(document, ci):
 
     # ---- CIF-adjusted line items table -----------------------------------
     headers = ["Sr.", "HSN Code", "No & Kind of Packages", "Item Code", "Description of Goods",
-               "Qty", f"Rate ({currency_code}) CIF", f"Amount ({currency_code}) CIF"]
+               "Net Weight", f"Rate ({currency_code}) CIF", f"Amount ({currency_code}) CIF"]
     rows = []
     cif_total = Decimal("0.00")
 
