@@ -25,3 +25,4 @@ reportlab==4.4.10
 python-docx==1.2.0
 num2words==0.5.14
 sqlparse==0.5.5
+pypdf==6.14.2  # test-only: extracts text from generated PDFs to verify content

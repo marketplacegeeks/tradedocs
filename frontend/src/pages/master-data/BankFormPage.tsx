@@ -8,7 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowLeft } from "lucide-react";
 
-import { Select } from "antd";
+import { Select, DatePicker } from "antd";
+import dayjs from "dayjs";
 
 import { createBank, getBank, updateBank } from "../../api/banks";
 import { extractApiError } from "../../utils/apiErrors";
@@ -46,6 +47,9 @@ const bankSchema = z
       .default(""),
     routing_number: z.string().optional().default(""),
     ad_code: z.string().optional().default(""),
+    // LUT (Letter of Undertaking) — GST filing, renewed once per financial year.
+    lut_number: z.string().optional().default(""),
+    lut_valid_until: z.string().nullable().optional().default(null),
     // Intermediary institution — optional, but all-or-nothing
     intermediary_bank_name: z.string().optional().default(""),
     intermediary_account_number: z.string().optional().default(""),
@@ -185,6 +189,7 @@ export default function BankFormPage() {
       nickname: "", beneficiary_name: "", bank_name: "",
       branch_name: "", branch_address: "", account_number: "",
       account_type: undefined, swift_code: "", iban: "", routing_number: "", ad_code: "",
+      lut_number: "", lut_valid_until: null,
       intermediary_bank_name: "", intermediary_account_number: "",
       intermediary_swift_code: "", intermediary_currency: null,
     },
@@ -219,6 +224,8 @@ export default function BankFormPage() {
         iban: existingBank.iban,
         routing_number: existingBank.routing_number,
         ad_code: existingBank.ad_code,
+        lut_number: existingBank.lut_number,
+        lut_valid_until: existingBank.lut_valid_until,
         intermediary_bank_name: existingBank.intermediary_bank_name,
         intermediary_account_number: existingBank.intermediary_account_number,
         intermediary_swift_code: existingBank.intermediary_swift_code,
@@ -231,7 +238,7 @@ export default function BankFormPage() {
   const BANK_FORM_FIELDS = new Set<string>([
     "organisation", "nickname", "beneficiary_name", "bank_name", "bank_country",
     "branch_name", "branch_address", "account_number", "account_type", "currency",
-    "swift_code", "iban", "routing_number", "ad_code",
+    "swift_code", "iban", "routing_number", "ad_code", "lut_number", "lut_valid_until",
     "intermediary_bank_name", "intermediary_account_number",
     "intermediary_swift_code", "intermediary_currency",
   ]);
@@ -401,6 +408,39 @@ export default function BankFormPage() {
             <Field label="AD Code" error={errors.ad_code?.message} hint="Optional. Authorised Dealer Code issued by the bank for customs/DGFT use.">
               <Controller name="ad_code" control={control} render={({ field }) =>
                 <input {...field} style={inputStyle(!!errors.ad_code)} placeholder="e.g. 12345678901234" />
+              } />
+            </Field>
+          </Row2>
+        </Section>
+
+        <Section
+          title="LUT (Letter of Undertaking)"
+          description="Optional. Lets an exporter ship without paying IGST. Filed with GST authorities for one financial year (1 Apr – 31 Mar) at a time and must be renewed."
+        >
+          {isEditing && existingBank?.is_lut_expired && (
+            <div style={{
+              background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+              borderRadius: 8, padding: "10px 16px", marginBottom: 16,
+              fontFamily: "var(--font-body)", fontSize: 13,
+            }}>
+              This bank's LUT number has expired. Please update it below.
+            </div>
+          )}
+          <Row2>
+            <Field label="LUT Number" error={errors.lut_number?.message} hint="Optional. The Letter of Undertaking number filed with GST authorities.">
+              <Controller name="lut_number" control={control} render={({ field }) =>
+                <input {...field} style={inputStyle(!!errors.lut_number)} placeholder="e.g. AD070124000123A" />
+              } />
+            </Field>
+            <Field label="LUT Valid Until" error={errors.lut_valid_until?.message} hint="Optional. The expiry date printed on the LUT acknowledgment.">
+              <Controller name="lut_valid_until" control={control} render={({ field }) =>
+                <DatePicker
+                  value={field.value ? dayjs(field.value) : undefined}
+                  onChange={(d) => field.onChange(d ? d.format("YYYY-MM-DD") : null)}
+                  allowClear
+                  style={{ width: "100%" }}
+                  status={errors.lut_valid_until ? "error" : undefined}
+                />
               } />
             </Field>
           </Row2>

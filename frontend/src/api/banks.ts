@@ -25,6 +25,11 @@ export interface Bank {
   swift_code: string;
   iban: string;
   routing_number: string;
+  ad_code: string;
+  // LUT (Letter of Undertaking) — GST filing, renewed once per financial year.
+  lut_number: string;
+  lut_valid_until: string | null;
+  is_lut_expired: boolean;          // read-only, returned by API
   // Intermediary institution (optional; all-or-nothing)
   intermediary_bank_name: string;
   intermediary_account_number: string;
@@ -47,6 +52,9 @@ export interface BankPayload {
   swift_code?: string;
   iban?: string;
   routing_number?: string;
+  ad_code?: string;
+  lut_number?: string;
+  lut_valid_until?: string | null;
   // Intermediary institution (optional; all-or-nothing)
   intermediary_bank_name?: string;
   intermediary_account_number?: string;

@@ -337,8 +337,15 @@ export default function BankListPage() {
                     }}
                   >
                     <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)" }}>
-                      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                        {bank.nickname}
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                          {bank.nickname}
+                        </span>
+                        {bank.is_lut_expired && (
+                          <span className="chip chip-pink" title="LUT number has expired — update it on the edit page.">
+                            LUT Expired
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-light)", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--text-secondary)" }}>

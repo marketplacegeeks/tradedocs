@@ -693,6 +693,15 @@ function Step1({
             maxWidth: 480,
             lineHeight: 2,
           }}>
+            {selectedBank.is_lut_expired && (
+              <div style={{
+                background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+                borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+                fontFamily: "var(--font-body)", fontSize: 12,
+              }}>
+                This bank's LUT number has expired. Update it on the Bank master data page.
+              </div>
+            )}
             <p style={{ ...LABEL, fontWeight: 600, marginBottom: 8 }}>Bank Details Preview (read-only)</p>
             <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--text-secondary)" }}>
               <div><strong>Beneficiary Name:</strong> {selectedBank.beneficiary_name}</div>
@@ -702,6 +711,8 @@ function Step1({
               {selectedBank.swift_code && <div><strong>SWIFT:</strong> {selectedBank.swift_code}</div>}
               {selectedBank.iban && <div><strong>IBAN:</strong> {selectedBank.iban}</div>}
               {selectedBank.routing_number && <div><strong>Routing No:</strong> {selectedBank.routing_number}</div>}
+              {selectedBank.ad_code && <div><strong>AD Code:</strong> {selectedBank.ad_code}</div>}
+              {selectedBank.lut_number && <div><strong>LUT No:</strong> {selectedBank.lut_number}</div>}
             </div>
           </div>
         )}

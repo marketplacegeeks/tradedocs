@@ -137,6 +137,8 @@ class BankFactory(factory.django.DjangoModelFactory):
     swift_code = ""
     iban = ""
     routing_number = ""
+    lut_number = ""
+    lut_valid_until = None
     # Intermediary fields default to empty (optional)
     intermediary_bank_name = ""
     intermediary_account_number = ""

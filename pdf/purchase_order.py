@@ -681,6 +681,10 @@ def generate_purchase_order_pdf_bytes(po) -> bytes:
             bank_lines.append(f"<b>SWIFT Code:</b> {_safe(bank.swift_code)}")
         if bank.iban:
             bank_lines.append(f"<b>IBAN:</b> {_safe(bank.iban)}")
+        if bank.ad_code:
+            bank_lines.append(f"<b>AD Code:</b> {_safe(bank.ad_code)}")
+        if bank.lut_number:
+            bank_lines.append(f"<b>LUT No.:</b> {_safe(bank.lut_number)}")
 
         bank_rows = [[Paragraph(line, style_text)] for line in bank_lines]
         bank_box = Table(bank_rows, colWidths=[180 * mm])

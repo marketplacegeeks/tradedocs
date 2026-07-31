@@ -1,4 +1,5 @@
 import re
+from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -253,6 +254,10 @@ class Bank(models.Model):
     routing_number = models.CharField(max_length=50, blank=True)
     # AD Code is a 14-digit number assigned by the bank to the exporter for DGFT/customs use.
     ad_code = models.CharField(max_length=255, blank=True, help_text="Authorised Dealer Code issued by the bank for customs/DGFT use")
+    # LUT (Letter of Undertaking) lets an exporter ship without paying IGST. It is filed with
+    # GST authorities for one financial year (1 Apr – 31 Mar) at a time and must be renewed.
+    lut_number = models.CharField(max_length=255, blank=True, help_text="Letter of Undertaking number filed with GST authorities")
+    lut_valid_until = models.DateField(null=True, blank=True, help_text="Date the current LUT number expires")
 
     # --- Intermediary Institution (optional; all-or-nothing) ---
     # Used when the receiving bank requires a correspondent bank for a specific currency.
@@ -280,6 +285,13 @@ class Bank(models.Model):
 
     def __str__(self):
         return f"{self.bank_name} – {self.nickname}"
+
+    @property
+    def is_lut_expired(self):
+        """True only if a LUT expiry date is on file and it has passed."""
+        if self.lut_valid_until is None:
+            return False
+        return self.lut_valid_until < date.today()
 
     def clean(self):
         """All four intermediary fields must be filled together or not at all."""

@@ -502,6 +502,10 @@ def build_ci_word_section(document, ci, client_invoice=False, pi=None):
             bank_lines.append(f"<b>SWIFT CODE:</b> {safe(bank.swift_code)}")
         if getattr(bank, "iban", None):
             bank_lines.append(f"<b>IBAN:</b> {safe(bank.iban)}")
+        if getattr(bank, "ad_code", None):
+            bank_lines.append(f"<b>AD CODE:</b> {safe(bank.ad_code)}")
+        if getattr(bank, "lut_number", None):
+            bank_lines.append(f"<b>LUT NO.:</b> {safe(bank.lut_number)}")
         if safe(getattr(bank, "intermediary_bank_name", "")):
             intermediary_currency_code = (
                 safe(getattr(bank.intermediary_currency, "code", ""))

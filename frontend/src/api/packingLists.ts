@@ -154,6 +154,10 @@ export interface BankDetails {
   routing_number: string;
   swift_code: string;
   iban: string;
+  ad_code: string;
+  lut_number: string;
+  lut_valid_until: string | null;
+  is_lut_expired: boolean;
   intermediary_bank_name: string;
   intermediary_account_number: string;
   intermediary_swift_code: string;

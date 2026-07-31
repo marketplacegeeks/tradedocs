@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
@@ -243,6 +245,22 @@ class TestBankModel:
     def test_empty_iban_is_allowed(self):
         bank = BankFactory.build(iban="")
         bank.full_clean(exclude=["bank_country", "currency"])  # optional — should not raise
+
+    def test_lut_expired_when_valid_until_in_past(self):
+        bank = BankFactory.build(
+            lut_number="AD070124000123A", lut_valid_until=datetime.date.today() - datetime.timedelta(days=1)
+        )
+        assert bank.is_lut_expired is True
+
+    def test_lut_not_expired_when_valid_until_in_future(self):
+        bank = BankFactory.build(
+            lut_number="AD070124000123A", lut_valid_until=datetime.date.today() + datetime.timedelta(days=1)
+        )
+        assert bank.is_lut_expired is False
+
+    def test_lut_not_expired_when_no_lut_on_file(self):
+        bank = BankFactory.build(lut_number="", lut_valid_until=None)
+        assert bank.is_lut_expired is False
 
 
 # ---------------------------------------------------------------------------

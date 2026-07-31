@@ -278,6 +278,29 @@ class TestCiSignedCopyUpload:
         assert resp.data["signed_copy_url"] is not None
 
 
+# ---- Bank & Payment tab: AD Code / LUT number -------------------------------
+
+@pytest.mark.django_db
+class TestCommercialInvoiceBankDetails:
+    def test_bank_details_includes_ad_code_and_lut(self):
+        maker = MakerFactory()
+        bank = BankFactory(ad_code="14012345678901", lut_number="AD070124000123A", lut_valid_until="2027-03-31")
+        ci = CommercialInvoiceFactory(bank=bank, created_by=maker)
+        resp = auth_client(maker).get(ci_detail_url(ci.pk))
+        assert resp.status_code == 200
+        assert resp.data["bank_details"]["ad_code"] == "14012345678901"
+        assert resp.data["bank_details"]["lut_number"] == "AD070124000123A"
+        assert resp.data["bank_details"]["lut_valid_until"] == "2027-03-31"
+        assert resp.data["bank_details"]["is_lut_expired"] is False
+
+    def test_bank_details_flags_expired_lut(self):
+        maker = MakerFactory()
+        bank = BankFactory(lut_number="AD070124000123A", lut_valid_until="2020-03-31")
+        ci = CommercialInvoiceFactory(bank=bank, created_by=maker)
+        resp = auth_client(maker).get(ci_detail_url(ci.pk))
+        assert resp.data["bank_details"]["is_lut_expired"] is True
+
+
 # ---- Permission enforcement tests (Phase 3: Security Hardening) -------------
 
 @pytest.mark.django_db

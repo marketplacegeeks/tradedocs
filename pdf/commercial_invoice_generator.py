@@ -823,6 +823,10 @@ def build_ci_story(ci, styles, client_invoice=False, pi=None) -> list:
             bank_lines.append(f"<b>SWIFT CODE:</b> {safe(bank.swift_code)}")
         if getattr(bank, "iban", None):
             bank_lines.append(f"<b>IBAN:</b> {safe(bank.iban)}")
+        if getattr(bank, "ad_code", None):
+            bank_lines.append(f"<b>AD CODE:</b> {safe(bank.ad_code)}")
+        if getattr(bank, "lut_number", None):
+            bank_lines.append(f"<b>LUT NO.:</b> {safe(bank.lut_number)}")
         if safe(getattr(bank, "intermediary_bank_name", "")):
             intermediary_currency_code = (
                 safe(getattr(bank.intermediary_currency, "code", ""))

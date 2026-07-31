@@ -614,6 +614,15 @@ function BankTab({ pl }: { pl: PackingList }) {
   return (
     <div style={CARD}>
       <p style={SECTION_TITLE}>Bank Details</p>
+      {b.is_lut_expired && (
+        <div style={{
+          background: "var(--pastel-pink)", color: "var(--pastel-pink-text)",
+          borderRadius: 8, padding: "10px 16px", marginBottom: 16,
+          fontFamily: "var(--font-body)", fontSize: 13,
+        }}>
+          This bank's LUT number has expired. Update it on the Bank master data page.
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
         <Field label="Beneficiary Name" value={b.beneficiary_name} />
         <Field label="Bank Name" value={b.bank_name} />
@@ -623,6 +632,9 @@ function BankTab({ pl }: { pl: PackingList }) {
         <Field label="IFSC / Routing Number" value={b.routing_number} />
         <Field label="SWIFT Code" value={b.swift_code} />
         <Field label="IBAN" value={b.iban} />
+        <Field label="AD Code" value={b.ad_code} />
+        <Field label="LUT Number" value={b.lut_number} />
+        <Field label="LUT Valid Until" value={b.lut_valid_until} />
       </div>
       {b.intermediary_bank_name && (
         <>

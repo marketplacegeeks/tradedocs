@@ -1297,6 +1297,29 @@ class TestBankEndpoints:
         ids = [item["id"] for item in response.data]
         assert inactive.id in ids
 
+    def test_checker_can_patch_lut_fields(self):
+        bank = BankFactory()
+        client = auth_client(CheckerFactory())
+        response = client.patch(
+            reverse("bank-detail", args=[bank.id]),
+            {"lut_number": "AD070124000123A", "lut_valid_until": "2027-03-31"},
+        )
+        assert response.status_code == 200
+        assert response.data["lut_number"] == "AD070124000123A"
+        assert response.data["lut_valid_until"] == "2027-03-31"
+
+    def test_response_flags_expired_lut(self):
+        bank = BankFactory(lut_number="AD070124000123A", lut_valid_until="2020-03-31")
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("bank-detail", args=[bank.id]))
+        assert response.data["is_lut_expired"] is True
+
+    def test_response_does_not_flag_future_lut_as_expired(self):
+        bank = BankFactory(lut_number="AD070124000123A", lut_valid_until="2099-03-31")
+        client = auth_client(MakerFactory())
+        response = client.get(reverse("bank-detail", args=[bank.id]))
+        assert response.data["is_lut_expired"] is False
+
 
 # ---------------------------------------------------------------------------
 # T&C Template endpoints (FR-07)

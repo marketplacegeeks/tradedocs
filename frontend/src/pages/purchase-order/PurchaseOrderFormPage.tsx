@@ -684,6 +684,11 @@ export default function PurchaseOrderFormPage() {
                   />
                 )}
               />
+              {banks.find((b) => b.id === watch("bank"))?.is_lut_expired && (
+                <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--pastel-pink-text)" }}>
+                  This bank's LUT number has expired.
+                </p>
+              )}
             </div>
             <div>
               <label style={LABEL}>Currency <span style={{ color: "#e53e3e" }}>*</span></label>

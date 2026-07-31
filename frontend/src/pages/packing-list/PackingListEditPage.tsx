@@ -391,6 +391,11 @@ export default function PackingListEditPage() {
             <Select allowClear style={{ width: "100%" }} value={headerForm.bank}
               onChange={(v) => setHeaderForm({ ...headerForm, bank: v })}
               showSearch optionFilterProp="label" options={banks.map((b: any) => ({ value: b.id, label: `${b.bank_name} – ${b.beneficiary_name}` })).sort((a, b) => a.label.localeCompare(b.label))} />
+            {banks.find((b: any) => b.id === headerForm.bank)?.is_lut_expired && (
+              <p style={{ margin: "4px 0 0", fontFamily: "var(--font-body)", fontSize: 11, color: "var(--pastel-pink-text)" }}>
+                This bank's LUT number has expired.
+              </p>
+            )}
           </div>
           <div>
             <label style={LABEL}>PL Date</label>

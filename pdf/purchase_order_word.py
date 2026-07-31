@@ -439,6 +439,10 @@ def generate_po_docx(po) -> io.BytesIO:
             bank_lines.append(f"<b>SWIFT Code:</b> {_safe(bank.swift_code)}")
         if bank.iban:
             bank_lines.append(f"<b>IBAN:</b> {_safe(bank.iban)}")
+        if bank.ad_code:
+            bank_lines.append(f"<b>AD Code:</b> {_safe(bank.ad_code)}")
+        if bank.lut_number:
+            bank_lines.append(f"<b>LUT No.:</b> {_safe(bank.lut_number)}")
 
         build_lined_box(document, bank_lines, bg_hex="F5F5F5")
         document.add_paragraph()
